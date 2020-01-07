@@ -1,0 +1,27 @@
+// Auto-generated code - DO NOT EDIT
+
+{{ $cfg := . }}
+{{ $locales := .Locales }}
+{{ $contentTypes := .ContentTypes }}
+
+package flyout
+
+import (
+	"github.com/foomo/contentful"
+)
+
+{{ range $index , $locale := $locales }}const spaceLocale{{ $locale.Name }} string = "{{ $locale.Code }}"
+{{ end }}
+{{ range $index , $locale := $locales }}{{ if $locale.Default }}const defaultLocale string = spaceLocale{{ $locale.Name }}{{ end }}
+{{ end }}var spaceLocales []string = []string{ {{ range $index , $locale := $locales }}spaceLocale{{ $locale.Name }}, {{ end }} }
+
+type contentfulClient struct {
+	SpaceID string
+	CDAKey  string
+	CPAKey  string
+	CMAKey  string
+	CDA     *contentful.Contentful
+	CPA     *contentful.Contentful
+	CMA     *contentful.Contentful
+	Debug   bool
+}
