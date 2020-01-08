@@ -4,20 +4,20 @@ import (
 	"bytes"
 	"encoding/json"
 	"log"
-	"os"
-	"path"
 	"runtime"
-	"text/template"
 
 	"github.com/foomo/contentful"
 )
 
-type Conf struct {
+// SpaceConf is the space config object passed to the template
+type SpaceConf struct {
+	Filename     string
 	PackageName  string
 	Locales      []Locale
 	ContentTypes []ContentType
 }
 
+// GetLocales retrieves locale definition from Contentful
 func GetLocales(CMA *contentful.Contentful, spaceID *string) (locales []Locale, err error) {
 
 	col, err := CMA.Locales.List(*spaceID).GetAll()
@@ -36,6 +36,7 @@ func GetLocales(CMA *contentful.Contentful, spaceID *string) (locales []Locale, 
 	return
 }
 
+// GetContentTypes retrieves content type definition from Contentful
 func GetContentTypes(CMA *contentful.Contentful, spaceID *string) (contentTypes []ContentType, err error) {
 
 	col := CMA.ContentTypes.List(*spaceID)
@@ -61,39 +62,20 @@ func GetContentTypes(CMA *contentful.Contentful, spaceID *string) (contentTypes 
 	return
 }
 
+// ProcessSpace calls the generators
 func ProcessSpace(packageName string, locales []Locale, contentTypes []ContentType) (err error) {
-	conf := Conf{PackageName: packageName, Locales: locales, ContentTypes: contentTypes}
 	_, filename, _, ok := runtime.Caller(0)
 	if !ok {
 		panic("No caller information")
 	}
+	conf := SpaceConf{Filename: filename, PackageName: packageName, Locales: locales, ContentTypes: contentTypes}
 
-	// VO base generation
-	tmpl, err := template.New(VoBase + TplExt).ParseFiles(path.Dir(filename) + TplDir + VoBase + TplExt)
-	if err != nil {
-		panic(err)
-	}
-
-	f, err := os.Create(path.Dir(filename) + OutDir + VoBase + GoExt)
-	if err != nil {
-		panic(err)
-	}
-	err = tmpl.Execute(f, conf)
+	err = GenerateVo(conf)
 	if err != nil {
 		panic(err)
 	}
 
-	// Lib generation
-	tmpl, err = template.New(VoLib + TplExt).ParseFiles(path.Dir(filename) + TplDir + VoLib + TplExt)
-	if err != nil {
-		panic(err)
-	}
-
-	f, err = os.Create(path.Dir(filename) + OutDir + VoLib + GoExt)
-	if err != nil {
-		panic(err)
-	}
-	err = tmpl.Execute(f, conf)
+	err = GenerateLib(conf)
 	if err != nil {
 		panic(err)
 	}
