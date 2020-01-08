@@ -12,10 +12,11 @@ import (
 	"github.com/foomo/contentful"
 )
 
-type Conf struct { 
-    Locales []Locale
-    ContentTypes []ContentType
-} 
+type Conf struct {
+	PackageName  string
+	Locales      []Locale
+	ContentTypes []ContentType
+}
 
 func GetLocales(CMA *contentful.Contentful, spaceID *string) (locales []Locale, err error) {
 
@@ -60,21 +61,42 @@ func GetContentTypes(CMA *contentful.Contentful, spaceID *string) (contentTypes 
 	return
 }
 
-func ProcessSpace(locales []Locale, contentTypes []ContentType) (err error) {
-	conf := Conf{Locales: locales, ContentTypes: contentTypes}
+func ProcessSpace(packageName string, locales []Locale, contentTypes []ContentType) (err error) {
+	conf := Conf{PackageName: packageName, Locales: locales, ContentTypes: contentTypes}
 	_, filename, _, ok := runtime.Caller(0)
 	if !ok {
 		panic("No caller information")
 	}
 
-	tmpl, err := template.New(VoLib).ParseFiles(path.Dir(filename) + TplDir + VoLib)
+	// VO base generation
+	tmpl, err := template.New(VoBase + TplExt).ParseFiles(path.Dir(filename) + TplDir + VoBase + TplExt)
 	if err != nil {
 		panic(err)
 	}
 
-	err = tmpl.Execute(os.Stdout, conf)
+	f, err := os.Create(path.Dir(filename) + OutDir + VoBase + GoExt)
 	if err != nil {
 		panic(err)
 	}
+	err = tmpl.Execute(f, conf)
+	if err != nil {
+		panic(err)
+	}
+
+	// Lib generation
+	tmpl, err = template.New(VoLib + TplExt).ParseFiles(path.Dir(filename) + TplDir + VoLib + TplExt)
+	if err != nil {
+		panic(err)
+	}
+
+	f, err = os.Create(path.Dir(filename) + OutDir + VoLib + GoExt)
+	if err != nil {
+		panic(err)
+	}
+	err = tmpl.Execute(f, conf)
+	if err != nil {
+		panic(err)
+	}
+
 	return
 }

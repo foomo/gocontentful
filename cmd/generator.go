@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"log"
+	"regexp"
 	"strings"
 
 	"github.com/foomo/contentful"
@@ -10,20 +11,31 @@ import (
 )
 
 func main() {
-	// Get Space ID and CMA Key from cmd line flags
+	// Get parameters from cmd line flags
 	flagSpaceID := flag.String("spaceid", "", "Contentful space ID")
 	flagCMAKey := flag.String("cmakey", "", "Contentful CMA key")
+	flagPackage := flag.String("package", "", "Generated package name")
 	flagContentTypes := flag.String("contenttypes", "", "[Optional] Content type IDs to parse, comma separated")
+
 	flag.Parse()
+
+	if *flagSpaceID == "" || *flagCMAKey == "" {
+		flag.Usage()
+		log.Fatal("Please specify the Contentful space ID and access Key")
+	}
+
+	matched, err := regexp.MatchString(`[a-z].{2,}`, *flagPackage)
+	if !matched {
+		flag.Usage()
+		log.Fatal("Please specify the package name correctly (only small caps letters)")
+	}
+
 	var flagContentTypesSlice []string
 	if *flagContentTypes != "" {
 		flagContentTypesSlice = strings.Split(*flagContentTypes, ",")
 		log.Println("flagConteTypesSlice:", flagContentTypesSlice)
 	}
-	if *flagSpaceID == "" || *flagCMAKey == "" {
-		flag.Usage()
-		log.Fatal("You have to specify the cmd parameters correctly")
-	}
+
 	// Get client
 	CMA := contentful.NewCMA(*flagCMAKey)
 	CMA.Debug = true
@@ -51,7 +63,7 @@ func main() {
 		}
 	}
 
-	err = erm.ProcessSpace(locales, filteredContentTypes)
+	err = erm.ProcessSpace(*flagPackage, locales, filteredContentTypes)
 	if err != nil {
 		log.Fatal("Something went horribly wrong...", err)
 	}
