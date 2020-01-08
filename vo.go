@@ -1,7 +1,5 @@
 package erm
 
-const FieldTypeArray string = "Array"
-
 // Locale VO
 type Locale struct {
 	Name    string `json:"name,omitempty"`
@@ -47,10 +45,11 @@ type ContentTypeFieldItems struct {
 
 // ContentTypeField VO
 type ContentTypeField struct {
-	ID              string                `json:"id,omitempty"`
-	Name            string                `json:"name,omitempty"`
-	Type            string                `json:"type,omitempty"`
+	ID              string                 `json:"id,omitempty"`
+	Name            string                 `json:"name,omitempty"`
+	Type            string                 `json:"type,omitempty"`
 	Items           *ContentTypeFieldItems `json:"items,omitempty"`
+	LinkType        string                 `json:"linkType,omitempty"`
 	ReferencedTypes []string
 }
 

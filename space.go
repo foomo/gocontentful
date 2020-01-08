@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"log"
 	"runtime"
+	"strings"
+	"text/template"
 
 	"github.com/foomo/contentful"
 )
@@ -12,6 +14,7 @@ import (
 // SpaceConf is the space config object passed to the template
 type SpaceConf struct {
 	Filename     string
+	FuncMap      map[string]interface{}
 	PackageName  string
 	Locales      []Locale
 	ContentTypes []ContentType
@@ -68,7 +71,8 @@ func ProcessSpace(packageName string, locales []Locale, contentTypes []ContentTy
 	if !ok {
 		panic("No caller information")
 	}
-	conf := SpaceConf{Filename: filename, PackageName: packageName, Locales: locales, ContentTypes: contentTypes}
+	funcMap := template.FuncMap{"fieldIsReference": fieldIsReference, "firstCap": strings.Title, "mapFieldType": mapFieldType}
+	conf := SpaceConf{Filename: filename, FuncMap: funcMap, PackageName: packageName, Locales: locales, ContentTypes: contentTypes}
 
 	err = GenerateVo(conf)
 	if err != nil {
@@ -81,4 +85,34 @@ func ProcessSpace(packageName string, locales []Locale, contentTypes []ContentTy
 	}
 
 	return
+}
+
+// mapFieldType takes a ContentTypeField from the space model definition
+// and returns a string that matches the type of the map[string] for the VO
+func mapFieldType(field ContentTypeField) string {
+	switch field.Type {
+	case FieldTypeSymbol: // It's a text field
+		return "string"
+	case FieldTypeArray: // It's either a text list or a multiple reference
+		switch field.Items.Type {
+		case FieldItemsTypeSymbol:
+			return "[]string"
+		case FieldItemsTypeLink:
+			return "[]ContentTypeSys"
+		default:
+			return ""
+		}
+	case FieldTypeLink:
+		return "ContentTypeSys"
+	default:
+		return ""
+	}
+	return ""
+}
+
+func fieldIsReference(field ContentTypeField) bool {
+	if (field.Type == FieldTypeArray && field.Items.Type == FieldItemsTypeLink) || (field.Type == FieldTypeLink && field.LinkType == FieldLinkTypeEntry) {
+		return true
+	}
+	return false
 }
