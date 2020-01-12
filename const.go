@@ -18,9 +18,9 @@ const (
 	FieldTypeLink     = "Link"
 	FieldTypeLocation = "Location"
 	FieldTypeNumber   = "Number"
-	FieldTypeObject   = "Object"
+	FieldTypeJSON     = "Object"
 	FieldTypeRichText = "RichText"
-	FieldTypeSymbol   = "Symbol"
+	FieldTypeText     = "Symbol"
 
 	FieldItemsTypeLink   = "Link"
 	FieldItemsTypeSymbol = "Symbol"

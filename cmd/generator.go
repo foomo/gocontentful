@@ -33,7 +33,6 @@ func main() {
 	var flagContentTypesSlice []string
 	if *flagContentTypes != "" {
 		flagContentTypesSlice = strings.Split(*flagContentTypes, ",")
-		log.Println("flagConteTypesSlice:", flagContentTypesSlice)
 	}
 
 	// Get client

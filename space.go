@@ -43,7 +43,6 @@ func GetLocales(CMA *contentful.Contentful, spaceID *string) (locales []Locale, 
 func GetContentTypes(CMA *contentful.Contentful, spaceID *string) (contentTypes []ContentType, err error) {
 
 	col := CMA.ContentTypes.List(*spaceID)
-	//col.Query.Equal("name", "Flyout")
 	_, err = col.GetAll()
 	if err != nil {
 		log.Fatal("Couldn't get locales")
@@ -71,7 +70,22 @@ func ProcessSpace(packageName string, locales []Locale, contentTypes []ContentTy
 	if !ok {
 		panic("No caller information")
 	}
-	funcMap := template.FuncMap{"fieldIsAsset": fieldIsAsset, "fieldIsReference": fieldIsReference, "firstCap": strings.Title, "mapFieldType": mapFieldType}
+	funcMap := template.FuncMap{
+		"firstCap": strings.Title, 
+		"fieldIsAsset": fieldIsAsset, 
+		"fieldIsBoolean": fieldIsBoolean, 
+		"fieldIsDate": fieldIsDate, 
+		"fieldIsInteger": fieldIsInteger, 
+		"fieldIsJSON": fieldIsJSON, 
+		"fieldIsLink": fieldIsLink, 
+		"fieldIsLocation": fieldIsLocation, 
+		"fieldIsNumber": fieldIsNumber, 
+		"fieldIsReference": fieldIsReference, 
+		"fieldIsRichText": fieldIsRichText, 
+		"fieldIsText": fieldIsText, 
+		"fieldIsTextList": fieldIsTextList, 
+		"mapFieldType": mapFieldType,
+	}
 	conf := SpaceConf{Filename: filename, FuncMap: funcMap, PackageName: packageName, Locales: locales, ContentTypes: contentTypes}
 
 	err = GenerateVo(conf)
@@ -87,52 +101,3 @@ func ProcessSpace(packageName string, locales []Locale, contentTypes []ContentTy
 	return
 }
 
-// mapFieldType takes a ContentTypeField from the space model definition
-// and returns a string that matches the type of the map[string] for the VO
-func mapFieldType(contentTypeName string, field ContentTypeField) string {
-	switch field.Type {
-	case FieldTypeArray: // It's either a text list or a multiple reference
-		switch field.Items.Type {
-		case FieldItemsTypeSymbol:
-			return "[]string"
-		case FieldItemsTypeLink:
-			return "[]ContentTypeSys"
-		default:
-			return ""
-		}
-	case FieldTypeBoolean:
-		return "bool"
-	case FieldTypeDate:
-		return "string"
-	case FieldTypeInteger:
-		return "float64"
-	case FieldTypeLink: // A single reference
-		return "ContentTypeSys"
-	case FieldTypeLocation:
-		return "ContentTypeFieldLocation"
-	case FieldTypeNumber: // Floating point
-		return "float64"
-	case FieldTypeObject: // JSON field
-		return "Cf" + firstCap(contentTypeName) + firstCap(field.ID)
-	case FieldTypeRichText:
-		return "interface{}"
-	case FieldTypeSymbol: // It's a text field
-		return "string"
-	default:
-		return ""
-	}
-}
-
-func fieldIsReference(field ContentTypeField) bool {
-	if (field.Type == FieldTypeArray && field.Items.Type == FieldItemsTypeLink && field.Items.LinkType == FieldLinkTypeEntry) || (field.Type == FieldTypeLink && field.LinkType == FieldLinkTypeEntry) {
-		return true
-	}
-	return false
-}
-
-func fieldIsAsset(field ContentTypeField) bool {
-	if (field.Type == FieldTypeArray && field.Items.Type == FieldItemsTypeLink && field.Items.LinkType == FieldLinkTypeAsset) || (field.Type == FieldTypeLink && field.LinkType == FieldLinkTypeAsset) {
-		return true
-	}
-	return false
-}

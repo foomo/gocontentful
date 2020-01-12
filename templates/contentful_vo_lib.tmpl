@@ -3,7 +3,10 @@
 package {{ .PackageName }}
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
+
 	"github.com/foomo/contentful"
 )
 
@@ -44,3 +47,59 @@ func getContentfulClient(cc *contentfulClient) (ccOut *contentfulClient, err err
 	}
 	return cc, nil
 }
+{{ range $index , $contentType := $contentTypes }}
+// ---{{ firstCap $contentType.Sys.ID }} methods---
+
+func newCf{{ firstCap $contentType.Sys.ID }}() (cf{{ firstCap $contentType.Sys.ID }} *Cf{{ firstCap $contentType.Sys.ID }}) {
+	cf{{ firstCap $contentType.Sys.ID }} = &Cf{{ firstCap $contentType.Sys.ID }}{}
+	{{ range $fieldIndex, $field := $contentType.Fields }}cf{{ firstCap $contentType.Sys.ID }}.Fields.{{ firstCap $field.ID }} = make(map[string]{{ mapFieldType $contentType.Sys.ID $field }})
+	{{ end }}return
+}
+
+func (cc *contentfulClient) getAll{{ firstCap $contentType.Sys.ID }}() (vos []*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
+	return cc.getFiltered{{ firstCap $contentType.Sys.ID }}(nil)
+}
+
+func (cc *contentfulClient) getFiltered{{ firstCap $contentType.Sys.ID }}(query *contentful.Query) (vos []*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
+	if cc.CDA == nil {
+		return nil, errors.New("getFiltered{{ firstCap $contentType.Sys.ID }}: No CDA client available")
+	}
+	col := cc.CDA.Entries.List(cc.SpaceID)
+	if query != nil {
+		col.Query = *query
+	}
+	col.Query.ContentType("{{ $contentType.Sys.ID }}").Locale("*").Include(10)
+	col.GetAll()
+	return toCf{{ firstCap $contentType.Sys.ID }}(col)
+}
+
+func toCf{{ firstCap $contentType.Sys.ID }}(col *contentful.Collection) (vos []*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
+	for _, item := range col.Items {
+		var vo Cf{{ firstCap $contentType.Sys.ID }}
+		byteArray, _ := json.Marshal(item)
+		err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&vo)
+		if err != nil {
+			break
+		}
+		vo.Col = col
+		vos = append(vos, &vo)
+	}
+	return vos, err
+}
+
+// Field getters
+{{ range $fieldIndex, $field := $contentType.Fields }}
+{{ if fieldIsText $field }}func (vo *Cf{{ firstCap $contentType.Sys.ID }}) get{{ firstCap $field.ID }}(locale ...string) ({{ $field.ID }} {{ mapFieldType $contentType.Sys.ID $field }}, err error) {
+	var loc string
+	if len(locale) != 0 {
+		loc = locale[0]
+	} else {
+		loc = defaultLocale
+	}
+	if val, ok := vo.Fields.{{ firstCap $field.ID }}[loc]; ok {
+		{{ $field.ID }} = val
+		return
+	}
+	err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: value for locale not found")
+	return
+}{{ end }}{{ end }}{{ end }}

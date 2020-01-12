@@ -8,7 +8,7 @@ import (
 
 // GenerateLib generates the API to access the value objects
 func GenerateLib(conf SpaceConf) (err error) {
-	tmpl, err := template.New(VoLib + TplExt).ParseFiles(path.Dir(conf.Filename) + TplDir + VoLib + TplExt)
+	tmpl, err := template.New(VoLib + TplExt).Funcs(conf.FuncMap).ParseFiles(path.Dir(conf.Filename) + TplDir + VoLib + TplExt)
 	if err != nil {
 		panic(err)
 	}
