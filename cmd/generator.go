@@ -11,6 +11,7 @@ import (
 )
 
 func main() {
+	log.Println("Contentful Entry-Reference Mapping Generator starting...")
 	// Get parameters from cmd line flags
 	flagSpaceID := flag.String("spaceid", "", "Contentful space ID")
 	flagCMAKey := flag.String("cmakey", "", "Contentful CMA key")
@@ -32,24 +33,28 @@ func main() {
 
 	var flagContentTypesSlice []string
 	if *flagContentTypes != "" {
-		flagContentTypesSlice = strings.Split(*flagContentTypes, ",")
+		for _, contentType := range strings.Split(*flagContentTypes, ",") {
+			flagContentTypesSlice = append(flagContentTypesSlice, strings.TrimSpace(contentType))
+		}
 	}
 
 	// Get client
 	CMA := contentful.NewCMA(*flagCMAKey)
-	CMA.Debug = true
+	CMA.Debug = false
 
 	// Get space locales
 	locales, err := erm.GetLocales(CMA, flagSpaceID)
 	if err != nil {
 		log.Fatal("Could not get locales")
 	}
+	log.Println("Locales found:", locales)
 
 	// Get content types
 	contentTypes, err := erm.GetContentTypes(CMA, flagSpaceID)
 	if err != nil {
 		log.Fatal("Could not get locales")
 	}
+	log.Println("Content types found:", len(contentTypes))
 
 	filteredContentTypes := []erm.ContentType{}
 	if len(flagContentTypesSlice) == 0 {
@@ -61,6 +66,7 @@ func main() {
 			}
 		}
 	}
+	log.Println("Filtered Content types:", len(filteredContentTypes))
 
 	err = erm.ProcessSpace(*flagPackage, locales, filteredContentTypes)
 	if err != nil {

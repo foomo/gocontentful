@@ -1,5 +1,31 @@
 package erm
 
+import (
+	"strings"
+	"text/template"
+)
+
+func getFuncMap() template.FuncMap {
+	return template.FuncMap{
+		"firstCap":                 strings.Title,
+		"fieldIsBasic":             fieldIsBasic,
+		"fieldIsAsset":             fieldIsAsset,
+		"fieldIsBoolean":           fieldIsBoolean,
+		"fieldIsDate":              fieldIsDate,
+		"fieldIsInteger":           fieldIsInteger,
+		"fieldIsJSON":              fieldIsJSON,
+		"fieldIsLink":              fieldIsLink,
+		"fieldIsLocation":          fieldIsLocation,
+		"fieldIsMultipleReference": fieldIsMultipleReference,
+		"fieldIsNumber":            fieldIsNumber,
+		"fieldIsReference":         fieldIsReference,
+		"fieldIsRichText":          fieldIsRichText,
+		"fieldIsText":              fieldIsText,
+		"fieldIsTextList":          fieldIsTextList,
+		"mapFieldType":             mapFieldType,
+	}
+}
+
 // mapFieldType takes a ContentTypeField from the space model definition
 // and returns a string that matches the type of the map[string] for the VO
 func mapFieldType(contentTypeName string, field ContentTypeField) string {
@@ -26,7 +52,7 @@ func mapFieldType(contentTypeName string, field ContentTypeField) string {
 	case FieldTypeNumber: // Floating point
 		return "float64"
 	case FieldTypeJSON: // JSON field
-		return "Cf" + firstCap(contentTypeName) + firstCap(field.ID)
+		return "interface{}"
 	case FieldTypeRichText:
 		return "interface{}"
 	case FieldTypeText: // It's a text field
@@ -64,12 +90,16 @@ func fieldIsLocation(field ContentTypeField) bool {
 	return field.Type == FieldTypeLocation
 }
 
+func fieldIsMultipleReference(field ContentTypeField) bool {
+	return field.Type == FieldTypeArray && field.Items.Type == FieldItemsTypeLink && field.Items.LinkType == FieldLinkTypeEntry
+}
+
 func fieldIsNumber(field ContentTypeField) bool {
 	return field.Type == FieldTypeNumber
 }
 
 func fieldIsReference(field ContentTypeField) bool {
-	return (field.Type == FieldTypeArray && field.Items.Type == FieldItemsTypeLink && field.Items.LinkType == FieldLinkTypeEntry) || (field.Type == FieldTypeLink && field.LinkType == FieldLinkTypeEntry)
+	return field.Type == FieldTypeLink && field.LinkType == FieldLinkTypeEntry
 }
 
 func fieldIsRichText(field ContentTypeField) bool {
@@ -84,7 +114,6 @@ func fieldIsTextList(field ContentTypeField) bool {
 	return field.Type == FieldTypeArray && field.Items.Type == FieldItemsTypeSymbol
 }
 
-
-
-
-
+func fieldIsBasic(field ContentTypeField) bool {
+	return field.Type == FieldTypeBoolean || field.Type == FieldTypeInteger || field.Type == FieldTypeJSON || field.Type == FieldTypeLocation || field.Type == FieldTypeNumber || field.Type == FieldTypeRichText || field.Type == FieldTypeText
+}

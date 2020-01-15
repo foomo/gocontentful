@@ -70,10 +70,10 @@ func (cc *contentfulClient) getFiltered{{ firstCap $contentType.Sys.ID }}(query 
 	}
 	col.Query.ContentType("{{ $contentType.Sys.ID }}").Locale("*").Include(10)
 	col.GetAll()
-	return toCf{{ firstCap $contentType.Sys.ID }}(col)
+	return colToCf{{ firstCap $contentType.Sys.ID }}(col)
 }
 
-func toCf{{ firstCap $contentType.Sys.ID }}(col *contentful.Collection) (vos []*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
+func colToCf{{ firstCap $contentType.Sys.ID }}(col *contentful.Collection) (vos []*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
 	for _, item := range col.Items {
 		var vo Cf{{ firstCap $contentType.Sys.ID }}
 		byteArray, _ := json.Marshal(item)
@@ -87,9 +87,20 @@ func toCf{{ firstCap $contentType.Sys.ID }}(col *contentful.Collection) (vos []*
 	return vos, err
 }
 
-// Field getters
+func (ref ContentfulReferencedEntry) toCf{{ firstCap $contentType.Sys.ID }}() (vo *Cf{{ firstCap $contentType.Sys.ID }}, err error) {
+		byteArray, _ := json.Marshal(ref.Entry)
+		err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&vo)
+		if err != nil {
+			return nil, err
+		}
+		vo.Col = ref.Col
+	return vo, nil
+}
+
+// {{ firstCap $contentType.Sys.ID }} Field getters
 {{ range $fieldIndex, $field := $contentType.Fields }}
-{{ if fieldIsText $field }}func (vo *Cf{{ firstCap $contentType.Sys.ID }}) get{{ firstCap $field.ID }}(locale ...string) ({{ $field.ID }} {{ mapFieldType $contentType.Sys.ID $field }}, err error) {
+{{ if fieldIsBasic $field }}
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) get{{ firstCap $field.ID }}(locale ...string) ({{ $field.ID }} {{ mapFieldType $contentType.Sys.ID $field }}, err error) {
 	var loc string
 	if len(locale) != 0 {
 		loc = locale[0]
@@ -100,6 +111,56 @@ func toCf{{ firstCap $contentType.Sys.ID }}(col *contentful.Collection) (vos []*
 		{{ $field.ID }} = val
 		return
 	}
-	err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: value for locale not found")
+	err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: value for field and locale not found")
 	return
-}{{ end }}{{ end }}{{ end }}
+}{{ end }}
+{{ if fieldIsMultipleReference $field }}func (vo *Cf{{ firstCap $contentType.Sys.ID }}) get{{ firstCap $field.ID }}(locale ...string) ({{ $field.ID }} []ContentfulReferencedEntry, err error) {
+	var loc string
+	if len(locale) != 0 {
+		loc = locale[0]
+	} else {
+		loc = defaultLocale
+	}
+	if localized{{ firstCap $field.ID }}, ok := vo.Fields.{{ firstCap $field.ID }}[loc]; ok {
+		for _, eachLocalized{{ firstCap $field.ID }} := range localized{{ firstCap $field.ID }} {
+			includeEntryMap := vo.Col.ToIncludesEntryMap()
+			var referencedEntry *contentful.Entry
+			if ref, ok := includeEntryMap[eachLocalized{{ firstCap $field.ID }}.Sys.ID]; ok {
+				referencedEntry = ref
+			} else {
+				err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: referenced entry not found in includes")
+				return
+			}
+
+			{{ $field.ID }} = append({{ $field.ID }}, ContentfulReferencedEntry{
+				Entry: referencedEntry,
+				Col:   vo.Col,
+			})
+		}
+		return
+	}
+	err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: value for field and locale not found")
+	return
+}{{ end }}
+{{ if fieldIsReference $field }}func (vo *Cf{{ firstCap $contentType.Sys.ID }}) get{{ firstCap $field.ID }}(locale ...string) ({{ $field.ID }} ContentfulReferencedEntry, err error) {
+	var loc string
+	if len(locale) != 0 {
+		loc = locale[0]
+	} else {
+		loc = defaultLocale
+	}
+	if localized{{ firstCap $field.ID }}, ok := vo.Fields.{{ firstCap $field.ID }}[loc]; ok {
+		includeEntryMap := vo.Col.ToIncludesEntryMap()
+		if referencedEntry, ok := includeEntryMap[localized{{ firstCap $field.ID }}.Sys.ID]; ok {
+			{{ $field.ID }}.Entry = referencedEntry
+			{{ $field.ID }}.Col = vo.Col
+			return
+		} 
+		err = errors.New("CfFlyout.get{{ firstCap $field.ID }}: referenced entry not found in includes")
+		return
+	}
+
+	err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: value for field and locale not found")
+	return
+}{{ end }}
+{{ end }}{{ end }}

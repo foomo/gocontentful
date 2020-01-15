@@ -6,7 +6,7 @@ import "github.com/foomo/contentful"
 {{ range $index , $contentType := $contentTypes }}
 // Cf{{ firstCap $contentType.Sys.ID }} is the main VO for this content type
 type Cf{{ firstCap $contentType.Sys.ID }} struct {
-	Sys    CfSys          `json:"sys,omitempty"`
+	Sys    ContentfulSys          `json:"sys,omitempty"`
 	Fields Cf{{ firstCap $contentType.Sys.ID }}Fields `json:"fields,omitempty"`
 	Col    *contentful.Collection
 }

@@ -2,6 +2,8 @@
 {{ $cfg := . }}
 package {{ .PackageName }}
 
+import "github.com/foomo/contentful"
+
 // --- Contentful common types
 
 // ContentTypeSysAttributes VO
@@ -16,8 +18,8 @@ type ContentTypeSys struct {
 	Sys ContentTypeSysAttributes `json:"sys,omitempty"`
 }
 
-// CfSys VO
-type CfSys struct {
+// ContentfulSys VO
+type ContentfulSys struct {
 	ID          string         `json:"id,omitempty"`
 	Type        string         `json:"type,omitempty"`
 	LinkType    string         `json:"linkType,omitempty"`
@@ -32,4 +34,10 @@ type CfSys struct {
 type ContentTypeFieldLocation struct {
 	Lat float64 `json:"lat,omitempty"`
 	Lon float64 `json:"lon,omitempty"`
+}
+
+// ContentfulReferencedEntry VO
+type ContentfulReferencedEntry struct {
+	Entry 	*contentful.Entry
+	Col 	*contentful.Collection
 }

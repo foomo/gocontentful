@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"log"
 	"runtime"
-	"strings"
-	"text/template"
 
 	"github.com/foomo/contentful"
 )
@@ -70,22 +68,7 @@ func ProcessSpace(packageName string, locales []Locale, contentTypes []ContentTy
 	if !ok {
 		panic("No caller information")
 	}
-	funcMap := template.FuncMap{
-		"firstCap": strings.Title, 
-		"fieldIsAsset": fieldIsAsset, 
-		"fieldIsBoolean": fieldIsBoolean, 
-		"fieldIsDate": fieldIsDate, 
-		"fieldIsInteger": fieldIsInteger, 
-		"fieldIsJSON": fieldIsJSON, 
-		"fieldIsLink": fieldIsLink, 
-		"fieldIsLocation": fieldIsLocation, 
-		"fieldIsNumber": fieldIsNumber, 
-		"fieldIsReference": fieldIsReference, 
-		"fieldIsRichText": fieldIsRichText, 
-		"fieldIsText": fieldIsText, 
-		"fieldIsTextList": fieldIsTextList, 
-		"mapFieldType": mapFieldType,
-	}
+	funcMap := getFuncMap()
 	conf := SpaceConf{Filename: filename, FuncMap: funcMap, PackageName: packageName, Locales: locales, ContentTypes: contentTypes}
 
 	err = GenerateVo(conf)
@@ -100,4 +83,3 @@ func ProcessSpace(packageName string, locales []Locale, contentTypes []ContentTy
 
 	return
 }
-

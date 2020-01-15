@@ -19,8 +19,8 @@ type ContentTypeSys struct {
 	Sys ContentTypeSysAttributes `json:"sys,omitempty"`
 }
 
-// CfSys VO
-type CfSys struct {
+// ContentfulSys VO
+type ContentfulSys struct {
 	ID          string         `json:"id,omitempty"`
 	Type        string         `json:"type,omitempty"`
 	LinkType    string         `json:"linkType,omitempty"`
@@ -55,7 +55,7 @@ type ContentTypeField struct {
 
 // ContentType VO
 type ContentType struct {
-	Sys    CfSys              `json:"sys,omitempty"`
+	Sys    ContentfulSys              `json:"sys,omitempty"`
 	Name   string             `json:"name,omitempty"`
 	Fields []ContentTypeField `json:"fields,omitempty"`
 }
