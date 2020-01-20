@@ -20,9 +20,11 @@ func getFuncMap() template.FuncMap {
 		"fieldIsNumber":            fieldIsNumber,
 		"fieldIsReference":         fieldIsReference,
 		"fieldIsRichText":          fieldIsRichText,
+		"fieldIsSymbol":            fieldIsSymbol,
+		"fieldIsSymbolList":        fieldIsSymbolList,
 		"fieldIsText":              fieldIsText,
-		"fieldIsTextList":          fieldIsTextList,
 		"mapFieldType":             mapFieldType,
+		"onlyLetters":              onlyLetters,
 	}
 }
 
@@ -55,6 +57,8 @@ func mapFieldType(contentTypeName string, field ContentTypeField) string {
 		return "interface{}"
 	case FieldTypeRichText:
 		return "interface{}"
+	case FieldTypeSymbol: // It's a text field
+		return "string"
 	case FieldTypeText: // It's a text field
 		return "string"
 	default:
@@ -63,7 +67,7 @@ func mapFieldType(contentTypeName string, field ContentTypeField) string {
 }
 
 func fieldIsAsset(field ContentTypeField) bool {
-	return (field.Type == FieldTypeArray && field.Items.Type == FieldItemsTypeLink && field.Items.LinkType == FieldLinkTypeAsset) || (field.Type == FieldTypeLink && field.LinkType == FieldLinkTypeAsset)
+	return field.Type == FieldTypeLink && field.LinkType == FieldLinkTypeAsset
 }
 
 func fieldIsBoolean(field ContentTypeField) bool {
@@ -90,6 +94,9 @@ func fieldIsLocation(field ContentTypeField) bool {
 	return field.Type == FieldTypeLocation
 }
 
+func fieldIsMultipleAsset(field ContentTypeField) bool {
+	return field.Type == FieldTypeArray && field.Items.Type == FieldItemsTypeLink && field.Items.LinkType == FieldLinkTypeAsset
+}
 func fieldIsMultipleReference(field ContentTypeField) bool {
 	return field.Type == FieldTypeArray && field.Items.Type == FieldItemsTypeLink && field.Items.LinkType == FieldLinkTypeEntry
 }
@@ -106,14 +113,18 @@ func fieldIsRichText(field ContentTypeField) bool {
 	return field.Type == FieldTypeRichText
 }
 
+func fieldIsSymbol(field ContentTypeField) bool {
+	return field.Type == FieldTypeSymbol
+}
+
+func fieldIsSymbolList(field ContentTypeField) bool {
+	return field.Type == FieldTypeArray && field.Items.Type == FieldItemsTypeSymbol
+}
+
 func fieldIsText(field ContentTypeField) bool {
 	return field.Type == FieldTypeText
 }
 
-func fieldIsTextList(field ContentTypeField) bool {
-	return field.Type == FieldTypeArray && field.Items.Type == FieldItemsTypeSymbol
-}
-
 func fieldIsBasic(field ContentTypeField) bool {
-	return field.Type == FieldTypeBoolean || field.Type == FieldTypeInteger || field.Type == FieldTypeJSON || field.Type == FieldTypeLocation || field.Type == FieldTypeNumber || field.Type == FieldTypeRichText || field.Type == FieldTypeText
+	return field.Type == FieldTypeBoolean || field.Type == FieldTypeInteger || field.Type == FieldTypeJSON || field.Type == FieldTypeLocation || field.Type == FieldTypeNumber || field.Type == FieldTypeRichText || field.Type == FieldTypeSymbol || field.Type == FieldTypeText
 }

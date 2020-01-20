@@ -10,10 +10,10 @@ import (
 	"github.com/foomo/contentful"
 )
 
-{{ range $index , $locale := $locales }}const spaceLocale{{ $locale.Name }} string = "{{ $locale.Code }}"
+{{ range $index , $locale := $locales }}const spaceLocale{{ onlyLetters $locale.Name }} string = "{{ $locale.Code }}"
 {{ end }}
-{{ range $index , $locale := $locales }}{{ if $locale.Default }}const defaultLocale string = spaceLocale{{ $locale.Name }}{{ end }}
-{{ end }}var spaceLocales []string = []string{ {{ range $index , $locale := $locales }}spaceLocale{{ $locale.Name }}, {{ end }} }
+{{ range $index , $locale := $locales }}{{ if $locale.Default }}const defaultLocale string = spaceLocale{{ onlyLetters $locale.Name }}{{ end }}
+{{ end }}var spaceLocales []string = []string{ {{ range $index , $locale := $locales }}spaceLocale{{ onlyLetters $locale.Name }}, {{ end }} }
 
 type contentfulClient struct {
 	SpaceID string

@@ -52,7 +52,7 @@ func main() {
 	// Get content types
 	contentTypes, err := erm.GetContentTypes(CMA, flagSpaceID)
 	if err != nil {
-		log.Fatal("Could not get locales")
+		log.Fatal("Could not get content types")
 	}
 	log.Println("Content types found:", len(contentTypes))
 
@@ -72,4 +72,6 @@ func main() {
 	if err != nil {
 		log.Fatal("Something went horribly wrong...", err)
 	}
+	log.Println("ALL DONE!")
+
 }

@@ -20,7 +20,8 @@ const (
 	FieldTypeNumber   = "Number"
 	FieldTypeJSON     = "Object"
 	FieldTypeRichText = "RichText"
-	FieldTypeText     = "Symbol"
+	FieldTypeSymbol     = "Symbol"
+	FieldTypeText     = "Text"
 
 	FieldItemsTypeLink   = "Link"
 	FieldItemsTypeSymbol = "Symbol"
