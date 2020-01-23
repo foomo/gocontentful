@@ -159,11 +159,72 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) get{{ firstCap $field.ID }}(loca
 			{{ $field.ID }}.Col = vo.Col
 			return
 		} 
-		err = errors.New("CfFlyout.get{{ firstCap $field.ID }}: referenced entry not found in includes")
+		err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: referenced entry not found in includes")
 		return
 	}
 
 	err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: value for field and locale not found")
 	return
 }{{ end }}
-{{ end }}{{ end }}
+{{ end }}
+
+// {{ firstCap $contentType.Sys.ID }} Field setters
+{{ range $fieldIndex, $field := $contentType.Fields }}
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) set{{ firstCap $field.ID }}({{ $field.ID }} {{ mapFieldType $contentType.Sys.ID $field }}, locale ...string) (err error) {
+	var loc string
+	if len(locale) != 0 {
+		loc = locale[0]
+	} else {
+		loc = defaultLocale
+	}
+	vo.Fields.{{ firstCap $field.ID }}[loc] = {{ $field.ID }}
+	return
+}
+{{ end }}
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) save(cc *contentfulClient) (err error) {
+	cfEntry := &contentful.Entry{}
+	tmp, errMarshal := json.Marshal(vo)
+	if errMarshal != nil {
+		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} save: Can't marshal JSON from VO")
+	}
+	errUnmarshal := json.Unmarshal(tmp, &cfEntry)
+	if errUnmarshal != nil {
+		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} save: Can't unmarshal JSON into CF entry")
+	}
+
+	err = cc.CMA.Entries.Upsert(cc.SpaceID, cfEntry)
+	if err != nil {
+		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} save: upsert operation failed")
+	}
+	tmp, errMarshal = json.Marshal(cfEntry)
+	if errMarshal != nil {
+		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} save: Can't marshal JSON back from CF entry")
+	}
+	errUnmarshal = json.Unmarshal(tmp, &vo)
+	if errUnmarshal != nil {
+		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} save: Can't unmarshal JSON back into VO")
+	}
+	err = cc.CMA.Entries.Publish(cc.SpaceID, cfEntry)
+	if err != nil {
+		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} save: publish operation failed")
+	}
+	return
+}
+
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) toReference() (refSys ContentTypeSys) {
+	refSys.Sys.ID = vo.Sys.ID
+	refSys.Sys.Type = "Link"
+	refSys.Sys.LinkType = "Entry"
+	return
+}
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) toReferenceArray() (refSysArray []ContentTypeSys) {
+	refSys := ContentTypeSys{}
+	refSys.Sys.ID = vo.Sys.ID
+	refSys.Sys.Type = "Link"
+	refSys.Sys.LinkType = "Entry"
+	refSysArray = append(refSysArray,refSys)
+	return
+}
+
+
+{{ end }}
