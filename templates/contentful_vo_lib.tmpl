@@ -14,7 +14,7 @@ import (
 {{ range $index , $locale := $locales }}{{ if $locale.Default }}const defaultLocale string = spaceLocale{{ onlyLetters $locale.Name }}{{ end }}
 {{ end }}var spaceLocales []string = []string{ {{ range $index , $locale := $locales }}spaceLocale{{ onlyLetters $locale.Name }}, {{ end }} }
 
-type contentfulClient struct {
+type ContentfulClient struct {
 	SpaceID string
 	CDAKey  string
 	CPAKey  string
@@ -25,7 +25,7 @@ type contentfulClient struct {
 	Debug   bool
 }
 
-func getContentfulClient(cc *contentfulClient) (*contentfulClient, error) {
+func GetContentfulClient(cc *ContentfulClient) (*ContentfulClient, error) {
 	if cc.SpaceID == "" {
 		return nil, errors.New("GetContentfulClient: SpaceID cannot be empty")
 	}
@@ -49,7 +49,7 @@ func getContentfulClient(cc *contentfulClient) (*contentfulClient, error) {
 {{ range $index , $contentType := $contentTypes }}
 // ---{{ firstCap $contentType.Sys.ID }} methods---
 
-func newCf{{ firstCap $contentType.Sys.ID }}() (cf{{ firstCap $contentType.Sys.ID }} *Cf{{ firstCap $contentType.Sys.ID }}) {
+func NewCf{{ firstCap $contentType.Sys.ID }}() (cf{{ firstCap $contentType.Sys.ID }} *Cf{{ firstCap $contentType.Sys.ID }}) {
 	cf{{ firstCap $contentType.Sys.ID }} = &Cf{{ firstCap $contentType.Sys.ID }}{}
 	{{ range $fieldIndex, $field := $contentType.Fields }}cf{{ firstCap $contentType.Sys.ID }}.Fields.{{ firstCap $field.ID }} = make(map[string]{{ mapFieldType $contentType.Sys.ID $field }})
 	{{ end }}
@@ -59,11 +59,11 @@ func newCf{{ firstCap $contentType.Sys.ID }}() (cf{{ firstCap $contentType.Sys.I
 	return
 }
 
-func (cc *contentfulClient) getAll{{ firstCap $contentType.Sys.ID }}() (vos []*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
-	return cc.getFiltered{{ firstCap $contentType.Sys.ID }}(nil)
+func (cc *ContentfulClient) GetAll{{ firstCap $contentType.Sys.ID }}() (vos []*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
+	return cc.GetFiltered{{ firstCap $contentType.Sys.ID }}(nil)
 }
 
-func (cc *contentfulClient) getFiltered{{ firstCap $contentType.Sys.ID }}(query *contentful.Query) (vos []*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
+func (cc *ContentfulClient) GetFiltered{{ firstCap $contentType.Sys.ID }}(query *contentful.Query) (vos []*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
 	if cc.CDA == nil {
 		return nil, errors.New("getFiltered{{ firstCap $contentType.Sys.ID }}: No CDA client available")
 	}
@@ -73,10 +73,10 @@ func (cc *contentfulClient) getFiltered{{ firstCap $contentType.Sys.ID }}(query 
 	}
 	col.Query.ContentType("{{ $contentType.Sys.ID }}").Locale("*").Include(10)
 	col.GetAll()
-	return colToCf{{ firstCap $contentType.Sys.ID }}(col)
+	return ColToCf{{ firstCap $contentType.Sys.ID }}(col)
 }
 
-func colToCf{{ firstCap $contentType.Sys.ID }}(col *contentful.Collection) (vos []*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
+func ColToCf{{ firstCap $contentType.Sys.ID }}(col *contentful.Collection) (vos []*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
 	for _, item := range col.Items {
 		var vo Cf{{ firstCap $contentType.Sys.ID }}
 		byteArray, _ := json.Marshal(item)
@@ -90,7 +90,7 @@ func colToCf{{ firstCap $contentType.Sys.ID }}(col *contentful.Collection) (vos 
 	return vos, err
 }
 
-func (ref ContentfulReferencedEntry) toCf{{ firstCap $contentType.Sys.ID }}() (vo *Cf{{ firstCap $contentType.Sys.ID }}, err error) {
+func (ref ContentfulReferencedEntry) ToCf{{ firstCap $contentType.Sys.ID }}() (vo *Cf{{ firstCap $contentType.Sys.ID }}, err error) {
 		byteArray, _ := json.Marshal(ref.Entry)
 		err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&vo)
 		if err != nil {
@@ -103,7 +103,7 @@ func (ref ContentfulReferencedEntry) toCf{{ firstCap $contentType.Sys.ID }}() (v
 // {{ firstCap $contentType.Sys.ID }} Field getters
 {{ range $fieldIndex, $field := $contentType.Fields }}
 {{ if fieldIsBasic $field }}
-func (vo *Cf{{ firstCap $contentType.Sys.ID }}) get{{ firstCap $field.ID }}(locale ...string) ({{ $field.ID }} {{ mapFieldType $contentType.Sys.ID $field }}, err error) {
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) Get{{ firstCap $field.ID }}(locale ...string) ({{ $field.ID }} {{ mapFieldType $contentType.Sys.ID $field }}, err error) {
 	var loc string
 	if len(locale) != 0 {
 		loc = locale[0]
@@ -117,7 +117,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) get{{ firstCap $field.ID }}(loca
 	err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: value for field and locale not found")
 	return
 }{{ end }}
-{{ if fieldIsMultipleReference $field }}func (vo *Cf{{ firstCap $contentType.Sys.ID }}) get{{ firstCap $field.ID }}(locale ...string) ({{ $field.ID }} []ContentfulReferencedEntry, err error) {
+{{ if fieldIsMultipleReference $field }}func (vo *Cf{{ firstCap $contentType.Sys.ID }}) Get{{ firstCap $field.ID }}(locale ...string) ({{ $field.ID }} []ContentfulReferencedEntry, err error) {
 	var loc string
 	if len(locale) != 0 {
 		loc = locale[0]
@@ -145,7 +145,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) get{{ firstCap $field.ID }}(loca
 	err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: value for field and locale not found")
 	return
 }{{ end }}
-{{ if fieldIsReference $field }}func (vo *Cf{{ firstCap $contentType.Sys.ID }}) get{{ firstCap $field.ID }}(locale ...string) ({{ $field.ID }} ContentfulReferencedEntry, err error) {
+{{ if fieldIsReference $field }}func (vo *Cf{{ firstCap $contentType.Sys.ID }}) Get{{ firstCap $field.ID }}(locale ...string) ({{ $field.ID }} ContentfulReferencedEntry, err error) {
 	var loc string
 	if len(locale) != 0 {
 		loc = locale[0]
@@ -170,7 +170,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) get{{ firstCap $field.ID }}(loca
 
 // {{ firstCap $contentType.Sys.ID }} Field setters
 {{ range $fieldIndex, $field := $contentType.Fields }}
-func (vo *Cf{{ firstCap $contentType.Sys.ID }}) set{{ firstCap $field.ID }}({{ $field.ID }} {{ mapFieldType $contentType.Sys.ID $field }}, locale ...string) (err error) {
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) Set{{ firstCap $field.ID }}({{ $field.ID }} {{ mapFieldType $contentType.Sys.ID $field }}, locale ...string) (err error) {
 	var loc string
 	if len(locale) != 0 {
 		loc = locale[0]
@@ -181,7 +181,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) set{{ firstCap $field.ID }}({{ $
 	return
 }
 {{ end }}
-func (vo *Cf{{ firstCap $contentType.Sys.ID }}) save(cc *contentfulClient) (err error) {
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) Save(cc *ContentfulClient) (err error) {
 	cfEntry := &contentful.Entry{}
 	tmp, errMarshal := json.Marshal(vo)
 	if errMarshal != nil {
@@ -211,13 +211,13 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) save(cc *contentfulClient) (err 
 	return
 }
 
-func (vo *Cf{{ firstCap $contentType.Sys.ID }}) toReference() (refSys ContentTypeSys) {
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) ToReference() (refSys ContentTypeSys) {
 	refSys.Sys.ID = vo.Sys.ID
 	refSys.Sys.Type = "Link"
 	refSys.Sys.LinkType = "Entry"
 	return
 }
-func (vo *Cf{{ firstCap $contentType.Sys.ID }}) toReferenceArray() (refSysArray []ContentTypeSys) {
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) ToReferenceArray() (refSysArray []ContentTypeSys) {
 	refSys := ContentTypeSys{}
 	refSys.Sys.ID = vo.Sys.ID
 	refSys.Sys.Type = "Link"
