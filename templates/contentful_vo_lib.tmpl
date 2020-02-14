@@ -5,7 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-
+	"fmt"
 	"github.com/foomo/contentful"
 )
 
@@ -194,7 +194,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) Save(cc *ContentfulClient) (err 
 
 	err = cc.CMA.Entries.Upsert(cc.SpaceID, cfEntry)
 	if err != nil {
-		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} save: upsert operation failed")
+		return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} save: upsert operation failed: %s", err)
 	}
 	tmp, errMarshal = json.Marshal(cfEntry)
 	if errMarshal != nil {

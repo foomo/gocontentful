@@ -23,6 +23,8 @@ type ContentfulSys struct {
 	Type        string         `json:"type,omitempty"`
 	LinkType    string         `json:"linkType,omitempty"`
 	ContentType ContentTypeSys `json:"contentType,omitempty"`
+	Environment ContentTypeSys `json:"environment,omitempty"`
+	Space       ContentTypeSys `json:"space,omitempty"`
 	CreatedAt   string         `json:"createdAt,omitempty"`
 	UpdatedAt   string         `json:"updatedAt,omitempty"`
 	Revision    float64        `json:"revision,omitempty"`
