@@ -17,6 +17,7 @@ func getFuncMap() template.FuncMap {
 		"fieldIsLink":              fieldIsLink,
 		"fieldIsLocation":          fieldIsLocation,
 		"fieldIsMultipleReference": fieldIsMultipleReference,
+		"fieldIsMultipleAsset":     fieldIsMultipleAsset,
 		"fieldIsNumber":            fieldIsNumber,
 		"fieldIsReference":         fieldIsReference,
 		"fieldIsRichText":          fieldIsRichText,
