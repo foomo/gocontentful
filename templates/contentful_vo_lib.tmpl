@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 	"github.com/foomo/contentful"
 )
 
@@ -45,6 +46,60 @@ func GetContentfulClient(cc *ContentfulClient) (*ContentfulClient, error) {
 		cc.CMA.Debug = cc.Debug == true
 	}
 	return cc, nil
+}
+
+func NewAsset(id string, uploadUrl string, imageFileType string, title string, locale ...string) *ContentfulAsset {
+	autoID := fmt.Sprintf("%d", time.Now().UnixNano()/int64(time.Millisecond))
+	if id == "" {
+		id = autoID
+	}
+	if title == "" {
+		title = id
+	}
+	var loc string
+	if len(locale) != 0 {
+		loc = locale[0]
+	} else {
+		loc = defaultLocale
+	}
+	asset := &ContentfulAsset{
+		Sys: &contentful.Sys{
+			ID: id,
+		},
+		Fields: &contentful.FileFields{
+			File: map[string]*contentful.File{
+				loc: &contentful.File{
+					UploadURL:   uploadUrl,
+					ContentType: imageFileType,
+					Name:        id,
+				},
+			},
+			Title: map[string]string{
+				loc: title,
+			},
+		},
+	}
+	return asset
+}
+
+func (asset *ContentfulAsset) UpsertAndProcess(cc *ContentfulClient) error {
+	cAsset := &contentful.Asset{Sys: asset.Sys, Fields: asset.Fields}
+	err := cc.CMA.Assets.Upsert(cc.SpaceID, cAsset)
+	if err != nil {
+		return err
+	}
+	err = cc.CMA.Assets.Process(cc.SpaceID, cAsset)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (asset ContentfulAsset) ToAssetReference() (refSys ContentTypeSys) {
+	refSys.Sys.ID = asset.Sys.ID
+	refSys.Sys.Type = "Link"
+	refSys.Sys.LinkType = "Asset"
+	return
 }
 {{ range $index , $contentType := $contentTypes }}
 // ---{{ firstCap $contentType.Sys.ID }} methods---
@@ -153,13 +208,62 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) Get{{ firstCap $field.ID }}(loca
 		loc = defaultLocale
 	}
 	if localized{{ firstCap $field.ID }}, ok := vo.Fields.{{ firstCap $field.ID }}[loc]; ok {
-		includeEntryMap := vo.Col.ToIncludesEntryMap()
-		if referencedEntry, ok := includeEntryMap[localized{{ firstCap $field.ID }}.Sys.ID]; ok {
+		includesEntryMap := vo.Col.ToIncludesEntryMap()
+		if referencedEntry, ok := includesEntryMap[localized{{ firstCap $field.ID }}.Sys.ID]; ok {
 			{{ $field.ID }}.Entry = referencedEntry
 			{{ $field.ID }}.Col = vo.Col
 			return
 		} 
 		err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: referenced entry not found in includes")
+		return
+	}
+
+	err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: value for field and locale not found")
+	return
+}{{ end }}
+{{ if fieldIsMultipleAsset $field }}func (vo *Cf{{ firstCap $contentType.Sys.ID }}) Get{{ firstCap $field.ID }}(locale ...string) ({{ $field.ID }} []ContentfulReferencedAsset, err error) {
+	var loc string
+	if len(locale) != 0 {
+		loc = locale[0]
+	} else {
+		loc = defaultLocale
+	}
+	if localized{{ firstCap $field.ID }}, ok := vo.Fields.{{ firstCap $field.ID }}[loc]; ok {
+		for _, eachLocalized{{ firstCap $field.ID }} := range localized{{ firstCap $field.ID }} {
+			includeAssetMap := vo.Col.ToIncludesAssetMap()
+			var referencedAsset *contentful.Asset
+			if ref, ok := includeAssetMap[eachLocalized{{ firstCap $field.ID }}.Sys.ID]; ok {
+				referencedAsset = ref
+			} else {
+				err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: referenced entry not found in includes")
+				return
+			}
+
+			{{ $field.ID }} = append({{ $field.ID }}, ContentfulReferencedAsset{
+				Asset: referencedAsset,
+				Col:   vo.Col,
+			})
+		}
+		return
+	}
+	err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: value for field and locale not found")
+	return
+}{{ end }}
+{{ if fieldIsAsset $field }}func (vo *Cf{{ firstCap $contentType.Sys.ID }}) Get{{ firstCap $field.ID }}(locale ...string) ({{ $field.ID }} ContentfulReferencedAsset, err error) {
+	var loc string
+	if len(locale) != 0 {
+		loc = locale[0]
+	} else {
+		loc = defaultLocale
+	}
+	if localized{{ firstCap $field.ID }}, ok := vo.Fields.{{ firstCap $field.ID }}[loc]; ok {
+		includesAssetMap := vo.Col.ToIncludesAssetMap()
+		if referencedAsset, ok := includesAssetMap[localized{{ firstCap $field.ID }}.Sys.ID]; ok {
+			{{ $field.ID }}.Asset = referencedAsset
+			{{ $field.ID }}.Col = vo.Col
+			return
+		} 
+		err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: referenced asset not found in includes")
 		return
 	}
 

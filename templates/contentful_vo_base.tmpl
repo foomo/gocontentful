@@ -43,35 +43,11 @@ type ContentfulReferencedEntry struct {
 	Col 	*contentful.Collection
 }
 
+// ContentfulReferencedAsset VO
+type ContentfulReferencedAsset struct {
+	Asset 	*contentful.IncludeAsset
+	Col 	*contentful.Collection
+}
+
 // ContentfulAsset VO
-type ContentfulAsset struct {
-	Sys    ContentfulSys          `json:"sys,omitempty"`
-	Fields ContentfulAssetFields `json:"fields,omitempty"`
-}
-
-// ContentfulAssetFields VO
-type ContentfulAssetFields struct {
-	Title map[string]string `json:"title,omitempty"`
-	Description map[string]string `json:"description,omitempty"`
-	File map[string]ContentfulAssetFile `json:"file,omitempty"`
-}
-
-// ContentfulAssetFile VO
-type ContentfulAssetFile struct {
-	URL string `json:"url,omitempty"`
-	Details ContentfulAssetFileDetails `json:"details,omitempty"`
-	FileName string `json:"fileName,omitempty"`
-	ContentType string `json:"contentType,omitempty"`
-}
-
-// ContentfulAssetFileDetails VO
-type ContentfulAssetFileDetails struct {
-	Size float64 `json:"size,omitempty"`
-	Image ContentfulImageAssetFileDetails `json:"image,omitempty"`
-}
-
-// ContentfulImageAssetFileDetails VO
-type ContentfulImageAssetFileDetails struct {
-	Width float64 `json:"width,omitempty"`
-	Height float64 `json:"height,omitempty"`
-}
+type ContentfulAsset contentful.Asset
