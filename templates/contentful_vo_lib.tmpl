@@ -139,6 +139,53 @@ func (cc *ContentfulClient) GetFiltered{{ firstCap $contentType.Sys.ID }}(query 
 	return ColToCf{{ firstCap $contentType.Sys.ID }}(col)
 }
 
+func (cc *ContentfulClient) Get{{ firstCap $contentType.Sys.ID }}ByID(id string) (vo *Cf{{ firstCap $contentType.Sys.ID }}, err error) {
+	if cc.CDA == nil {
+		return nil, errors.New("get{{ firstCap $contentType.Sys.ID }}ByID: No CDA client available")
+	}
+	col := cc.CDA.Entries.List(cc.SpaceID)
+	col.Query.ContentType("{{ $contentType.Sys.ID }}").Locale("*").Equal("sys.id",id)
+	col.GetAll()
+	vos, err := ColToCf{{ firstCap $contentType.Sys.ID }}(col)
+	if err != nil {
+		return nil, errors.New("get{{ firstCap $contentType.Sys.ID }}ByID: Error converting to VO")
+	}
+	vo = vos[0]
+	return
+}
+
+func (cc *ContentfulClient) PreviewAll{{ firstCap $contentType.Sys.ID }}() (vos []*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
+	return cc.PreviewFiltered{{ firstCap $contentType.Sys.ID }}(nil)
+}
+
+func (cc *ContentfulClient) PreviewFiltered{{ firstCap $contentType.Sys.ID }}(query *contentful.Query) (vos []*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
+	if cc.CPA == nil {
+		return nil, errors.New("PreviewFiltered{{ firstCap $contentType.Sys.ID }}: No CPA client available")
+	}
+	col := cc.CPA.Entries.List(cc.SpaceID)
+	if query != nil {
+		col.Query = *query
+	}
+	col.Query.ContentType("{{ $contentType.Sys.ID }}").Locale("*").Include(10)
+	col.GetAll()
+	return ColToCf{{ firstCap $contentType.Sys.ID }}(col)
+}
+
+func (cc *ContentfulClient) Preview{{ firstCap $contentType.Sys.ID }}ByID(id string) (vo *Cf{{ firstCap $contentType.Sys.ID }}, err error) {
+	if cc.CPA == nil {
+		return nil, errors.New("Preview{{ firstCap $contentType.Sys.ID }}ByID: No CDA client available")
+	}
+	col := cc.CPA.Entries.List(cc.SpaceID)
+	col.Query.ContentType("{{ $contentType.Sys.ID }}").Locale("*").Equal("sys.id",id)
+	col.GetAll()
+	vos, err := ColToCf{{ firstCap $contentType.Sys.ID }}(col)
+	if err != nil {
+		return nil, errors.New("Preview{{ firstCap $contentType.Sys.ID }}ByID: Error converting to VO")
+	}
+	vo = vos[0]
+	return
+}
+
 func ColToCf{{ firstCap $contentType.Sys.ID }}(col *contentful.Collection) (vos []*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
 	for _, item := range col.Items {
 		var vo Cf{{ firstCap $contentType.Sys.ID }}
