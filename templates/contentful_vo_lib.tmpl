@@ -15,38 +15,46 @@ import (
 {{ range $index , $locale := $locales }}{{ if $locale.Default }}const defaultLocale string = spaceLocale{{ onlyLetters $locale.Name }}{{ end }}
 {{ end }}var spaceLocales []string = []string{ {{ range $index , $locale := $locales }}spaceLocale{{ onlyLetters $locale.Name }}, {{ end }} }
 
-type ContentfulClient struct {
-	SpaceID string
+type ContentfulKeys struct {
 	CDAKey  string
 	CPAKey  string
 	CMAKey  string
+}
+type ContentfulClient struct {
+	SpaceID string
 	CDA     *contentful.Contentful
 	CPA     *contentful.Contentful
 	CMA     *contentful.Contentful
 	Debug   bool
 }
 
-func GetContentfulClient(cc *ContentfulClient) (*ContentfulClient, error) {
-	if cc.SpaceID == "" {
-		return nil, errors.New("GetContentfulClient: SpaceID cannot be empty")
+func NewContentfulClient(spaceID string, ck *ContentfulKeys, debug bool) (*ContentfulClient, error) {
+	cc := &ContentfulClient{}
+	if spaceID == "" {
+		return nil, errors.New("NewContentfulClient: SpaceID cannot be empty")
 	}
-	if cc.CDAKey == "" && cc.CPAKey == "" && cc.CMAKey == "" {
-		return nil, errors.New("GetContentfulClient: You must provide at least one API Key")
+	cc.SpaceID = spaceID
+	if ck == nil {
+		return nil, errors.New("NewContentfulClient: Please provide at least one API key")
 	}
-	if cc.CDAKey != "" {
-		cc.CDA = contentful.NewCDA(cc.CDAKey)
-		cc.CDA.Debug = cc.Debug == true
+	if ck.CDAKey == "" && ck.CPAKey == "" && ck.CMAKey == "" {
+		return nil, errors.New("NewContentfulClient: Please provide at least one API Key")
 	}
-	if cc.CPAKey != "" {
-		cc.CPA = contentful.NewCPA(cc.CPAKey)
-		cc.CPA.Debug = cc.Debug == true
+	if ck.CDAKey != "" {
+		cc.CDA = contentful.NewCDA(ck.CDAKey)
+		cc.CDA.Debug = debug
 	}
-	if cc.CMAKey != "" {
-		cc.CMA = contentful.NewCMA(cc.CMAKey)
-		cc.CMA.Debug = cc.Debug == true
+	if ck.CPAKey != "" {
+		cc.CPA = contentful.NewCPA(ck.CPAKey)
+		cc.CPA.Debug = debug
+	}
+	if ck.CMAKey != "" {
+		cc.CMA = contentful.NewCMA(ck.CMAKey)
+		cc.CMA.Debug = debug
 	}
 	return cc, nil
 }
+
 
 func NewAsset(id string, uploadUrl string, imageFileType string, title string, locale ...string) *ContentfulAsset {
 	autoID := fmt.Sprintf("%d", time.Now().UnixNano()/int64(time.Millisecond))
