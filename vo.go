@@ -2,9 +2,10 @@ package erm
 
 // Locale VO
 type Locale struct {
-	Name    string `json:"name,omitempty"`
-	Code    string `json:"code,omitempty"`
-	Default bool   `json:"default,omitempty"`
+	Name         string `json:"name,omitempty"`
+	Code         string `json:"code,omitempty"`
+	FallbackCode string `json:"fallbackCode,omitempty"`
+	Default      bool   `json:"default,omitempty"`
 }
 
 // ContentTypeSysAttributes VO
@@ -55,7 +56,7 @@ type ContentTypeField struct {
 
 // ContentType VO
 type ContentType struct {
-	Sys    ContentfulSys              `json:"sys,omitempty"`
+	Sys    ContentfulSys      `json:"sys,omitempty"`
 	Name   string             `json:"name,omitempty"`
 	Fields []ContentTypeField `json:"fields,omitempty"`
 }

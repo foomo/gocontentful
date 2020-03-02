@@ -14,6 +14,7 @@ import (
 {{ end }}
 {{ range $index , $locale := $locales }}{{ if $locale.Default }}const defaultLocale string = spaceLocale{{ onlyLetters $locale.Name }}{{ end }}
 {{ end }}var spaceLocales []string = []string{ {{ range $index , $locale := $locales }}spaceLocale{{ onlyLetters $locale.Name }}, {{ end }} }
+var localeFallback = map[string]string{ {{ range $index, $locale := $locales }}{{if $locale.FallbackCode}} spaceLocale{{ onlyLetters $locale.Name }}: {{ range $indexSearch, $localeSearch := $locales }}{{ if eq $localeSearch.Code $locale.FallbackCode}}spaceLocale{{ onlyLetters $localeSearch.Name }}{{end}}{{end}}, {{ end }}{{ end }}}
 
 type ContentfulKeys struct {
 	CDAKey  string
@@ -109,7 +110,12 @@ func (asset ContentfulAsset) ToAssetReference() (refSys ContentTypeSys) {
 	refSys.Sys.LinkType = "Asset"
 	return
 }
+
+func (ref ContentfulReferencedEntry) ContentType() (contentType string) {
+	return ref.Entry.Sys.ContentType.Sys.ID
+}
 {{ range $index , $contentType := $contentTypes }}
+
 // ---{{ firstCap $contentType.Sys.ID }} methods---
 
 func NewCf{{ firstCap $contentType.Sys.ID }}() (cf{{ firstCap $contentType.Sys.ID }} *Cf{{ firstCap $contentType.Sys.ID }}) {
@@ -220,11 +226,18 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) Get{{ firstCap $field.ID }}(loca
 	} else {
 		loc = defaultLocale
 	}
-	if val, ok := vo.Fields.{{ firstCap $field.ID }}[loc]; ok {
-		{{ $field.ID }} = val
-		return
+	if _, ok := vo.Fields.{{ firstCap $field.ID }}[loc]; !ok {
+		if _, ok := localeFallback[loc]; !ok {
+			err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: not found, no fallback locale available")
+			return
+		}
+		loc = localeFallback[loc]
+		if _, ok := vo.Fields.{{ firstCap $field.ID }}[loc]; !ok {
+			err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: not found, no fallback value available")
+			return
+		}
 	}
-	err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: value for field and locale not found")
+	{{ $field.ID }} = vo.Fields.{{ firstCap $field.ID }}[loc]
 	return
 }{{ end }}
 {{ if fieldIsMultipleReference $field }}func (vo *Cf{{ firstCap $contentType.Sys.ID }}) Get{{ firstCap $field.ID }}(locale ...string) ({{ $field.ID }} []ContentfulReferencedEntry, err error) {
@@ -234,25 +247,32 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) Get{{ firstCap $field.ID }}(loca
 	} else {
 		loc = defaultLocale
 	}
-	if localized{{ firstCap $field.ID }}, ok := vo.Fields.{{ firstCap $field.ID }}[loc]; ok {
-		for _, eachLocalized{{ firstCap $field.ID }} := range localized{{ firstCap $field.ID }} {
-			includeEntryMap := vo.Col.ToIncludesEntryMap()
-			var referencedEntry *contentful.Entry
-			if ref, ok := includeEntryMap[eachLocalized{{ firstCap $field.ID }}.Sys.ID]; ok {
-				referencedEntry = ref
-			} else {
-				err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: referenced entry not found in includes")
-				return
-			}
-
-			{{ $field.ID }} = append({{ $field.ID }}, ContentfulReferencedEntry{
-				Entry: referencedEntry,
-				Col:   vo.Col,
-			})
+	if _, ok := vo.Fields.{{ firstCap $field.ID }}[loc]; !ok {
+		if _, ok := localeFallback[loc]; !ok {
+			err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: not found, no fallback locale available")
+			return
 		}
-		return
+		loc = localeFallback[loc]
+		if _, ok := vo.Fields.{{ firstCap $field.ID }}[loc]; !ok {
+			err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: not found, no fallback value available")
+			return
+		}
 	}
-	err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: value for field and locale not found")
+	for _, eachLocalized{{ firstCap $field.ID }} := range vo.Fields.{{ firstCap $field.ID }}[loc] {
+		includeEntryMap := vo.Col.ToIncludesEntryMap()
+		var referencedEntry *contentful.Entry
+		if ref, ok := includeEntryMap[eachLocalized{{ firstCap $field.ID }}.Sys.ID]; ok {
+			referencedEntry = ref
+		} else {
+			err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: referenced entry not found in includes")
+			return
+		}
+
+		{{ $field.ID }} = append({{ $field.ID }}, ContentfulReferencedEntry{
+			Entry: referencedEntry,
+			Col:   vo.Col,
+		})
+	}
 	return
 }{{ end }}
 {{ if fieldIsReference $field }}func (vo *Cf{{ firstCap $contentType.Sys.ID }}) Get{{ firstCap $field.ID }}(locale ...string) ({{ $field.ID }} ContentfulReferencedEntry, err error) {
@@ -262,18 +282,25 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) Get{{ firstCap $field.ID }}(loca
 	} else {
 		loc = defaultLocale
 	}
-	if localized{{ firstCap $field.ID }}, ok := vo.Fields.{{ firstCap $field.ID }}[loc]; ok {
-		includesEntryMap := vo.Col.ToIncludesEntryMap()
-		if referencedEntry, ok := includesEntryMap[localized{{ firstCap $field.ID }}.Sys.ID]; ok {
-			{{ $field.ID }}.Entry = referencedEntry
-			{{ $field.ID }}.Col = vo.Col
+	if _, ok := vo.Fields.{{ firstCap $field.ID }}[loc]; !ok {
+		if _, ok := localeFallback[loc]; !ok {
+			err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: not found, no fallback locale available")
 			return
-		} 
-		err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: referenced entry not found in includes")
-		return
+		}
+		loc = localeFallback[loc]
+		if _, ok := vo.Fields.{{ firstCap $field.ID }}[loc]; !ok {
+			err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: not found, no fallback value available")
+			return
+		}
 	}
-
-	err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: value for field and locale not found")
+	localized{{ firstCap $field.ID }} := vo.Fields.{{ firstCap $field.ID }}[loc]
+	includesEntryMap := vo.Col.ToIncludesEntryMap()
+	if referencedEntry, ok := includesEntryMap[localized{{ firstCap $field.ID }}.Sys.ID]; ok {
+		{{ $field.ID }}.Entry = referencedEntry
+		{{ $field.ID }}.Col = vo.Col
+		return
+	} 
+	err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: referenced entry not found in includes")
 	return
 }{{ end }}
 {{ if fieldIsMultipleAsset $field }}func (vo *Cf{{ firstCap $contentType.Sys.ID }}) Get{{ firstCap $field.ID }}(locale ...string) ({{ $field.ID }} []ContentfulReferencedAsset, err error) {
@@ -283,25 +310,32 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) Get{{ firstCap $field.ID }}(loca
 	} else {
 		loc = defaultLocale
 	}
-	if localized{{ firstCap $field.ID }}, ok := vo.Fields.{{ firstCap $field.ID }}[loc]; ok {
-		for _, eachLocalized{{ firstCap $field.ID }} := range localized{{ firstCap $field.ID }} {
-			includeAssetMap := vo.Col.ToIncludesAssetMap()
-			var referencedAsset *contentful.Asset
-			if ref, ok := includeAssetMap[eachLocalized{{ firstCap $field.ID }}.Sys.ID]; ok {
-				referencedAsset = ref
-			} else {
-				err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: referenced entry not found in includes")
-				return
-			}
-
-			{{ $field.ID }} = append({{ $field.ID }}, ContentfulReferencedAsset{
-				Asset: referencedAsset,
-				Col:   vo.Col,
-			})
+	if _, ok := vo.Fields.{{ firstCap $field.ID }}[loc]; !ok {
+		if _, ok := localeFallback[loc]; !ok {
+			err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: not found, no fallback locale available")
+			return
 		}
-		return
+		loc = localeFallback[loc]
+		if _, ok := vo.Fields.{{ firstCap $field.ID }}[loc]; !ok {
+			err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: not found, no fallback value available")
+			return
+		}
 	}
-	err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: value for field and locale not found")
+	for _, eachLocalized{{ firstCap $field.ID }} := range vo.Fields.{{ firstCap $field.ID }}[loc] {
+		includeAssetMap := vo.Col.ToIncludesAssetMap()
+		var referencedAsset *contentful.Asset
+		if ref, ok := includeAssetMap[eachLocalized{{ firstCap $field.ID }}.Sys.ID]; ok {
+			referencedAsset = ref
+		} else {
+			err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: referenced entry not found in includes")
+			return
+		}
+
+		{{ $field.ID }} = append({{ $field.ID }}, ContentfulReferencedAsset{
+			Asset: referencedAsset,
+			Col:   vo.Col,
+		})
+	}
 	return
 }{{ end }}
 {{ if fieldIsAsset $field }}func (vo *Cf{{ firstCap $contentType.Sys.ID }}) Get{{ firstCap $field.ID }}(locale ...string) ({{ $field.ID }} ContentfulReferencedAsset, err error) {
@@ -311,18 +345,25 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) Get{{ firstCap $field.ID }}(loca
 	} else {
 		loc = defaultLocale
 	}
-	if localized{{ firstCap $field.ID }}, ok := vo.Fields.{{ firstCap $field.ID }}[loc]; ok {
-		includesAssetMap := vo.Col.ToIncludesAssetMap()
-		if referencedAsset, ok := includesAssetMap[localized{{ firstCap $field.ID }}.Sys.ID]; ok {
-			{{ $field.ID }}.Asset = referencedAsset
-			{{ $field.ID }}.Col = vo.Col
+	if _, ok := vo.Fields.{{ firstCap $field.ID }}[loc]; !ok {
+		if _, ok := localeFallback[loc]; !ok {
+			err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: not found, no fallback locale available")
 			return
-		} 
-		err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: referenced asset not found in includes")
-		return
+		}
+		loc = localeFallback[loc]
+		if _, ok := vo.Fields.{{ firstCap $field.ID }}[loc]; !ok {
+			err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: not found, no fallback value available")
+			return
+		}
 	}
-
-	err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: value for field and locale not found")
+	localized{{ firstCap $field.ID }} := vo.Fields.{{ firstCap $field.ID }}[loc]
+	includesAssetMap := vo.Col.ToIncludesAssetMap()
+	if referencedAsset, ok := includesAssetMap[localized{{ firstCap $field.ID }}.Sys.ID]; ok {
+		{{ $field.ID }}.Asset = referencedAsset
+		{{ $field.ID }}.Col = vo.Col
+		return
+	} 
+	err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: referenced asset not found in includes")
 	return
 }{{ end }}
 {{ end }}
