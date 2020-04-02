@@ -228,12 +228,12 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) Get{{ firstCap $field.ID }}(loca
 	}
 	if _, ok := vo.Fields.{{ firstCap $field.ID }}[loc]; !ok {
 		if _, ok := localeFallback[loc]; !ok {
-			err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: not found, no fallback locale available")
+			err = errors.New(fmt.Sprintf("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: not found, no fallback locale available (%s)",vo.Sys.ID))
 			return
 		}
 		loc = localeFallback[loc]
 		if _, ok := vo.Fields.{{ firstCap $field.ID }}[loc]; !ok {
-			err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: not found, no fallback value available")
+			err = errors.New(fmt.Sprintf("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: not found, no fallback value available (%s)",vo.Sys.ID))
 			return
 		}
 	}
@@ -249,12 +249,12 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) Get{{ firstCap $field.ID }}(loca
 	}
 	if _, ok := vo.Fields.{{ firstCap $field.ID }}[loc]; !ok {
 		if _, ok := localeFallback[loc]; !ok {
-			err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: not found, no fallback locale available")
+			err = errors.New(fmt.Sprintf("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: not found, no fallback locale available (%s)",vo.Sys.ID))
 			return
 		}
 		loc = localeFallback[loc]
 		if _, ok := vo.Fields.{{ firstCap $field.ID }}[loc]; !ok {
-			err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: not found, no fallback value available")
+			err = errors.New(fmt.Sprintf("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: not found, no fallback value available (%s)",vo.Sys.ID))
 			return
 		}
 	}
@@ -284,12 +284,12 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) Get{{ firstCap $field.ID }}(loca
 	}
 	if _, ok := vo.Fields.{{ firstCap $field.ID }}[loc]; !ok {
 		if _, ok := localeFallback[loc]; !ok {
-			err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: not found, no fallback locale available")
+			err = errors.New(fmt.Sprintf("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: not found, no fallback locale available (%s)",vo.Sys.ID))
 			return
 		}
 		loc = localeFallback[loc]
 		if _, ok := vo.Fields.{{ firstCap $field.ID }}[loc]; !ok {
-			err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: not found, no fallback value available")
+			err = errors.New(fmt.Sprintf("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: not found, no fallback value available (%s)",vo.Sys.ID))
 			return
 		}
 	}
@@ -312,12 +312,12 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) Get{{ firstCap $field.ID }}(loca
 	}
 	if _, ok := vo.Fields.{{ firstCap $field.ID }}[loc]; !ok {
 		if _, ok := localeFallback[loc]; !ok {
-			err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: not found, no fallback locale available")
+			err = errors.New(fmt.Sprintf("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: not found, no fallback locale available (%s)",vo.Sys.ID))
 			return
 		}
 		loc = localeFallback[loc]
 		if _, ok := vo.Fields.{{ firstCap $field.ID }}[loc]; !ok {
-			err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: not found, no fallback value available")
+			err = errors.New(fmt.Sprintf("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: not found, no fallback value available (%s)",vo.Sys.ID))
 			return
 		}
 	}
@@ -347,12 +347,12 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) Get{{ firstCap $field.ID }}(loca
 	}
 	if _, ok := vo.Fields.{{ firstCap $field.ID }}[loc]; !ok {
 		if _, ok := localeFallback[loc]; !ok {
-			err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: not found, no fallback locale available")
+			err = errors.New(fmt.Sprintf("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: not found, no fallback locale available (%s)",vo.Sys.ID))
 			return
 		}
 		loc = localeFallback[loc]
 		if _, ok := vo.Fields.{{ firstCap $field.ID }}[loc]; !ok {
-			err = errors.New("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: not found, no fallback value available")
+			err = errors.New(fmt.Sprintf("Cf{{ firstCap $contentType.Sys.ID }}.get{{ firstCap $field.ID }}: not found, no fallback value available (%s)",vo.Sys.ID))
 			return
 		}
 	}
