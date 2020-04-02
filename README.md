@@ -6,6 +6,24 @@ A Contentful Entry-Reference Mapping code generator for Go. Initial features:
 - CDA, CPA, CMA support for CRUD operations
 - Automatic management/resolution of references
 
+How to run and generate the library files
+-----------------------------------------
+
+Let's assume you want to generate a package named "people" and manipulate entries of content type ID "person". From the main directory run this:
+
+`go run cmd/generator.go -spaceid=YOUR_SPACE_ID -cmakey=YOUR_MANAGEMENT_KEY -package=people -contenttypes=person`
+
+The script will scan the space, download locales and content types and create three files inside the "generated" directory:
+
+<pre><code>generated
+|-contentful_vo_base.go
+|-contentful_vo_lib.go
+|-contentful_vo.go</code></pre>
+
+Copy these files into a subdirectory of your project and import the "people" package. 
+
+_Note: Do NOT modify these files! If you change the content model in Contentful you will need to run the generator again and overwrite the files._
+
 Current function set
 ---------------------
 
