@@ -1,7 +1,6 @@
 package erm
 
 import (
-	"fmt"
 	"strings"
 	"text/template"
 )
@@ -147,7 +146,6 @@ func fieldIsText(field ContentTypeField) bool {
 }
 
 func fieldIsBasic(field ContentTypeField) bool {
-	fmt.Println(field.Name, fieldIsSymbolList(field) || fieldIsBoolean(field) || fieldIsInteger(field) || fieldIsNumber(field) || fieldIsSymbol(field) || fieldIsText(field) || fieldIsDate(field))
 	return fieldIsSymbolList(field) || fieldIsBoolean(field) || fieldIsInteger(field) || fieldIsNumber(field) || fieldIsSymbol(field) || fieldIsText(field) || fieldIsDate(field)
 }
 func fieldIsComplex(field ContentTypeField) bool {
