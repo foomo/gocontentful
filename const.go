@@ -9,7 +9,6 @@ const (
 	VoLib   = "contentful_vo_lib"
 	VoBase  = "contentful_vo_base"
 	VoSpace = "contentful_vo"
-	VoJSON  = "contentful_vo_json"
 
 	FieldTypeArray    = "Array"
 	FieldTypeBoolean  = "Boolean"
@@ -20,7 +19,7 @@ const (
 	FieldTypeNumber   = "Number"
 	FieldTypeJSON     = "Object"
 	FieldTypeRichText = "RichText"
-	FieldTypeSymbol     = "Symbol"
+	FieldTypeSymbol   = "Symbol"
 	FieldTypeText     = "Text"
 
 	FieldItemsTypeLink   = "Link"

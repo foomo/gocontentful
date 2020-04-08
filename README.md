@@ -11,11 +11,11 @@ How to run and generate the library files
 
 Let's assume you want to generate a package named "people" and manipulate entries of content type ID "person". From the main directory run this:
 
-`go run cmd/generator.go -spaceid=YOUR_SPACE_ID -cmakey=YOUR_MANAGEMENT_KEY -package=people -contenttypes=person`
+`go run cmd/contentfulerm.go -spaceid=YOUR_SPACE_ID -cmakey=YOUR_MANAGEMENT_KEY -package=people -contenttypes=person`
 
-The script will scan the space, download locales and content types and create three files inside the "generated" directory:
+The script will scan the space, download locales and content types and create three files in a directory named after the package inside the "generated" directory:
 
-<pre><code>generated
+<pre><code>generated/people
 |-contentful_vo_base.go
 |-contentful_vo_lib.go
 |-contentful_vo.go</code></pre>
@@ -80,9 +80,9 @@ Converts a referenced entry to the specified value object. See the ContentType()
 
 Field getters are named after the field ID in Contentful and return the proper type. For example, if the Person content type has a Symbol (short text) field named 'Name', this will be the getter:
 
-(vo *CfPerson) **GetName**(locale ...string) (name string, err error) 
+(vo *CfPerson) **Name**(locale ...string) (string, error) 
 
-The locale parameter is optional and if not passed, the function will return the value for the default locale of the space. If the locale is specified and a value doesn't exist, the function will return the value for the default locale if that's specified as a fallback locale in the space definition in Contentful, otherwise will return an error.
+The locale parameter is optional and if not passed, the function will return the value for the default locale of the space. If the locale is specified and it's not available for the space, an error is returned. If the locale is valid but a value doesn't exist for the field and locale, the function will return the value for the default locale if that's specified as a fallback locale in the space definition in Contentful, otherwise will return an error.
 
 Possible return types are:
 
@@ -90,11 +90,11 @@ Possible return types are:
 - _[]string_ for fields of type List
 - _float64_ for fields of type Integer or Number
 - _bool_ for fields of type Boolean
-- _ContentTypeSys_ for single reference fields
-- _[]ContentTypeSys_ for multiple reference fields
-- _ContentTypeFieldLocation_ for fields of type Location
-- interface{} for fields of type Object or RichText
-	
+- _*ContentTypeSys_ for single reference fields
+- _[]*ContentTypeSys_ for multiple reference fields
+- _*ContentTypeFieldLocation_ for fields of type Location
+- *interface{} for fields of type Object or RichText
+
 ---
 
 **FIELD SETTERS**

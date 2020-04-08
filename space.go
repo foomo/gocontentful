@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"log"
+	"os"
+	"path"
 	"runtime"
 
 	"github.com/foomo/contentful"
@@ -43,7 +45,7 @@ func GetContentTypes(CMA *contentful.Contentful, spaceID *string) (contentTypes 
 	col := CMA.ContentTypes.List(*spaceID)
 	_, err = col.GetAll()
 	if err != nil {
-		log.Fatal("Couldn't get locales")
+		log.Fatal("Couldn't get content types")
 	}
 	for _, item := range col.Items {
 		var contentType ContentType
@@ -51,11 +53,6 @@ func GetContentTypes(CMA *contentful.Contentful, spaceID *string) (contentTypes 
 		err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&contentType)
 		if err != nil {
 			break
-		}
-		for _, field := range contentType.Fields {
-			if (field.Type == FieldTypeArray) && field.Items != nil && field.Items.Validations != nil {
-
-			}
 		}
 		contentTypes = append(contentTypes, contentType)
 	}
@@ -71,6 +68,13 @@ func ProcessSpace(packageName string, locales []Locale, contentTypes []ContentTy
 	funcMap := getFuncMap()
 	conf := SpaceConf{Filename: filename, FuncMap: funcMap, PackageName: packageName, Locales: locales, ContentTypes: contentTypes}
 
+	pathDir := path.Dir(conf.Filename) + OutDir + conf.PackageName
+	if _, err := os.Stat(pathDir); os.IsNotExist(err) {
+		os.Mkdir(pathDir, 0700)
+	}
+	if err != nil {
+		panic(err)
+	}
 	err = GenerateVo(conf)
 	if err != nil {
 		panic(err)

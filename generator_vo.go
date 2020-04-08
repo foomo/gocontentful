@@ -14,7 +14,7 @@ func GenerateVo(conf SpaceConf) (err error) {
 		panic(err)
 	}
 
-	f, err := os.Create(path.Dir(conf.Filename) + OutDir + VoBase + GoExt)
+	f, err := os.Create(path.Dir(conf.Filename) + OutDir + conf.PackageName + "/" + VoBase + GoExt)
 	if err != nil {
 		panic(err)
 	}
@@ -30,7 +30,7 @@ func GenerateVo(conf SpaceConf) (err error) {
 		panic(err)
 	}
 
-	f, err = os.Create(path.Dir(conf.Filename) + OutDir + VoSpace + GoExt)
+	f, err = os.Create(path.Dir(conf.Filename) + OutDir + conf.PackageName + "/" + VoSpace + GoExt)
 	if err != nil {
 		panic(err)
 	}

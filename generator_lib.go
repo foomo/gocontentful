@@ -13,7 +13,7 @@ func GenerateLib(conf SpaceConf) (err error) {
 		panic(err)
 	}
 
-	f, err := os.Create(path.Dir(conf.Filename) + OutDir + VoLib + GoExt)
+	f, err := os.Create(path.Dir(conf.Filename) + OutDir + conf.PackageName + "/" + VoLib + GoExt)
 	if err != nil {
 		panic(err)
 	}

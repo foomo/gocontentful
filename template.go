@@ -1,6 +1,7 @@
 package erm
 
 import (
+	"fmt"
 	"strings"
 	"text/template"
 )
@@ -9,6 +10,7 @@ func getFuncMap() template.FuncMap {
 	return template.FuncMap{
 		"firstCap":                 strings.Title,
 		"fieldIsBasic":             fieldIsBasic,
+		"fieldIsComplex":           fieldIsComplex,
 		"fieldIsAsset":             fieldIsAsset,
 		"fieldIsBoolean":           fieldIsBoolean,
 		"fieldIsDate":              fieldIsDate,
@@ -25,6 +27,7 @@ func getFuncMap() template.FuncMap {
 		"fieldIsSymbolList":        fieldIsSymbolList,
 		"fieldIsText":              fieldIsText,
 		"mapFieldType":             mapFieldType,
+		"mapFieldTypeLiteral":      mapFieldTypeLiteral,
 		"onlyLetters":              onlyLetters,
 	}
 }
@@ -62,6 +65,23 @@ func mapFieldType(contentTypeName string, field ContentTypeField) string {
 		return "string"
 	case FieldTypeText: // It's a text field
 		return "string"
+	default:
+		return ""
+	}
+}
+
+// mapFieldTypeLiteral takes a ContentTypeField from the space model definition
+// and returns an empty literal that matches the type of the map[string] for the VO
+func mapFieldTypeLiteral(contentTypeName string, field ContentTypeField) string {
+	switch field.Type {
+	case FieldTypeBoolean:
+		return "false"
+	case FieldTypeDate, FieldTypeSymbol, FieldTypeText:
+		return `""`
+	case FieldTypeInteger, FieldTypeNumber:
+		return "0"
+	case FieldTypeArray, FieldTypeLink, FieldTypeLocation, FieldTypeJSON, FieldTypeRichText:
+		return "nil"
 	default:
 		return ""
 	}
@@ -127,5 +147,9 @@ func fieldIsText(field ContentTypeField) bool {
 }
 
 func fieldIsBasic(field ContentTypeField) bool {
-	return field.Type == FieldTypeBoolean || field.Type == FieldTypeInteger || field.Type == FieldTypeJSON || field.Type == FieldTypeLocation || field.Type == FieldTypeNumber || field.Type == FieldTypeRichText || field.Type == FieldTypeSymbol || field.Type == FieldTypeText
+	fmt.Println(field.Name, fieldIsSymbolList(field) || fieldIsBoolean(field) || fieldIsInteger(field) || fieldIsNumber(field) || fieldIsSymbol(field) || fieldIsText(field) || fieldIsDate(field))
+	return fieldIsSymbolList(field) || fieldIsBoolean(field) || fieldIsInteger(field) || fieldIsNumber(field) || fieldIsSymbol(field) || fieldIsText(field) || fieldIsDate(field)
+}
+func fieldIsComplex(field ContentTypeField) bool {
+	return field.Type == FieldTypeJSON || field.Type == FieldTypeLocation || field.Type == FieldTypeRichText
 }
