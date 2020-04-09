@@ -399,7 +399,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) Set{{ firstCap $field.ID }}({{ $
 	var loc Locale
 	if len(locale) != 0 {
 		loc = locale[0]
-		if localeFallback[loc]!="" {
+		if _, ok := localeFallback[loc]; !ok {
 			return ErrLocaleUnsupported
 		}
 	} else {
