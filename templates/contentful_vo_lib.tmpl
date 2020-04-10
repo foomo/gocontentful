@@ -158,14 +158,17 @@ func (cc *ContentfulClient) GetFiltered{{ firstCap $contentType.Sys.ID }}(query 
 
 func (cc *ContentfulClient) Get{{ firstCap $contentType.Sys.ID }}ByID(id string) (vo *Cf{{ firstCap $contentType.Sys.ID }}, err error) {
 	if cc.CDA == nil {
-		return nil, errors.New("get{{ firstCap $contentType.Sys.ID }}ByID: No CDA client available")
+		return nil, errors.New("Get{{ firstCap $contentType.Sys.ID }}ByID: No CDA client available")
 	}
 	col := cc.CDA.Entries.List(cc.SpaceID)
 	col.Query.ContentType("{{ $contentType.Sys.ID }}").Locale("*").Equal("sys.id",id)
 	col.GetAll()
+	if len(col.Items) == 0 {
+		return nil, fmt.Errorf("Get{{ firstCap $contentType.Sys.ID }}ByID: %s Not found", id)
+	}
 	vos, err := ColToCf{{ firstCap $contentType.Sys.ID }}(col)
 	if err != nil {
-		return nil, errors.New("get{{ firstCap $contentType.Sys.ID }}ByID: Error converting to VO")
+		return nil, fmt.Errorf("Get{{ firstCap $contentType.Sys.ID }}ByID: Error converting %s to VO: " + err.Error(), id)
 	}
 	vo = vos[0]
 	return
@@ -190,14 +193,52 @@ func (cc *ContentfulClient) PreviewFiltered{{ firstCap $contentType.Sys.ID }}(qu
 
 func (cc *ContentfulClient) Preview{{ firstCap $contentType.Sys.ID }}ByID(id string) (vo *Cf{{ firstCap $contentType.Sys.ID }}, err error) {
 	if cc.CPA == nil {
-		return nil, errors.New("Preview{{ firstCap $contentType.Sys.ID }}ByID: No CDA client available")
+		return nil, errors.New("Preview{{ firstCap $contentType.Sys.ID }}ByID: No CPA client available")
 	}
 	col := cc.CPA.Entries.List(cc.SpaceID)
 	col.Query.ContentType("{{ $contentType.Sys.ID }}").Locale("*").Equal("sys.id",id)
 	col.GetAll()
+	if len(col.Items) == 0 {
+		return nil, fmt.Errorf("Preview{{ firstCap $contentType.Sys.ID }}ByID: %s Not found", id)
+	}
 	vos, err := ColToCf{{ firstCap $contentType.Sys.ID }}(col)
 	if err != nil {
-		return nil, errors.New("Preview{{ firstCap $contentType.Sys.ID }}ByID: Error converting to VO")
+		return nil, fmt.Errorf("Preview{{ firstCap $contentType.Sys.ID }}ByID: Error converting %s to VO: " + err.Error(), id)
+	}
+	vo = vos[0]
+	return
+}
+
+func (cc *ContentfulClient) ManageAll{{ firstCap $contentType.Sys.ID }}() (vos []*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
+	return cc.ManageFiltered{{ firstCap $contentType.Sys.ID }}(nil)
+}
+
+func (cc *ContentfulClient) ManageFiltered{{ firstCap $contentType.Sys.ID }}(query *contentful.Query) (vos []*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
+	if cc.CMA == nil {
+		return nil, errors.New("ManageFiltered{{ firstCap $contentType.Sys.ID }}: No CMA client available")
+	}
+	col := cc.CMA.Entries.List(cc.SpaceID)
+	if query != nil {
+		col.Query = *query
+	}
+	col.Query.ContentType("{{ $contentType.Sys.ID }}").Locale("*").Include(10)
+	col.GetAll()
+	return ColToCf{{ firstCap $contentType.Sys.ID }}(col)
+}
+
+func (cc *ContentfulClient) Manage{{ firstCap $contentType.Sys.ID }}ByID(id string) (vo *Cf{{ firstCap $contentType.Sys.ID }}, err error) {
+	if cc.CMA == nil {
+		return nil, errors.New("Manage{{ firstCap $contentType.Sys.ID }}ByID: No CMA client available")
+	}
+	col := cc.CMA.Entries.List(cc.SpaceID)
+	col.Query.ContentType("{{ $contentType.Sys.ID }}").Locale("*").Equal("sys.id",id)
+	col.GetAll()
+	if len(col.Items) == 0 {
+		return nil, fmt.Errorf("Manage{{ firstCap $contentType.Sys.ID }}ByID: %s Not found", id)
+	}
+	vos, err := ColToCf{{ firstCap $contentType.Sys.ID }}(col)
+	if err != nil {
+		return nil, fmt.Errorf("Manage{{ firstCap $contentType.Sys.ID }}ByID: Error converting %s to VO: " + err.Error(), id)
 	}
 	vo = vos[0]
 	return
@@ -409,32 +450,65 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) Set{{ firstCap $field.ID }}({{ $
 	return
 }
 {{ end }}
-func (vo *Cf{{ firstCap $contentType.Sys.ID }}) Save(cc *ContentfulClient) (err error) {
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) UpsertEntry(cc *ContentfulClient) (err error) {
 	cfEntry := &contentful.Entry{}
 	tmp, errMarshal := json.Marshal(vo)
 	if errMarshal != nil {
-		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} save: Can't marshal JSON from VO")
+		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} UpsertEntry: Can't marshal JSON from VO")
 	}
 	errUnmarshal := json.Unmarshal(tmp, &cfEntry)
 	if errUnmarshal != nil {
-		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} save: Can't unmarshal JSON into CF entry")
+		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} UpsertEntry: Can't unmarshal JSON into CF entry")
 	}
 
 	err = cc.CMA.Entries.Upsert(cc.SpaceID, cfEntry)
 	if err != nil {
-		return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} save: upsert operation failed: %s", err)
+		return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} UpsertEntry: Operation failed: %s", err)
 	}
-	tmp, errMarshal = json.Marshal(cfEntry)
+	return
+}
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) PublishEntry(cc *ContentfulClient) (err error) {
+	cfEntry := &contentful.Entry{}
+	tmp, errMarshal := json.Marshal(vo)
 	if errMarshal != nil {
-		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} save: Can't marshal JSON back from CF entry")
+		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} PublishEntry: Can't marshal JSON from VO")
 	}
-	errUnmarshal = json.Unmarshal(tmp, &vo)
+	errUnmarshal := json.Unmarshal(tmp, &cfEntry)
 	if errUnmarshal != nil {
-		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} save: Can't unmarshal JSON back into VO")
+		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} PublishEntry: Can't unmarshal JSON into CF entry")
 	}
 	err = cc.CMA.Entries.Publish(cc.SpaceID, cfEntry)
 	if err != nil {
-		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} save: publish operation failed")
+		return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} PublishEntry: publish operation failed: %s", err)
+	}
+	return
+}
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) UpdateEntry(cc *ContentfulClient) (err error) {
+	cfEntry := &contentful.Entry{}
+	tmp, errMarshal := json.Marshal(vo)
+	if errMarshal != nil {
+		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} UpdateEntry: Can't marshal JSON from VO")
+	}
+	errUnmarshal := json.Unmarshal(tmp, &cfEntry)
+	if errUnmarshal != nil {
+		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} UpdateEntry: Can't unmarshal JSON into CF entry")
+	}
+
+	err = cc.CMA.Entries.Upsert(cc.SpaceID, cfEntry)
+	if err != nil {
+		return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} UpdateEntry: upsert operation failed: %s", err)
+	}
+	tmp, errMarshal = json.Marshal(cfEntry)
+	if errMarshal != nil {
+		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} UpdateEntry: Can't marshal JSON back from CF entry")
+	}
+	errUnmarshal = json.Unmarshal(tmp, &vo)
+	if errUnmarshal != nil {
+		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} UpdateEntry: Can't unmarshal JSON back into VO")
+	}
+	err = cc.CMA.Entries.Publish(cc.SpaceID, cfEntry)
+	if err != nil {
+		return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} UpdateEntry: publish operation failed: %s", err)
 	}
 	return
 }
