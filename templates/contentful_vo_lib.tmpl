@@ -499,7 +499,28 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) UpdateEntry(cc *ContentfulClient
 	}
 	return
 }
-
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) DeleteEntry(cc *ContentfulClient) (err error) {
+	cfEntry := &contentful.Entry{}
+	tmp, errMarshal := json.Marshal(vo)
+	if errMarshal != nil {
+		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} DeleteEntry: Can't marshal JSON from VO")
+	}
+	errUnmarshal := json.Unmarshal(tmp, &cfEntry)
+	if errUnmarshal != nil {
+		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} DeleteEntry: Can't unmarshal JSON into CF entry")
+	}
+	if cfEntry.Sys.PublishedCounter > 0 {
+		errUnpublish := cc.CMA.Entries.Unpublish(cc.SpaceID, cfEntry)
+		if errUnpublish != nil {
+			return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} DeleteEntry: Unpublish entry failed: %w", errUnpublish)
+		}
+	}
+	errDelete := cc.CMA.Entries.Delete(cc.SpaceID, cfEntry.Sys.ID)
+	if errDelete != nil {
+		return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} DeleteEntry: Delete entry failed: %w", errDelete)
+	}
+	return nil
+}
 func (vo *Cf{{ firstCap $contentType.Sys.ID }}) ToReference() (refSys ContentTypeSys) {
 	refSys.Sys.ID = vo.Sys.ID
 	refSys.Sys.Type = "Link"

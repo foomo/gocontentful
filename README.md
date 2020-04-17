@@ -33,14 +33,6 @@ Current function set
 
 Creates a Contentful client, this is the first function you need to call.
 
->**NewAssetFromURL**(id string, uploadUrl string, imageFileType string, title string, locale ...string) *ContentfulAsset
-
-Creates an Asset from an URL of an existing file online (you still need to upsert it later).
-
->(asset ContentfulAsset) **ToAssetReference**() (refSys ContentTypeSys) 
-
-Converts the asset to a reference. You need to do this before you add the asset to a reference field of an entry.
-
 ---
 
 **FUNCTIONS NAMED AFTER THE CONTENT TYPE**
@@ -142,8 +134,7 @@ Field setters are named after the field ID in Contentful and require to pass in 
 
 ---
 
-**SAVING ENTRIES**
-
+**WRITE OPERATIONS**
 
 >(vo *CfPerson) **UpsertEntry**(cc *ContentfulClient) (err error) 
 
@@ -157,3 +148,18 @@ Publishes the entry. Note that before publshing you will need to retrieve the en
 
 Shortcut function that upserts and publishes the entry. Note that before calling this you will need to retrieve the entry with one of the Manage* functions above to acquire the Sys object that contains the version information. Otherwise the API call will fail with a "Version mismatch" error. Using this shortcut function avoids retrieving the entry twice.
 
+>(vo *CfPerson) **DeleteEntry**(cc *ContentfulClient) (err error) 
+
+Unpublishes and deletes the entry
+
+---
+
+**ASSET FUNCTION**
+
+>**NewAssetFromURL**(id string, uploadUrl string, imageFileType string, title string, locale ...string) *contentful.Asset
+
+Creates an Asset from an URL of an existing file online (you still need to upsert it later).
+
+>(asset ContentfulAsset) **ToAssetReference**() (refSys ContentTypeSys) 
+
+Converts the asset to a reference. You need to do this before you add the asset to a reference field of an entry.
