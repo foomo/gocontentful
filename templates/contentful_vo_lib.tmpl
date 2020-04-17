@@ -65,7 +65,7 @@ func NewContentfulClient(spaceID string, ck *ContentfulKeys, debug bool) (*Conte
 }
 
 
-func NewAsset(id string, uploadUrl string, imageFileType string, title string, locale ...Locale) *ContentfulAsset {
+func NewAssetFromURL(id string, uploadUrl string, imageFileType string, title string, locale ...Locale) *contentful.Asset {
 	autoID := fmt.Sprintf("%d", time.Now().UnixNano()/int64(time.Millisecond))
 	if id == "" {
 		id = autoID
@@ -82,7 +82,7 @@ func NewAsset(id string, uploadUrl string, imageFileType string, title string, l
 	} else {
 		loc = defaultLocale
 	}
-	asset := &ContentfulAsset{
+	asset := &contentful.Asset{
 		Sys: &contentful.Sys{
 			ID: id,
 		},
@@ -102,20 +102,7 @@ func NewAsset(id string, uploadUrl string, imageFileType string, title string, l
 	return asset
 }
 
-func (asset *ContentfulAsset) UpsertAndProcess(cc *ContentfulClient) error {
-	cAsset := &contentful.Asset{Sys: asset.Sys, Fields: asset.Fields}
-	err := cc.CMA.Assets.Upsert(cc.SpaceID, cAsset)
-	if err != nil {
-		return err
-	}
-	err = cc.CMA.Assets.Process(cc.SpaceID, cAsset)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (asset ContentfulAsset) ToAssetReference() (refSys ContentTypeSys) {
+func ToAssetReference(asset *contentful.Asset) (refSys ContentTypeSys) {
 	refSys.Sys.ID = asset.Sys.ID
 	refSys.Sys.Type = "Link"
 	refSys.Sys.LinkType = "Asset"
