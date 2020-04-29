@@ -3,6 +3,35 @@
 
 import "github.com/foomo/contentful"
 
+const (
+	FieldTypeLink      string = "Link"
+	FieldLinkTypeEntry string = "Entry"
+	FieldLinkTypeAsset string = "Asset"
+
+	RichTextNodeDocument       string = "document"
+	RichTextNodeParagraph      string = "paragraph"
+	RichTextNodeHeading1       string = "heading-1"
+	RichTextNodeHeading2       string = "heading-2"
+	RichTextNodeHeading3       string = "heading-3"
+	RichTextNodeHeading4       string = "heading-4"
+	RichTextNodeHeading5       string = "heading-5"
+	RichTextNodeHeading6       string = "heading-6"
+	RichTextNodeHyperlink      string = "hyperlink"
+	RichTextNodeEntryHyperlink string = "entry-hyperlink"
+	RichTextNodeAssetHyperlink string = "asset-hyperlink"
+	RichTextNodeText           string = "text"
+	RichTextNodeUnorderedList  string = "unordered-list"
+	RichTextNodeOrderedList    string = "ordered-list"
+	RichTextNodeListItem       string = "list-item"
+	RichTextNodeBlockquote     string = "blockquote"
+	RichTextNodeHR             string = "hr"
+
+	RichTextMarkBold      string = "bold"
+	RichTextMarkItalic    string = "italic"
+	RichTextMarkUnderline string = "underline"
+	RichTextMarkCode      string = "code"
+)
+
 // --- Contentful common types
 
 // ContentTypeSysAttributes VO
@@ -52,3 +81,21 @@ type ContentfulReferencedAsset struct {
 
 // ContentfulAsset VO
 type ContentfulAsset contentful.Asset
+
+// RichText
+type RichTextNode struct {
+	NodeType string         `json:"nodeType,omitempty"`
+	Value    string         `json:"value,omitempty"`
+	Marks    []RichTextMark `json:"marks,omitempty"`
+	Data     RichTextData   `json:"data,omitempty"`
+	Content  []RichTextNode `json:"content,omitempty"`
+}
+
+type RichTextData struct {
+	URI    string         `json:"uri,omitempty"`
+	Target ContentTypeSys `json:"target,omitempty"`
+}
+
+type RichTextMark struct {
+	Type string `json:"type,omitempty"`
+}

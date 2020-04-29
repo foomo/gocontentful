@@ -104,8 +104,8 @@ func NewAssetFromURL(id string, uploadUrl string, imageFileType string, title st
 
 func ToAssetReference(asset *contentful.Asset) (refSys ContentTypeSys) {
 	refSys.Sys.ID = asset.Sys.ID
-	refSys.Sys.Type = "Link"
-	refSys.Sys.LinkType = "Asset"
+	refSys.Sys.Type = FieldTypeLink
+	refSys.Sys.LinkType = FieldLinkTypeAsset
 	return
 }
 
@@ -121,7 +121,7 @@ func NewCf{{ firstCap $contentType.Sys.ID }}() (cf{{ firstCap $contentType.Sys.I
 	{{ range $fieldIndex, $field := $contentType.Fields }}cf{{ firstCap $contentType.Sys.ID }}.Fields.{{ firstCap $field.ID }} = map[string]{{ mapFieldType $contentType.Sys.ID $field }}{}
 	{{ end }}
 	cf{{ firstCap $contentType.Sys.ID }}.Sys.ContentType.Sys.ID = "{{ $contentType.Sys.ID }}"
-	cf{{ firstCap $contentType.Sys.ID }}.Sys.ContentType.Sys.Type = "Link"
+	cf{{ firstCap $contentType.Sys.ID }}.Sys.ContentType.Sys.Type = FieldTypeLink
 	cf{{ firstCap $contentType.Sys.ID }}.Sys.ContentType.Sys.LinkType = "ContentType"
 	return
 }
@@ -259,15 +259,13 @@ func (ref ContentfulReferencedEntry) ToCf{{ firstCap $contentType.Sys.ID }}() (v
 {{ range $fieldIndex, $field := $contentType.Fields }}
 {{ if fieldIsBasic $field }}
 func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale ...Locale) ({{ mapFieldType $contentType.Sys.ID $field }}, error) {
-	var loc Locale
+	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
-		if localeFallback[loc]!="" {
+		if _, ok := localeFallback[loc]; !ok {
 			return {{ mapFieldTypeLiteral $contentType.Sys.ID $field }}, ErrLocaleUnsupported
 		}
-	} else {
-		loc = defaultLocale
-	}
+	} 
 	if _, ok := vo.Fields.{{ firstCap $field.ID }}[string(loc)]; !ok {
 		if _, ok := localeFallback[loc]; !ok {
 			return {{ mapFieldTypeLiteral $contentType.Sys.ID $field }}, ErrNotSet
@@ -280,15 +278,13 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 	return vo.Fields.{{ firstCap $field.ID }}[string(loc)], nil
 }{{ end }}{{ if fieldIsComplex $field }}
 func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale ...Locale) (*{{ mapFieldType $contentType.Sys.ID $field }}, error) {
-	var loc Locale
+	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
-		if localeFallback[loc]!="" {
+		if _, ok := localeFallback[loc]; !ok {
 			return {{ mapFieldTypeLiteral $contentType.Sys.ID $field }}, ErrLocaleUnsupported
 		}
-	} else {
-		loc = defaultLocale
-	}
+	} 
 	if _, ok := vo.Fields.{{ firstCap $field.ID }}[string(loc)]; !ok {
 		if _, ok := localeFallback[loc]; !ok {
 			return {{ mapFieldTypeLiteral $contentType.Sys.ID $field }}, ErrNotSet
@@ -302,15 +298,13 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 	return &{{ $field.ID }}, nil
 }{{ end }}{{ if fieldIsMultipleReference $field }}func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale ...Locale) ([]*ContentfulReferencedEntry, error) {
 	{{ $field.ID }} := []*ContentfulReferencedEntry{}
-	var loc Locale
+	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
-		if localeFallback[loc]!="" {
+		if _, ok := localeFallback[loc]; !ok {
 			return nil, ErrLocaleUnsupported
 		}
-	} else {
-		loc = defaultLocale
-	}
+	} 
 	if _, ok := vo.Fields.{{ firstCap $field.ID }}[string(loc)]; !ok {
 		if _, ok := localeFallback[loc]; !ok {
 			return nil, ErrNotSet
@@ -333,15 +327,13 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 	return {{ $field.ID }}, nil 
 }{{ end }}{{ if fieldIsReference $field }}func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale ...Locale) (*ContentfulReferencedEntry, error) {
 	{{ $field.ID }} := &ContentfulReferencedEntry{}
-	var loc Locale
+	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
-		if localeFallback[loc]!="" {
+		if _, ok := localeFallback[loc]; !ok {
 			return nil, ErrLocaleUnsupported
 		}
-	} else {
-		loc = defaultLocale
-	}
+	} 
 	if _, ok := vo.Fields.{{ firstCap $field.ID }}[string(loc)]; !ok {
 		if _, ok := localeFallback[loc]; !ok {
 			return nil, ErrNotSet
@@ -361,15 +353,13 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 	return {{ $field.ID }}, nil
 }{{ end }}{{ if fieldIsMultipleAsset $field }}func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale ...Locale) ([]*ContentfulReferencedAsset, error) {
 	{{ $field.ID }} := []*ContentfulReferencedAsset{}
-	var loc Locale
+	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
-		if localeFallback[loc]!="" {
+		if _, ok := localeFallback[loc]; !ok {
 			return nil, ErrLocaleUnsupported
 		}
-	} else {
-		loc = defaultLocale
-	}
+	} 
 	if _, ok := vo.Fields.{{ firstCap $field.ID }}[string(loc)]; !ok {
 		if _, ok := localeFallback[loc]; !ok {
 			return nil, ErrNotSet
@@ -393,15 +383,13 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 	return {{ $field.ID }}, nil
 }{{ end }}{{ if fieldIsAsset $field }}func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale ...Locale) (*ContentfulReferencedAsset, error) {
 	{{ $field.ID }} := &ContentfulReferencedAsset{}
-	var loc Locale
+	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
-		if localeFallback[loc]!="" {
+		if _, ok := localeFallback[loc]; !ok {
 			return nil, ErrLocaleUnsupported
 		}
-	} else {
-		loc = defaultLocale
-	}
+	} 
 	if _, ok := vo.Fields.{{ firstCap $field.ID }}[string(loc)]; !ok {
 		if _, ok := localeFallback[loc]; !ok {
 			return nil, ErrNotSet
@@ -424,15 +412,13 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 // {{ firstCap $contentType.Sys.ID }} Field setters
 {{ range $fieldIndex, $field := $contentType.Fields }}
 func (vo *Cf{{ firstCap $contentType.Sys.ID }}) Set{{ firstCap $field.ID }}({{ $field.ID }} {{ mapFieldType $contentType.Sys.ID $field }}, locale ...Locale) (err error) {
-	var loc Locale
+	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
 		if _, ok := localeFallback[loc]; !ok {
 			return ErrLocaleUnsupported
 		}
-	} else {
-		loc = defaultLocale
-	}
+	} 
 	vo.Fields.{{ firstCap $field.ID }}[string(loc)] = {{ $field.ID }}
 	return
 }
@@ -523,15 +509,15 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) DeleteEntry(cc *ContentfulClient
 }
 func (vo *Cf{{ firstCap $contentType.Sys.ID }}) ToReference() (refSys ContentTypeSys) {
 	refSys.Sys.ID = vo.Sys.ID
-	refSys.Sys.Type = "Link"
-	refSys.Sys.LinkType = "Entry"
+	refSys.Sys.Type = FieldTypeLink
+	refSys.Sys.LinkType = FieldLinkTypeEntry
 	return
 }
 func (vo *Cf{{ firstCap $contentType.Sys.ID }}) ToReferenceArray() (refSysArray []ContentTypeSys) {
 	refSys := ContentTypeSys{}
 	refSys.Sys.ID = vo.Sys.ID
-	refSys.Sys.Type = "Link"
-	refSys.Sys.LinkType = "Entry"
+	refSys.Sys.Type = FieldTypeLink
+	refSys.Sys.LinkType = FieldLinkTypeEntry
 	refSysArray = append(refSysArray,refSys)
 	return
 }
