@@ -73,15 +73,6 @@ type ContentfulReferencedEntry struct {
 	Col 	*contentful.Collection
 }
 
-// ContentfulReferencedAsset VO
-type ContentfulReferencedAsset struct {
-	Asset 	*contentful.IncludeAsset
-	Col 	*contentful.Collection
-}
-
-// ContentfulAsset VO
-type ContentfulAsset contentful.Asset
-
 // RichText
 type RichTextNode struct {
 	NodeType string         `json:"nodeType,omitempty"`

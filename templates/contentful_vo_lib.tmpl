@@ -351,8 +351,8 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 	{{ $field.ID }}.Entry = includesEntryMap[localized{{ firstCap $field.ID }}.Sys.ID]
 	{{ $field.ID }}.Col = vo.Col
 	return {{ $field.ID }}, nil
-}{{ end }}{{ if fieldIsMultipleAsset $field }}func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale ...Locale) ([]*ContentfulReferencedAsset, error) {
-	{{ $field.ID }} := []*ContentfulReferencedAsset{}
+}{{ end }}{{ if fieldIsMultipleAsset $field }}func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale ...Locale) ([]*contentful.IncludeAsset, error) {
+	{{ $field.ID }} := []*contentful.IncludeAsset{}
 	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
@@ -370,19 +370,23 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 		}
 	}
 	for _, eachLocalized{{ firstCap $field.ID }} := range vo.Fields.{{ firstCap $field.ID }}[string(loc)] {
-		includeAssetMap := vo.Col.ToIncludesAssetMap()
+		includeAssetMap := vo.Col.ToIncludesLocalizedAssetMap()
 		if _, ok := includeAssetMap[eachLocalized{{ firstCap $field.ID }}.Sys.ID]; !ok {
 			return nil, ErrRefNotIncludes
 			
 		}
-		{{ $field.ID }} = append({{ $field.ID }}, &ContentfulReferencedAsset{
-			Asset: includeAssetMap[eachLocalized{{ firstCap $field.ID }}.Sys.ID],
-			Col:   vo.Col,
-		})
+		tempAsset := &contentful.IncludeAsset{}
+		tempAsset.Sys = includeAssetMap[eachLocalized{{ firstCap $field.ID }}.Sys.ID].Sys
+		tempAsset.Fields = &contentful.IncludeFileFields{}
+		tempAsset.Fields.Title = includeAssetMap[eachLocalized{{ firstCap $field.ID }}.Sys.ID].Fields.Title[string(loc)]
+		tempAsset.Fields.Description = includeAssetMap[eachLocalized{{ firstCap $field.ID }}.Sys.ID].Fields.Description[string(loc)]
+		tempAsset.Fields.File = includeAssetMap[eachLocalized{{ firstCap $field.ID }}.Sys.ID].Fields.File[string(loc)]
+		{{ $field.ID }} = append({{ $field.ID }}, tempAsset)
 	}
 	return {{ $field.ID }}, nil
-}{{ end }}{{ if fieldIsAsset $field }}func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale ...Locale) (*ContentfulReferencedAsset, error) {
-	{{ $field.ID }} := &ContentfulReferencedAsset{}
+}{{ end }}{{ if fieldIsAsset $field }}func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale ...Locale) (*contentful.IncludeAsset, error) {
+	{{ $field.ID }} := &contentful.IncludeAsset{}
+	{{ $field.ID }}.Fields = &contentful.IncludeFileFields{}
 	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
@@ -400,12 +404,14 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 		}
 	}
 	localized{{ firstCap $field.ID }} := vo.Fields.{{ firstCap $field.ID }}[string(loc)]
-	includesAssetMap := vo.Col.ToIncludesAssetMap()
+	includesAssetMap := vo.Col.ToIncludesLocalizedAssetMap()
 	if _, ok := includesAssetMap[localized{{ firstCap $field.ID }}.Sys.ID]; !ok {
 		return nil, ErrRefNotIncludes
 	}
-	{{ $field.ID }}.Asset = includesAssetMap[localized{{ firstCap $field.ID }}.Sys.ID]
-	{{ $field.ID }}.Col = vo.Col
+	{{ $field.ID }}.Sys = includesAssetMap[localized{{ firstCap $field.ID }}.Sys.ID].Sys
+	{{ $field.ID }}.Fields.Title = includesAssetMap[localized{{ firstCap $field.ID }}.Sys.ID].Fields.Title[string(loc)]
+	{{ $field.ID }}.Fields.Description = includesAssetMap[localized{{ firstCap $field.ID }}.Sys.ID].Fields.Description[string(loc)]
+	{{ $field.ID }}.Fields.File = includesAssetMap[localized{{ firstCap $field.ID }}.Sys.ID].Fields.File[string(loc)]
 	return {{ $field.ID }}, nil
 }{{ end }}{{ end }}
 

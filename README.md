@@ -160,6 +160,6 @@ Unpublishes and deletes the entry
 
 Creates an Asset from an URL of an existing file online (you still need to upsert it later).
 
->(asset ContentfulAsset) **ToAssetReference**() (refSys ContentTypeSys) 
+>**ToAssetReference**(asset *contentful.Asset) (refSys ContentTypeSys) 
 
 Converts the asset to a reference. You need to do this before you add the asset to a reference field of an entry.
