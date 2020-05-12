@@ -351,8 +351,8 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 	{{ $field.ID }}.Entry = includesEntryMap[localized{{ firstCap $field.ID }}.Sys.ID]
 	{{ $field.ID }}.Col = vo.Col
 	return {{ $field.ID }}, nil
-}{{ end }}{{ if fieldIsMultipleAsset $field }}func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale ...Locale) ([]*contentful.IncludeAsset, error) {
-	{{ $field.ID }} := []*contentful.IncludeAsset{}
+}{{ end }}{{ if fieldIsMultipleAsset $field }}func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale ...Locale) ([]*contentful.AssetNoLocale, error) {
+	{{ $field.ID }} := []*contentful.AssetNoLocale{}
 	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
@@ -377,16 +377,16 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 		}
 		tempAsset := &contentful.IncludeAsset{}
 		tempAsset.Sys = includeAssetMap[eachLocalized{{ firstCap $field.ID }}.Sys.ID].Sys
-		tempAsset.Fields = &contentful.IncludeFileFields{}
+		tempAsset.Fields = &contentful.FileFieldsNoLocale{}
 		tempAsset.Fields.Title = includeAssetMap[eachLocalized{{ firstCap $field.ID }}.Sys.ID].Fields.Title[string(loc)]
 		tempAsset.Fields.Description = includeAssetMap[eachLocalized{{ firstCap $field.ID }}.Sys.ID].Fields.Description[string(loc)]
 		tempAsset.Fields.File = includeAssetMap[eachLocalized{{ firstCap $field.ID }}.Sys.ID].Fields.File[string(loc)]
 		{{ $field.ID }} = append({{ $field.ID }}, tempAsset)
 	}
 	return {{ $field.ID }}, nil
-}{{ end }}{{ if fieldIsAsset $field }}func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale ...Locale) (*contentful.IncludeAsset, error) {
-	{{ $field.ID }} := &contentful.IncludeAsset{}
-	{{ $field.ID }}.Fields = &contentful.IncludeFileFields{}
+}{{ end }}{{ if fieldIsAsset $field }}func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale ...Locale) (*contentful.AssetNoLocale, error) {
+	{{ $field.ID }} := &contentful.AssetNoLocale{}
+	{{ $field.ID }}.Fields = &contentful.FileFieldsNoLocale{}
 	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
