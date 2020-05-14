@@ -164,7 +164,7 @@ Creates an Asset from an URL of an existing file online (you still need to upser
 
 Converts the asset to a reference. You need to do this before you add the asset to a reference field of an entry.
 
->**convertHtmlToRichText**(htmlSrc string) (*RichTextNode, error)
+>**HtmlToRichText**(htmlSrc string) *RichTextNode
 
-Converts a string HTML to a RichTextNode. This is far from complete but useful to migrate data from third-party systems to Contentful. It currently supports headings, paragraphs, hyperlinks, italic and bold tags, horizontal rules, blockquote, ordered and unordered lists.
+Converts a string HTML to a RichTextNode. This is far from complete but useful to migrate data from third-party systems to Contentful. It currently supports headings, paragraphs, hyperlinks, italic and bold tags, horizontal rules, blockquote, ordered and unordered lists. Note that this function doesn't return any error, as it converts the input text into something as good as possible without any validation.
 

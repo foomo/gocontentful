@@ -113,7 +113,7 @@ func ToAssetReference(asset *contentful.Asset) (refSys ContentTypeSys) {
 
 // RichText utils
 
-func convertHtmlToRichText(htmlSrc string) (*RichTextNode, error) {
+func HtmlToRichText(htmlSrc string) *RichTextNode {
 	htmlClean := strings.TrimSpace(htmlSrc)
 	htmlClean = strings.ReplaceAll(htmlClean, `&nbsp;`, ` `)
 	htmlClean = strings.ReplaceAll(htmlClean, "\t", "")
@@ -127,7 +127,23 @@ func convertHtmlToRichText(htmlSrc string) (*RichTextNode, error) {
 		NodeType: RichTextNodeDocument,
 	}
 	rtnd.Content, _ = htmlLinesToRichTextNode(htmlLines, 0, "", nil)
-	return rtnd, nil
+	if len(rtnd.Content) == 1 && rtnd.Content[0].(RichTextNodeTextNode).NodeType == RichTextNodeText {
+		basicRich := &RichTextNode{
+			NodeType: RichTextNodeDocument,
+		}
+		par := RichTextNode{
+			NodeType: RichTextNodeParagraph,
+		}
+		text := RichTextNodeTextNode{
+			NodeType: RichTextNodeText,
+			Value:    rtnd.Content[0].(RichTextNodeTextNode).Value,
+			Marks:    []RichTextMark{},
+		}
+		par.Content = append(par.Content, text)
+		basicRich.Content = append(basicRich.Content, par)
+		return basicRich
+	}
+	return rtnd
 }
 
 func getMark(mark string) string {
