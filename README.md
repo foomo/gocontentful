@@ -154,7 +154,7 @@ Unpublishes and deletes the entry
 
 ---
 
-**ASSET FUNCTION**
+**UTILITY FUNCTIONS**
 
 >**NewAssetFromURL**(id string, uploadUrl string, imageFileType string, title string, locale ...string) *contentful.Asset
 
@@ -163,3 +163,8 @@ Creates an Asset from an URL of an existing file online (you still need to upser
 >**ToAssetReference**(asset *contentful.Asset) (refSys ContentTypeSys) 
 
 Converts the asset to a reference. You need to do this before you add the asset to a reference field of an entry.
+
+>**convertHtmlToRichText**(htmlSrc string) (*RichTextNode, error)
+
+Converts a string HTML to a RichTextNode. This is far from complete but useful to migrate data from third-party systems to Contentful. It currently supports headings, paragraphs, hyperlinks, italic and bold tags, horizontal rules, blockquote, ordered and unordered lists.
+

@@ -30,6 +30,27 @@ const (
 	RichTextMarkItalic    string = "italic"
 	RichTextMarkUnderline string = "underline"
 	RichTextMarkCode      string = "code"
+
+	HtmlHeading1       string = "h1"
+	HtmlHeading2       string = "h2"
+	HtmlHeading3       string = "h3"
+	HtmlHeading4       string = "h4"
+	HtmlHeading5       string = "h5"
+	HtmlHeading6       string = "h6"
+	HtmlParagraph      string = "p"
+	HtmlItalic         string = "i"
+	HtmlEm             string = "em"
+	HtmlBold           string = "b"
+	HtmlStrong         string = "strong"
+	HtmlAnchor         string = "a"
+	HtmlBlockquote     string = "blockquote"
+	HtmlUnorderedList  string = "ul"
+	HtmlOrderedList    string = "ol"
+	HtmlListItem       string = "li"
+	HtmlBreak          string = "br"
+	HtmlHorizontalRule string = "hr"
+
+	HtmlAttributeHref string = "href"
 )
 
 // --- Contentful common types
@@ -75,16 +96,22 @@ type ContentfulReferencedEntry struct {
 
 // RichText
 type RichTextNode struct {
-	NodeType string         `json:"nodeType,omitempty"`
-	Value    string         `json:"value,omitempty"`
-	Marks    []RichTextMark `json:"marks,omitempty"`
-	Data     RichTextData   `json:"data,omitempty"`
-	Content  []RichTextNode `json:"content,omitempty"`
+	NodeType string         `json:"nodeType"`
+	Content  []interface{} `json:"content"`
+	Data     RichTextData   `json:"data"`
 }
+
+type RichTextNodeTextNode struct {
+	NodeType string         `json:"nodeType"`
+	Data     RichTextData   `json:"data"`
+	Value    string         `json:"value"`
+	Marks    []RichTextMark `json:"marks"`
+}
+
 
 type RichTextData struct {
 	URI    string         `json:"uri,omitempty"`
-	Target ContentTypeSys `json:"target,omitempty"`
+	Target *ContentTypeSys `json:"target,omitempty"`
 }
 
 type RichTextMark struct {

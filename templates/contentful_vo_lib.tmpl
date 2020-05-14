@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
+	"strings"
 	"time"
 	"github.com/foomo/contentful"
 )
@@ -64,7 +66,7 @@ func NewContentfulClient(spaceID string, ck *ContentfulKeys, debug bool) (*Conte
 	return cc, nil
 }
 
-
+// Asset utils
 func NewAssetFromURL(id string, uploadUrl string, imageFileType string, title string, locale ...Locale) *contentful.Asset {
 	autoID := fmt.Sprintf("%d", time.Now().UnixNano()/int64(time.Millisecond))
 	if id == "" {
@@ -108,6 +110,176 @@ func ToAssetReference(asset *contentful.Asset) (refSys ContentTypeSys) {
 	refSys.Sys.LinkType = FieldLinkTypeAsset
 	return
 }
+
+// RichText utils
+
+func convertHtmlToRichText(htmlSrc string) (*RichTextNode, error) {
+	htmlClean := strings.TrimSpace(htmlSrc)
+	htmlClean = strings.ReplaceAll(htmlClean, `&nbsp;`, ` `)
+	htmlClean = strings.ReplaceAll(htmlClean, "\t", "")
+	htmlClean = regexp.MustCompile(`[\s]{2,}`).ReplaceAllString(htmlClean, " ")
+	re := regexp.MustCompile(`>([^\n])`)
+	htmlClean = re.ReplaceAllString(htmlClean, fmt.Sprintf(">\n"+`$1`))
+	re = regexp.MustCompile(`(.{1})<`)
+	htmlClean = re.ReplaceAllString(htmlClean, `$1`+fmt.Sprintf("\n<"))
+	htmlLines := strings.Split(htmlClean, "\n")
+	rtnd := &RichTextNode{
+		NodeType: RichTextNodeDocument,
+	}
+	rtnd.Content, _ = htmlLinesToRichTextNode(htmlLines, 0, "", nil)
+	return rtnd, nil
+}
+
+func getMark(mark string) string {
+	switch mark {
+	case HtmlItalic, HtmlEm:
+		return RichTextMarkItalic
+	case HtmlBold, HtmlStrong:
+		return RichTextMarkBold
+	}
+	return ""
+}
+
+func getAttribute(htmlLine string, attribute string) string {
+	re := regexp.MustCompile(` href=["']([^"']+)["']`)
+	matches := re.FindStringSubmatch(htmlLine)
+	if len(matches) == 2 {
+		return strings.ToLower(matches[1])
+	}
+	return ""
+}
+
+func htmlLinesToRichTextNode(htmlLines []string, start int, pendingTag string, marks []string) ([]interface{}, int) {
+	nodeSlice := make([]interface{}, 0)
+	for i := start; i < len(htmlLines); i++ {
+		htmlLine := htmlLines[i]
+		if isClosingPending(htmlLine, pendingTag) {
+			return nodeSlice, i
+		}
+		currentNode := RichTextNode{}
+		if isTag(htmlLine) {
+			tt := tagType(htmlLine)
+			switch tt {
+			case HtmlParagraph, HtmlHeading1, HtmlHeading2, HtmlHeading3, HtmlHeading4, HtmlHeading5, HtmlHeading6, HtmlUnorderedList, HtmlOrderedList:
+				currentNode.NodeType = mapTagRichTextNodeType(tt)
+				var nextLine int
+				currentNode.Content, nextLine = htmlLinesToRichTextNode(htmlLines, i+1, tt, marks)
+				nodeSlice = append(nodeSlice, currentNode)
+				if nextLine == -1 {
+					return nodeSlice, -1
+				}
+				i = nextLine
+			case HtmlBlockquote, HtmlListItem:
+				currentNode.NodeType = mapTagRichTextNodeType(tt)
+				currentNode.Content = make([]interface{}, 0)
+				innerContent, nextLine := htmlLinesToRichTextNode(htmlLines, i+1, tt, marks)
+				currentNode.Content = append(currentNode.Content, RichTextNode{
+					NodeType: RichTextNodeParagraph,
+					Content:  innerContent,
+				})
+				nodeSlice = append(nodeSlice, currentNode)
+				if nextLine == -1 {
+					return nodeSlice, -1
+				}
+				i = nextLine
+			case HtmlAnchor:
+				currentNode.NodeType = RichTextNodeHyperlink
+				var nextLine int
+				currentNode.Data = RichTextData{URI: getAttribute(htmlLine, HtmlAttributeHref)}
+				currentNode.Content, nextLine = htmlLinesToRichTextNode(htmlLines, i+1, tt, marks)
+				nodeSlice = append(nodeSlice, currentNode)
+				if nextLine == -1 {
+					return nodeSlice, -1
+				}
+				i = nextLine
+			case HtmlHorizontalRule:
+				currentNode.NodeType = RichTextNodeHR
+				currentNode.Content = make([]interface{}, 0)
+				nodeSlice = append(nodeSlice, currentNode)
+			case HtmlItalic, HtmlEm, HtmlBold, HtmlStrong:
+				marks = append(marks, tt)
+			case HtmlBreak:
+				if nodeSlice[len(nodeSlice)-1].(RichTextNodeTextNode).NodeType == RichTextNodeText {
+					target := nodeSlice[len(nodeSlice)-1].(RichTextNodeTextNode)
+					target.Value += "\n"
+					nodeSlice[len(nodeSlice)-1] = target
+				}
+			}
+			continue //unsupported tags will be ignored but content is preserved
+		}
+		if isClosingTag(htmlLine) {
+			continue //closing tags that are not pending equal to unknown
+		}
+		if htmlLine == " " {
+			continue
+		}
+		currentNodeTextNode := RichTextNodeTextNode{}
+		currentNodeTextNode.NodeType = RichTextNodeText
+		currentNodeTextNode.Marks = []RichTextMark{}
+		currentNodeTextNode.Value = htmlLine
+		for _, mark := range marks {
+			currentNodeTextNode.Marks = append(currentNodeTextNode.Marks, RichTextMark{
+				Type: getMark(mark),
+			})
+		}
+		marks = nil
+		nodeSlice = append(nodeSlice, currentNodeTextNode)
+	}
+	return nodeSlice, -1
+}
+
+func isClosingPending(htmlLine, tag string) bool {
+	return regexp.MustCompile(`</` + strings.ToLower(tag) + `.+$`).MatchString(strings.ToLower(htmlLine))
+}
+
+func isClosingTag(htmlLine string) bool {
+	return regexp.MustCompile(`</[a-zA-Z]+.+$`).MatchString(htmlLine)
+}
+
+func isTag(htmlLine string) bool {
+	return regexp.MustCompile(`<[a-zA-Z]+.+$`).MatchString(htmlLine)
+}
+
+func mapTagRichTextNodeType(tag string) string {
+	switch tag {
+	case HtmlParagraph:
+		return RichTextNodeParagraph
+	case HtmlAnchor:
+		return RichTextNodeHyperlink
+	case HtmlHeading1:
+		return RichTextNodeHeading1
+	case HtmlHeading2:
+		return RichTextNodeHeading2
+	case HtmlHeading3:
+		return RichTextNodeHeading3
+	case HtmlHeading4:
+		return RichTextNodeHeading4
+	case HtmlHeading5:
+		return RichTextNodeHeading5
+	case HtmlHeading6:
+		return RichTextNodeHeading6
+	case HtmlBlockquote:
+		return RichTextNodeBlockquote
+	case HtmlUnorderedList:
+		return RichTextNodeUnorderedList
+	case HtmlOrderedList:
+		return RichTextNodeOrderedList
+	case HtmlListItem:
+		return RichTextNodeListItem
+	}
+	return ""
+}
+
+func tagType(htmlLine string) string {
+	re := regexp.MustCompile(`^<([a-zA-Z0-9]+)[\s]*>*`)
+	matches := re.FindStringSubmatch(htmlLine)
+	if len(matches) == 2 {
+		return strings.ToLower(matches[1])
+	}
+	return ""
+}
+
+// Other utils
 
 func (ref ContentfulReferencedEntry) ContentType() (contentType string) {
 	return ref.Entry.Sys.ContentType.Sys.ID
@@ -375,7 +547,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 			return nil, ErrRefNotIncludes
 			
 		}
-		tempAsset := &contentful.IncludeAsset{}
+		tempAsset := &contentful.AssetNoLocale{}
 		tempAsset.Sys = includeAssetMap[eachLocalized{{ firstCap $field.ID }}.Sys.ID].Sys
 		tempAsset.Fields = &contentful.FileFieldsNoLocale{}
 		tempAsset.Fields.Title = includeAssetMap[eachLocalized{{ firstCap $field.ID }}.Sys.ID].Fields.Title[string(loc)]
@@ -424,6 +596,9 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) Set{{ firstCap $field.ID }}({{ $
 		if _, ok := localeFallback[loc]; !ok {
 			return ErrLocaleUnsupported
 		}
+	}
+	if vo.Fields.{{ firstCap $field.ID }} == nil {
+		vo.Fields.{{ firstCap $field.ID }} = make(map[string]{{ mapFieldType $contentType.Sys.ID $field }})
 	} 
 	vo.Fields.{{ firstCap $field.ID }}[string(loc)] = {{ $field.ID }}
 	return
