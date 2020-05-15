@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
+	"io"
 	"regexp"
 	"strings"
 	"time"
@@ -152,6 +154,10 @@ func getMark(mark string) string {
 		return RichTextMarkItalic
 	case HtmlBold, HtmlStrong:
 		return RichTextMarkBold
+	case HtmlUnderline:
+		return RichTextMarkUnderline
+	case HtmlCode:
+		return RichTextMarkCode
 	}
 	return ""
 }
@@ -198,6 +204,15 @@ func htmlLinesToRichTextNode(htmlLines []string, start int, pendingTag string, m
 					return nodeSlice, -1
 				}
 				i = nextLine
+			case HtmlCode:
+				currentNode.NodeType = RichTextNodeParagraph
+				var nextLine int
+				currentNode.Content, nextLine = htmlLinesToRichTextNode(htmlLines, i+1, HtmlCode, []string{HtmlCode})
+				nodeSlice = append(nodeSlice, currentNode)
+				if nextLine == -1 {
+					return nodeSlice, -1
+				}
+				i = nextLine
 			case HtmlAnchor:
 				currentNode.NodeType = RichTextNodeHyperlink
 				var nextLine int
@@ -212,7 +227,7 @@ func htmlLinesToRichTextNode(htmlLines []string, start int, pendingTag string, m
 				currentNode.NodeType = RichTextNodeHR
 				currentNode.Content = make([]interface{}, 0)
 				nodeSlice = append(nodeSlice, currentNode)
-			case HtmlItalic, HtmlEm, HtmlBold, HtmlStrong:
+			case HtmlItalic, HtmlEm, HtmlBold, HtmlStrong, HtmlUnderline:
 				marks = append(marks, tt)
 			case HtmlBreak:
 				if nodeSlice[len(nodeSlice)-1].(RichTextNodeTextNode).NodeType == RichTextNodeText {
@@ -293,6 +308,128 @@ func tagType(htmlLine string) string {
 		return strings.ToLower(matches[1])
 	}
 	return ""
+}
+
+func (ts htmlTags) open(w io.Writer) {
+
+	for _, t := range ts {
+		tagString := "<" + t.name
+		if len(t.attrs) > 0 {
+			for name, value := range t.attrs {
+				tagString += " " + name + `="` + html.EscapeString(value) + `"`
+			}
+		}
+		w.Write([]byte(tagString + ">"))
+	}
+}
+
+func (ts htmlTags) close(w io.Writer) {
+
+	for _, t := range ts {
+		w.Write([]byte("</" + t.name + ">"))
+	}
+}
+
+type LinkResolverFunc func(url string) (resolvedURL string, resolveError error)
+
+func (n *RichTextGenericNode) renderHTML(w io.Writer, linkResolver LinkResolverFunc) (err error) {
+
+	tags := htmlTags{}
+
+	switch n.NodeType {
+	case RichTextNodeParagraph:
+		tags = []htmlTag{htmlTag{name: HtmlParagraph}}
+	case RichTextNodeHeading1:
+		tags = []htmlTag{htmlTag{name: HtmlHeading1}}
+	case RichTextNodeHeading2:
+		tags = []htmlTag{htmlTag{name: HtmlHeading2}}
+	case RichTextNodeHeading3:
+		tags = []htmlTag{htmlTag{name: HtmlHeading3}}
+	case RichTextNodeHeading4:
+		tags = []htmlTag{htmlTag{name: HtmlHeading4}}
+	case RichTextNodeHeading5:
+		tags = []htmlTag{htmlTag{name: HtmlHeading5}}
+	case RichTextNodeHeading6:
+		tags = []htmlTag{htmlTag{name: HtmlHeading6}}
+	case RichTextNodeOrderedList:
+		tags = []htmlTag{htmlTag{name: HtmlOrderedList}}
+	case RichTextNodeUnorderedList:
+		tags = []htmlTag{htmlTag{name: HtmlUnorderedList}}
+	case RichTextNodeListItem:
+		tags = []htmlTag{htmlTag{name: HtmlListItem}}
+	case RichTextNodeHR:
+		tags = []htmlTag{htmlTag{name: HtmlHorizontalRule}}
+	case RichTextNodeBlockquote:
+		tags = []htmlTag{htmlTag{name: HtmlBlockquote}}
+	case RichTextNodeText:
+		tags = []htmlTag{}
+	case RichTextNodeHyperlink:
+		uri, _ := n.Data["uri"]
+		attrs := map[string]string{}
+		switch uri.(type) {
+		case string:
+			uriString := uri.(string)
+			if uriString != "" {
+				resolvedURL, errResolveURL := linkResolver(uriString)
+				if errResolveURL != nil {
+					err = errResolveURL
+					return
+				}
+
+				attrs["href"] = resolvedURL
+			}
+
+		}
+		tags = []htmlTag{htmlTag{name: HtmlAnchor, attrs: attrs}}
+	default:
+	}
+	for _, m := range n.Marks {
+		markTag := ""
+		switch m.Type {
+		case RichTextMarkBold:
+			markTag = HtmlBold
+		case RichTextMarkItalic:
+			markTag = HtmlItalic
+		case RichTextMarkUnderline:
+			markTag = HtmlUnderline
+		case RichTextMarkCode:
+			markTag = HtmlCode
+		case RichTextNodeBlockquote:
+			markTag = HtmlBlockquote
+		}
+		if markTag != "" {
+			tags = append(tags, htmlTag{name: markTag})
+		}
+	}
+
+	tags.open(w)
+	w.Write([]byte(html.EscapeString(n.Value)))
+	for _, subNode := range n.Content {
+		errSubNode := subNode.renderHTML(w, linkResolver)
+		if errSubNode != nil {
+			err = errSubNode
+			return
+		}
+	}
+	tags.close(w)
+	return
+}
+
+func RichTextToHtml(rt interface{}) string {
+	w := bytes.NewBuffer([]byte{})
+	node := &RichTextGenericNode{}
+	byt, err := json.Marshal(rt)
+	if err != nil {
+		return ""
+	}
+	err = json.Unmarshal(byt, node)
+	if err != nil {
+		return ""
+	}
+	node.renderHTML(w, func(url string) (transformedURL string, err error) {
+		return url, nil
+	})
+	return string(w.Bytes())
 }
 
 // Other utils

@@ -42,8 +42,10 @@ const (
 	HtmlEm             string = "em"
 	HtmlBold           string = "b"
 	HtmlStrong         string = "strong"
+	HtmlUnderline      string = "u"
 	HtmlAnchor         string = "a"
 	HtmlBlockquote     string = "blockquote"
+	HtmlCode           string = "code"
 	HtmlUnorderedList  string = "ul"
 	HtmlOrderedList    string = "ol"
 	HtmlListItem       string = "li"
@@ -108,6 +110,13 @@ type RichTextNodeTextNode struct {
 	Marks    []RichTextMark `json:"marks"`
 }
 
+type RichTextGenericNode struct {
+	NodeType string                 `json:"nodeType"`
+	Content  []*RichTextGenericNode `json:"content"`
+	Data     map[string]interface{} `json:"data"`
+	Value    string                 `json:"value"`
+	Marks    []RichTextMark         `json:"marks"`
+}
 
 type RichTextData struct {
 	URI    string         `json:"uri,omitempty"`
@@ -117,3 +126,10 @@ type RichTextData struct {
 type RichTextMark struct {
 	Type string `json:"type,omitempty"`
 }
+
+type htmlTag struct {
+	attrs map[string]string
+	name  string
+}
+
+type htmlTags []htmlTag

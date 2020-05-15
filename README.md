@@ -166,5 +166,8 @@ Converts the asset to a reference. You need to do this before you add the asset 
 
 >**HtmlToRichText**(htmlSrc string) *RichTextNode
 
-Converts a string HTML to a RichTextNode. This is far from complete but useful to migrate data from third-party systems to Contentful. It currently supports headings, paragraphs, hyperlinks, italic and bold tags, horizontal rules, blockquote, ordered and unordered lists. Note that this function doesn't return any error, as it converts the input text into something as good as possible without any validation.
+Converts an HTML fragment to a RichTextNode. This is far from complete but useful to migrate data from third-party systems to Contentful. It currently supports headings, paragraphs, hyperlinks, italic and bold tags, horizontal rules, blockquote, ordered and unordered lists, code. Unknown tags are stripped. This function doesn't return any error as it converts the input text into something as good as possible, without  validation.
 
+>**RichTextToHtml**(rt interface{}) string
+
+Converts an interface representing a Contentful RichText value (usually from a field getter) into HTML. It currently supports all tags except for embedded and inline entries and assets.
