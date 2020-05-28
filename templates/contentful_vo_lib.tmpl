@@ -99,7 +99,7 @@ func NewAssetFromURL(id string, uploadUrl string, imageFileType string, title st
 		},
 		Fields: &contentful.FileFields{
 			File: map[string]*contentful.File{
-				string(loc): &contentful.File{
+				string(loc): {
 					UploadURL:   uploadUrl,
 					ContentType: imageFileType,
 					Name:        id,
@@ -351,29 +351,29 @@ func (n *RichTextGenericNode) renderHTML(w io.Writer, linkResolver LinkResolverF
 
 	switch n.NodeType {
 	case RichTextNodeParagraph:
-		tags = []htmlTag{htmlTag{name: HtmlParagraph}}
+		tags = []htmlTag{ {name: HtmlParagraph} }
 	case RichTextNodeHeading1:
-		tags = []htmlTag{htmlTag{name: HtmlHeading1}}
+		tags = []htmlTag{ {name: HtmlHeading1} }
 	case RichTextNodeHeading2:
-		tags = []htmlTag{htmlTag{name: HtmlHeading2}}
+		tags = []htmlTag{ {name: HtmlHeading2} }
 	case RichTextNodeHeading3:
-		tags = []htmlTag{htmlTag{name: HtmlHeading3}}
+		tags = []htmlTag{ {name: HtmlHeading3} }
 	case RichTextNodeHeading4:
-		tags = []htmlTag{htmlTag{name: HtmlHeading4}}
+		tags = []htmlTag{ {name: HtmlHeading4} }
 	case RichTextNodeHeading5:
-		tags = []htmlTag{htmlTag{name: HtmlHeading5}}
+		tags = []htmlTag{ {name: HtmlHeading5} }
 	case RichTextNodeHeading6:
-		tags = []htmlTag{htmlTag{name: HtmlHeading6}}
+		tags = []htmlTag{ {name: HtmlHeading6} }
 	case RichTextNodeOrderedList:
-		tags = []htmlTag{htmlTag{name: HtmlOrderedList}}
+		tags = []htmlTag{ {name: HtmlOrderedList} }
 	case RichTextNodeUnorderedList:
-		tags = []htmlTag{htmlTag{name: HtmlUnorderedList}}
+		tags = []htmlTag{ {name: HtmlUnorderedList} }
 	case RichTextNodeListItem:
-		tags = []htmlTag{htmlTag{name: HtmlListItem}}
+		tags = []htmlTag{ {name: HtmlListItem} }
 	case RichTextNodeHR:
-		tags = []htmlTag{htmlTag{name: HtmlHorizontalRule}}
+		tags = []htmlTag{ {name: HtmlHorizontalRule} }
 	case RichTextNodeBlockquote:
-		tags = []htmlTag{htmlTag{name: HtmlBlockquote}}
+		tags = []htmlTag{ {name: HtmlBlockquote} }
 	case RichTextNodeText:
 		tags = []htmlTag{}
 	case RichTextNodeHyperlink:
