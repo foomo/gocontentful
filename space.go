@@ -18,6 +18,7 @@ type SpaceConf struct {
 	PackageName  string
 	Locales      []Locale
 	ContentTypes []ContentType
+	ContentType  ContentType
 }
 
 // GetLocales retrieves locale definition from Contentful

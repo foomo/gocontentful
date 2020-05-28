@@ -6,9 +6,10 @@ const (
 	TplDir = "/templates/"
 	OutDir = "/generated/"
 
-	VoLib   = "contentful_vo_lib"
-	VoBase  = "contentful_vo_base"
-	VoSpace = "contentful_vo"
+	VoLib            = "contentful_vo_lib"
+	VoLibContentType = "contentful_vo_lib_contenttype"
+	VoBase           = "contentful_vo_base"
+	VoSpace          = "contentful_vo"
 
 	FieldTypeArray    = "Array"
 	FieldTypeBoolean  = "Boolean"
