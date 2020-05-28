@@ -39,9 +39,15 @@ type ContentfulClient struct {
 	CPA     *contentful.Contentful
 	CMA     *contentful.Contentful
 	Debug   bool
+	LogFn   func(
+		contentType string,
+		entryID string,
+		method string,
+		err error,
+	)
 }
 
-func NewContentfulClient(spaceID string, ck *ContentfulKeys, debug bool) (*ContentfulClient, error) {
+func NewContentfulClient(spaceID string, ck *ContentfulKeys, logFn func(contentType string, entryID string, method string, err error), debug bool) (*ContentfulClient, error) {
 	cc := &ContentfulClient{}
 	if spaceID == "" {
 		return nil, errors.New("NewContentfulClient: SpaceID cannot be empty")
@@ -65,6 +71,7 @@ func NewContentfulClient(spaceID string, ck *ContentfulKeys, debug bool) (*Conte
 		cc.CMA = contentful.NewCMA(ck.CMAKey)
 		cc.CMA.Debug = debug
 	}
+	cc.LogFn = logFn
 	return cc, nil
 }
 

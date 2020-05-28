@@ -13,25 +13,34 @@ Let's assume you want to generate a package named "people" and manipulate entrie
 
 `go run cmd/contentfulerm.go -spaceid=YOUR_SPACE_ID -cmakey=YOUR_MANAGEMENT_KEY -package=people -contenttypes=person`
 
-The script will scan the space, download locales and content types and create three files in a directory named after the package inside the "generated" directory:
+Note: You can pass multiple values to contenttypes as a comma-separated list
+
+The script will scan the space, download locales and content types and generate some files in a directory named after the package inside the "generated" directory:
 
 <pre><code>generated/people
 |-contentful_vo_base.go
+|-contentful_vo_lib_person.go // One file for each content type
 |-contentful_vo_lib.go
-|-contentful_vo.go</code></pre>
+|-contentful_vo.go
+</code></pre>
 
 Copy these files into a subdirectory of your project and import the "people" package. 
 
 _Note: Do NOT modify these files! If you change the content model in Contentful you will need to run the generator again and overwrite the files._
 
-Current function set
+Public function set
 ---------------------
 
 **BASE FUNCTIONS COMMON TO ALL CONTENT TYPES**
 
->**NewContentfulClient**(spaceID string, ck *ContentfulKeys, debug bool) (*ContentfulClient, error)
+>**NewContentfulClient**(spaceID string, ck *ContentfulKeys, logFn func(contentType string, entryID string, method string, err error), debug bool) (*ContentfulClient, error)
 
-Creates a Contentful client, this is the first function you need to call.
+Creates a Contentful client, this is the first function you need to call:
+
+* _spaceID_ is the ID of the Contentful space the client attach to
+* _ck_ is a struct you can fill in with all the keys for the APIs you need to work with. For instance, you will need a CDAKey if you want to use the Get methods for the Content Delivery API or a CMAKey if you nee the Manage methods. 
+* _logFn_ is logging function you can pass to the client to be used by the shortcut value getter or conversion methods. Normal getters are named after the field name or content type and return both a value and an error, e.g. _Name()_ for a person. Often in the application code it's safe and much less verbose not to handle errors for each getter but accept a default  return value, for example an empty string for a string field that is not filled in. In these cases you can prefix the method with an underscore, e.g. ___Name()_ to get only the value. If you pass a logging function to the client's constructor, it will be called transparently any time it's not possible to read or convert a value and the default is returned. This way the application code remains lean but you still get full logging of the underlying operations. Note that it's your responsibility to check in your application that some return values are safe before calling further methods, especially in case of _nil_ values like a en empty reference field that might panic if you call a conversion function on them!
+* _debug_ enables or disables the debug mode in the Contentful client
 
 ---
 
@@ -79,13 +88,13 @@ Retrieves draft Person entries matching the specified query from the CPA.
 
 Retrieves the draft Person entry with the specified ID from the CPA.
 
->**ColToCfPerson**(col *contentful.Collection) (vos []*CfPerson, err error)
-
-Converts a *contentful.Collection to the corresponding value objects.
-
 >(ref ContentfulReferencedEntry) **ToCfPerson**() (vo *CfPerson, err error)
 
 Converts a referenced entry to the specified value object. See the ContentType() function above.
+
+>(ref ContentfulReferencedEntry) **_ToCfPerson**() (vo *CfPerson)
+
+Shortcut (value only) version of the previous method, with automatic logging to the client if defined (see NewContentfulClient above)
 
 ---
 
@@ -123,6 +132,10 @@ Possible return types are:
 - _[]*ContentTypeSys_ for multiple reference fields
 - _*ContentTypeFieldLocation_ for fields of type Location
 - *interface{} for fields of type Object or RichText
+
+>(vo *CfPerson) **\_Name**(locale ...string) (string) 
+
+Shortcut (value only) version of the previous method, with automatic logging to the client if defined (see NewContentfulClient above)
 
 ---
 

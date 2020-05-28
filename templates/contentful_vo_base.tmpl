@@ -94,6 +94,12 @@ type ContentTypeFieldLocation struct {
 type ContentfulReferencedEntry struct {
 	Entry 	*contentful.Entry
 	Col 	*contentful.Collection
+	LogFn   func(
+		contentType string,
+		entryID string,
+		method string,
+		err error,
+	)
 }
 
 // RichText

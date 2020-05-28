@@ -8,6 +8,12 @@ type Cf{{ firstCap $contentType.Sys.ID }} struct {
 	Sys    ContentfulSys          `json:"sys,omitempty"`
 	Fields Cf{{ firstCap $contentType.Sys.ID }}Fields `json:"fields,omitempty"`
 	Col    *contentful.Collection
+	LogFn  func(
+		contentType string,
+		entryID string,
+		method string,
+		err error,
+	)
 }
 
 // Cf{{ firstCap $contentType.Sys.ID }}Fields is a CfNameFields VO

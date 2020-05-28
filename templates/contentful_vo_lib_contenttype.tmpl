@@ -35,7 +35,7 @@ func (cc *ContentfulClient) GetFiltered{{ firstCap $contentType.Sys.ID }}(query 
 	}
 	col.Query.ContentType("{{ $contentType.Sys.ID }}").Locale("*").Include(10)
 	col.GetAll()
-	return ColToCf{{ firstCap $contentType.Sys.ID }}(col)
+	return colToCf{{ firstCap $contentType.Sys.ID }}(col,cc.LogFn)
 }
 
 func (cc *ContentfulClient) Get{{ firstCap $contentType.Sys.ID }}ByID(id string) (vo *Cf{{ firstCap $contentType.Sys.ID }}, err error) {
@@ -48,7 +48,7 @@ func (cc *ContentfulClient) Get{{ firstCap $contentType.Sys.ID }}ByID(id string)
 	if len(col.Items) == 0 {
 		return nil, fmt.Errorf("Get{{ firstCap $contentType.Sys.ID }}ByID: %s Not found", id)
 	}
-	vos, err := ColToCf{{ firstCap $contentType.Sys.ID }}(col)
+	vos, err := colToCf{{ firstCap $contentType.Sys.ID }}(col,cc.LogFn)
 	if err != nil {
 		return nil, fmt.Errorf("Get{{ firstCap $contentType.Sys.ID }}ByID: Error converting %s to VO: " + err.Error(), id)
 	}
@@ -70,7 +70,7 @@ func (cc *ContentfulClient) PreviewFiltered{{ firstCap $contentType.Sys.ID }}(qu
 	}
 	col.Query.ContentType("{{ $contentType.Sys.ID }}").Locale("*").Include(10)
 	col.GetAll()
-	return ColToCf{{ firstCap $contentType.Sys.ID }}(col)
+	return colToCf{{ firstCap $contentType.Sys.ID }}(col,cc.LogFn)
 }
 
 func (cc *ContentfulClient) Preview{{ firstCap $contentType.Sys.ID }}ByID(id string) (vo *Cf{{ firstCap $contentType.Sys.ID }}, err error) {
@@ -83,7 +83,7 @@ func (cc *ContentfulClient) Preview{{ firstCap $contentType.Sys.ID }}ByID(id str
 	if len(col.Items) == 0 {
 		return nil, fmt.Errorf("Preview{{ firstCap $contentType.Sys.ID }}ByID: %s Not found", id)
 	}
-	vos, err := ColToCf{{ firstCap $contentType.Sys.ID }}(col)
+	vos, err := colToCf{{ firstCap $contentType.Sys.ID }}(col,cc.LogFn)
 	if err != nil {
 		return nil, fmt.Errorf("Preview{{ firstCap $contentType.Sys.ID }}ByID: Error converting %s to VO: " + err.Error(), id)
 	}
@@ -105,7 +105,7 @@ func (cc *ContentfulClient) ManageFiltered{{ firstCap $contentType.Sys.ID }}(que
 	}
 	col.Query.ContentType("{{ $contentType.Sys.ID }}").Locale("*").Include(10)
 	col.GetAll()
-	return ColToCf{{ firstCap $contentType.Sys.ID }}(col)
+	return colToCf{{ firstCap $contentType.Sys.ID }}(col,cc.LogFn)
 }
 
 func (cc *ContentfulClient) Manage{{ firstCap $contentType.Sys.ID }}ByID(id string) (vo *Cf{{ firstCap $contentType.Sys.ID }}, err error) {
@@ -118,7 +118,7 @@ func (cc *ContentfulClient) Manage{{ firstCap $contentType.Sys.ID }}ByID(id stri
 	if len(col.Items) == 0 {
 		return nil, fmt.Errorf("Manage{{ firstCap $contentType.Sys.ID }}ByID: %s Not found", id)
 	}
-	vos, err := ColToCf{{ firstCap $contentType.Sys.ID }}(col)
+	vos, err := colToCf{{ firstCap $contentType.Sys.ID }}(col,cc.LogFn)
 	if err != nil {
 		return nil, fmt.Errorf("Manage{{ firstCap $contentType.Sys.ID }}ByID: Error converting %s to VO: " + err.Error(), id)
 	}
@@ -126,7 +126,7 @@ func (cc *ContentfulClient) Manage{{ firstCap $contentType.Sys.ID }}ByID(id stri
 	return
 }
 
-func ColToCf{{ firstCap $contentType.Sys.ID }}(col *contentful.Collection) (vos []*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
+func colToCf{{ firstCap $contentType.Sys.ID }}(col *contentful.Collection, logFn func(string, string, string, error)) (vos []*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
 	for _, item := range col.Items {
 		var vo Cf{{ firstCap $contentType.Sys.ID }}
 		byteArray, _ := json.Marshal(item)
@@ -135,6 +135,7 @@ func ColToCf{{ firstCap $contentType.Sys.ID }}(col *contentful.Collection) (vos 
 			break
 		}
 		vo.Col = col
+		vo.LogFn = logFn
 		vos = append(vos, &vo)
 	}
 	return vos, err
@@ -150,10 +151,20 @@ func (ref ContentfulReferencedEntry) ToCf{{ firstCap $contentType.Sys.ID }}() (v
 	return vo, nil
 }
 
+func (ref ContentfulReferencedEntry) _ToCf{{ firstCap $contentType.Sys.ID }}() (vo *Cf{{ firstCap $contentType.Sys.ID }}) {
+	byteArray, _ := json.Marshal(ref.Entry)
+	err := json.NewDecoder(bytes.NewReader(byteArray)).Decode(&vo)
+	if err != nil && vo.LogFn != nil {
+		vo.LogFn(ref.Entry.Sys.ContentType.Sys.ID, ref.Entry.Sys.ID, "_ToCf{{ firstCap $contentType.Sys.ID }}()", err)
+		return
+	}
+	vo.Col = ref.Col
+	return
+}
+
 // {{ firstCap $contentType.Sys.ID }} Field getters
 {{ range $fieldIndex, $field := $contentType.Fields }}
-{{ if fieldIsBasic $field }}
-func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale ...Locale) ({{ mapFieldType $contentType.Sys.ID $field }}, error) {
+{{ if fieldIsBasic $field }}func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale ...Locale) ({{ mapFieldType $contentType.Sys.ID $field }}, error) {
 	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
@@ -171,6 +182,17 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 		}
 	}
 	return vo.Fields.{{ firstCap $field.ID }}[string(loc)], nil
+}
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) _{{ firstCap $field.ID }}(locale ...Locale) ({{ mapFieldType $contentType.Sys.ID $field }}) {
+	loc := defaultLocale
+	if len(locale) != 0 {
+		loc = locale[0]
+	}
+	value, err := vo.{{ firstCap $field.ID }}(loc)
+	if err != nil && vo.LogFn != nil {
+		vo.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "_{{ firstCap $field.ID }}()", err)
+	}
+	return value
 }{{ end }}{{ if fieldIsComplex $field }}
 func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale ...Locale) (*{{ mapFieldType $contentType.Sys.ID $field }}, error) {
 	loc := defaultLocale
@@ -191,6 +213,17 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 	}
 	{{ $field.ID }} := vo.Fields.{{ firstCap $field.ID }}[string(loc)]
 	return &{{ $field.ID }}, nil
+}
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) _{{ firstCap $field.ID }}(locale ...Locale) ({{ mapFieldType $contentType.Sys.ID $field }}) {
+	loc := defaultLocale
+	if len(locale) != 0 {
+		loc = locale[0]
+	}
+	value, err := vo.{{ firstCap $field.ID }}(loc)
+	if err != nil && vo.LogFn != nil {
+		vo.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "_{{ firstCap $field.ID }}()", err)
+	}
+	return value
 }{{ end }}{{ if fieldIsMultipleReference $field }}func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale ...Locale) ([]*ContentfulReferencedEntry, error) {
 	{{ $field.ID }} := []*ContentfulReferencedEntry{}
 	loc := defaultLocale
@@ -220,6 +253,17 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 		})
 	}
 	return {{ $field.ID }}, nil 
+}
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) _{{ firstCap $field.ID }}(locale ...Locale) ([]*ContentfulReferencedEntry) {
+	loc := defaultLocale
+	if len(locale) != 0 {
+		loc = locale[0]
+	}
+	value, err := vo.{{ firstCap $field.ID }}(loc)
+	if err != nil && vo.LogFn != nil {
+		vo.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "_{{ firstCap $field.ID }}()", err)
+	}
+	return value
 }{{ end }}{{ if fieldIsReference $field }}func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale ...Locale) (*ContentfulReferencedEntry, error) {
 	{{ $field.ID }} := &ContentfulReferencedEntry{}
 	loc := defaultLocale
@@ -246,6 +290,17 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 	{{ $field.ID }}.Entry = includesEntryMap[localized{{ firstCap $field.ID }}.Sys.ID]
 	{{ $field.ID }}.Col = vo.Col
 	return {{ $field.ID }}, nil
+}
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) _{{ firstCap $field.ID }}(locale ...Locale) (*ContentfulReferencedEntry) {
+	loc := defaultLocale
+	if len(locale) != 0 {
+		loc = locale[0]
+	}
+	value, err := vo.{{ firstCap $field.ID }}(loc)
+	if err != nil && vo.LogFn != nil {
+		vo.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "_{{ firstCap $field.ID }}()", err)
+	}
+	return value
 }{{ end }}{{ if fieldIsMultipleAsset $field }}func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale ...Locale) ([]*contentful.AssetNoLocale, error) {
 	{{ $field.ID }} := []*contentful.AssetNoLocale{}
 	loc := defaultLocale
@@ -279,6 +334,17 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 		{{ $field.ID }} = append({{ $field.ID }}, tempAsset)
 	}
 	return {{ $field.ID }}, nil
+}
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) _{{ firstCap $field.ID }}(locale ...Locale) ([]*contentful.AssetNoLocale) {
+	loc := defaultLocale
+	if len(locale) != 0 {
+		loc = locale[0]
+	}
+	value, err := vo.{{ firstCap $field.ID }}(loc)
+	if err != nil && vo.LogFn != nil {
+		vo.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "_{{ firstCap $field.ID }}()", err)
+	}
+	return value
 }{{ end }}{{ if fieldIsAsset $field }}func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale ...Locale) (*contentful.AssetNoLocale, error) {
 	{{ $field.ID }} := &contentful.AssetNoLocale{}
 	{{ $field.ID }}.Fields = &contentful.FileFieldsNoLocale{}
@@ -308,6 +374,17 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 	{{ $field.ID }}.Fields.Description = includesAssetMap[localized{{ firstCap $field.ID }}.Sys.ID].Fields.Description[string(loc)]
 	{{ $field.ID }}.Fields.File = includesAssetMap[localized{{ firstCap $field.ID }}.Sys.ID].Fields.File[string(loc)]
 	return {{ $field.ID }}, nil
+}
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) _{{ firstCap $field.ID }}(locale ...Locale) (*contentful.AssetNoLocale) {
+	loc := defaultLocale
+	if len(locale) != 0 {
+		loc = locale[0]
+	}
+	value, err := vo.{{ firstCap $field.ID }}(loc)
+	if err != nil && vo.LogFn != nil {
+		vo.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "_{{ firstCap $field.ID }}()", err)
+	}
+	return value
 }{{ end }}{{ end }}
 
 // {{ firstCap $contentType.Sys.ID }} Field setters
