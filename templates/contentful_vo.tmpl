@@ -13,7 +13,7 @@ type Cf{{ firstCap $contentType.Sys.ID }} struct {
 		entryID string,
 		method string,
 		err error,
-	)
+	) `json:"-"`
 }
 
 // Cf{{ firstCap $contentType.Sys.ID }}Fields is a CfNameFields VO
