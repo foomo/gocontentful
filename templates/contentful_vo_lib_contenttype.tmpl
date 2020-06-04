@@ -151,11 +151,11 @@ func (ref ContentfulReferencedEntry) ToCf{{ firstCap $contentType.Sys.ID }}() (v
 	return vo, nil
 }
 
-func (ref ContentfulReferencedEntry) _ToCf{{ firstCap $contentType.Sys.ID }}() (vo *Cf{{ firstCap $contentType.Sys.ID }}) {
+func (ref ContentfulReferencedEntry) ValueOfCf{{ firstCap $contentType.Sys.ID }}() (vo *Cf{{ firstCap $contentType.Sys.ID }}) {
 	byteArray, _ := json.Marshal(ref.Entry)
 	err := json.NewDecoder(bytes.NewReader(byteArray)).Decode(&vo)
 	if err != nil && vo.LogFn != nil {
-		vo.LogFn(ref.Entry.Sys.ContentType.Sys.ID, ref.Entry.Sys.ID, "_ToCf{{ firstCap $contentType.Sys.ID }}()", err)
+		vo.LogFn(ref.Entry.Sys.ContentType.Sys.ID, ref.Entry.Sys.ID, "ValueOfCf{{ firstCap $contentType.Sys.ID }}()", err)
 		return
 	}
 	vo.Col = ref.Col
@@ -183,14 +183,14 @@ func (ref ContentfulReferencedEntry) _ToCf{{ firstCap $contentType.Sys.ID }}() (
 	}
 	return vo.Fields.{{ firstCap $field.ID }}[string(loc)], nil
 }
-func (vo *Cf{{ firstCap $contentType.Sys.ID }}) _{{ firstCap $field.ID }}(locale ...Locale) ({{ mapFieldType $contentType.Sys.ID $field }}) {
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) ValueOf{{ firstCap $field.ID }}(locale ...Locale) ({{ mapFieldType $contentType.Sys.ID $field }}) {
 	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
 	}
 	value, err := vo.{{ firstCap $field.ID }}(loc)
 	if err != nil && vo.LogFn != nil {
-		vo.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "_{{ firstCap $field.ID }}()", err)
+		vo.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "ValueOf{{ firstCap $field.ID }}()", err)
 	}
 	return value
 }{{ end }}{{ if fieldIsComplex $field }}
@@ -214,14 +214,14 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 	{{ $field.ID }} := vo.Fields.{{ firstCap $field.ID }}[string(loc)]
 	return &{{ $field.ID }}, nil
 }
-func (vo *Cf{{ firstCap $contentType.Sys.ID }}) _{{ firstCap $field.ID }}(locale ...Locale) ({{ mapFieldType $contentType.Sys.ID $field }}) {
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) ValueOf{{ firstCap $field.ID }}(locale ...Locale) ({{ mapFieldType $contentType.Sys.ID $field }}) {
 	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
 	}
 	value, err := vo.{{ firstCap $field.ID }}(loc)
 	if err != nil && vo.LogFn != nil {
-		vo.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "_{{ firstCap $field.ID }}()", err)
+		vo.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "ValueOf{{ firstCap $field.ID }}()", err)
 	}
 	return value
 }{{ end }}{{ if fieldIsMultipleReference $field }}func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale ...Locale) ([]*ContentfulReferencedEntry, error) {
@@ -254,14 +254,14 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) _{{ firstCap $field.ID }}(locale
 	}
 	return {{ $field.ID }}, nil 
 }
-func (vo *Cf{{ firstCap $contentType.Sys.ID }}) _{{ firstCap $field.ID }}(locale ...Locale) ([]*ContentfulReferencedEntry) {
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) ValueOf{{ firstCap $field.ID }}(locale ...Locale) ([]*ContentfulReferencedEntry) {
 	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
 	}
 	value, err := vo.{{ firstCap $field.ID }}(loc)
 	if err != nil && vo.LogFn != nil {
-		vo.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "_{{ firstCap $field.ID }}()", err)
+		vo.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "ValueOf{{ firstCap $field.ID }}()", err)
 	}
 	return value
 }{{ end }}{{ if fieldIsReference $field }}func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale ...Locale) (*ContentfulReferencedEntry, error) {
@@ -291,14 +291,14 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) _{{ firstCap $field.ID }}(locale
 	{{ $field.ID }}.Col = vo.Col
 	return {{ $field.ID }}, nil
 }
-func (vo *Cf{{ firstCap $contentType.Sys.ID }}) _{{ firstCap $field.ID }}(locale ...Locale) (*ContentfulReferencedEntry) {
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) ValueOf{{ firstCap $field.ID }}(locale ...Locale) (*ContentfulReferencedEntry) {
 	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
 	}
 	value, err := vo.{{ firstCap $field.ID }}(loc)
 	if err != nil && vo.LogFn != nil {
-		vo.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "_{{ firstCap $field.ID }}()", err)
+		vo.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "ValueOf{{ firstCap $field.ID }}()", err)
 	}
 	return value
 }{{ end }}{{ if fieldIsMultipleAsset $field }}func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale ...Locale) ([]*contentful.AssetNoLocale, error) {
@@ -335,14 +335,14 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) _{{ firstCap $field.ID }}(locale
 	}
 	return {{ $field.ID }}, nil
 }
-func (vo *Cf{{ firstCap $contentType.Sys.ID }}) _{{ firstCap $field.ID }}(locale ...Locale) ([]*contentful.AssetNoLocale) {
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) ValueOf{{ firstCap $field.ID }}(locale ...Locale) ([]*contentful.AssetNoLocale) {
 	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
 	}
 	value, err := vo.{{ firstCap $field.ID }}(loc)
 	if err != nil && vo.LogFn != nil {
-		vo.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "_{{ firstCap $field.ID }}()", err)
+		vo.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "ValueOf{{ firstCap $field.ID }}()", err)
 	}
 	return value
 }{{ end }}{{ if fieldIsAsset $field }}func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale ...Locale) (*contentful.AssetNoLocale, error) {
@@ -375,14 +375,14 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) _{{ firstCap $field.ID }}(locale
 	{{ $field.ID }}.Fields.File = includesAssetMap[localized{{ firstCap $field.ID }}.Sys.ID].Fields.File[string(loc)]
 	return {{ $field.ID }}, nil
 }
-func (vo *Cf{{ firstCap $contentType.Sys.ID }}) _{{ firstCap $field.ID }}(locale ...Locale) (*contentful.AssetNoLocale) {
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) ValueOf{{ firstCap $field.ID }}(locale ...Locale) (*contentful.AssetNoLocale) {
 	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
 	}
 	value, err := vo.{{ firstCap $field.ID }}(loc)
 	if err != nil && vo.LogFn != nil {
-		vo.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "_{{ firstCap $field.ID }}()", err)
+		vo.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "ValueOf{{ firstCap $field.ID }}()", err)
 	}
 	return value
 }{{ end }}{{ end }}
