@@ -243,7 +243,7 @@ func htmlLinesToRichTextNode(htmlLines []string, start int, pendingTag string, m
 			case HtmlItalic, HtmlEm, HtmlBold, HtmlStrong, HtmlUnderline:
 				marks = append(marks, tt)
 			case HtmlBreak:
-				if nodeSlice[len(nodeSlice)-1].(RichTextNodeTextNode).NodeType == RichTextNodeText {
+				if len(nodeSlice) > 0 && nodeSlice[len(nodeSlice)-1].(RichTextNodeTextNode).NodeType == RichTextNodeText {
 					target := nodeSlice[len(nodeSlice)-1].(RichTextNodeTextNode)
 					target.Value += "\n"
 					nodeSlice[len(nodeSlice)-1] = target
