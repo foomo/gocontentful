@@ -9,6 +9,8 @@ import (
 	"github.com/foomo/contentful"
 )
 
+const ContentType{{ firstCap $contentType.Sys.ID }} = "{{ $contentType.Sys.ID }}" 
+
 // ---{{ firstCap $contentType.Sys.ID }} methods---
 
 func NewCf{{ firstCap $contentType.Sys.ID }}() (cf{{ firstCap $contentType.Sys.ID }} *Cf{{ firstCap $contentType.Sys.ID }}) {
