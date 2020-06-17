@@ -184,3 +184,11 @@ Converts an HTML fragment to a RichTextNode. This is far from complete but usefu
 >**RichTextToHtml**(rt interface{}) string
 
 Converts an interface representing a Contentful RichText value (usually from a field getter) into HTML. It currently supports all tags except for embedded and inline entries and assets.
+
+---
+
+**CONSTANTS**
+
+Each generated content type library file exports a constant with the Contentful ID of the content type itself, for example in _contentful_vo_lib_person.go_:
+
+>const ContentTypePerson = "person"
