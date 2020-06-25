@@ -37,6 +37,11 @@ func (cc *ContentfulClient) GetFiltered{{ firstCap $contentType.Sys.ID }}(query 
 	}
 	col.Query.ContentType("{{ $contentType.Sys.ID }}").Locale("*").Include(10)
 	col.GetAll()
+	if col.Includes["Entry"] != nil {
+		for _, item := range col.Items { 
+			col.Includes["Entry"] = append(col.Includes["Entry"].([]interface{}), item)
+		}
+	}
 	return colToCf{{ firstCap $contentType.Sys.ID }}(col,cc.LogFn)
 }
 
@@ -72,6 +77,11 @@ func (cc *ContentfulClient) PreviewFiltered{{ firstCap $contentType.Sys.ID }}(qu
 	}
 	col.Query.ContentType("{{ $contentType.Sys.ID }}").Locale("*").Include(10)
 	col.GetAll()
+	if col.Includes["Entry"] != nil {
+		for _, item := range col.Items { 
+			col.Includes["Entry"] = append(col.Includes["Entry"].([]interface{}), item)
+		}
+	}
 	return colToCf{{ firstCap $contentType.Sys.ID }}(col,cc.LogFn)
 }
 
@@ -107,6 +117,11 @@ func (cc *ContentfulClient) ManageFiltered{{ firstCap $contentType.Sys.ID }}(que
 	}
 	col.Query.ContentType("{{ $contentType.Sys.ID }}").Locale("*").Include(10)
 	col.GetAll()
+	if col.Includes["Entry"] != nil {
+		for _, item := range col.Items { 
+			col.Includes["Entry"] = append(col.Includes["Entry"].([]interface{}), item)
+		}
+	}
 	return colToCf{{ firstCap $contentType.Sys.ID }}(col,cc.LogFn)
 }
 
