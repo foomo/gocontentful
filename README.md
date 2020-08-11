@@ -88,13 +88,9 @@ Retrieves draft Person entries matching the specified query from the CPA.
 
 Retrieves the draft Person entry with the specified ID from the CPA.
 
->(ref ContentfulReferencedEntry) **ToCfPerson**() (vo *CfPerson, err error)
+>(ref ContentfulReferencedEntry) **ToCfPerson**() (vo *CfPerson)
 
-Converts a referenced entry to the specified value object. See the ContentType() function above.
-
->(ref ContentfulReferencedEntry) **ValueOfCfPerson**() (vo *CfPerson)
-
-Shortcut (value only) version of the previous method, with automatic logging to the client if defined (see NewContentfulClient above)
+Shortcut (value only) version of the previous method, with automatic error logging if defined (see NewContentfulClient above)
 
 ---
 
@@ -155,7 +151,11 @@ Upserts the entry. This will appear as "Draft" (if it's a new entry) or "Changed
 
 >(vo *CfPerson) **PublishEntry**(cc *ContentfulClient) (err error) 
 
-Publishes the entry. Note that before publshing you will need to retrieve the entry with one of the Manage* functions above to acquire the Sys object that contains the version information. Otherwise the API call will fail with a "Version mismatch" error. This is needed even if you have just upserted the entry with the function above!
+Publishes the entry. Note that before publishing you will need to retrieve the entry with one of the Manage* functions above to acquire the Sys object that contains the version information. Otherwise the API call will fail with a "Version mismatch" error. This is needed even if you have just upserted the entry with the function above!
+
+>(vo *CfPerson) **UnpublishEntry**(cc *ContentfulClient) (err error) 
+
+Unpublishes the entry. Note that before unpublishing you will need to retrieve the entry with one of the Manage* functions above to acquire the Sys object that contains the version information. Otherwise the API call will fail with a "Version mismatch" error. This is needed even if you have just upserted the entry with the function above!
 
 >(vo *CfPerson) **UpdateEntry**(cc *ContentfulClient) (err error) 
 

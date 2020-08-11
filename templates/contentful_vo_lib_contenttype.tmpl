@@ -158,21 +158,11 @@ func colToCf{{ firstCap $contentType.Sys.ID }}(col *contentful.Collection, logFn
 	return vos, err
 }
 
-func (ref ContentfulReferencedEntry) ToCf{{ firstCap $contentType.Sys.ID }}() (vo *Cf{{ firstCap $contentType.Sys.ID }}, err error) {
-		byteArray, _ := json.Marshal(ref.Entry)
-		err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&vo)
-		if err != nil {
-			return nil, err
-		}
-		vo.Col = ref.Col
-	return vo, nil
-}
-
-func (ref ContentfulReferencedEntry) ValueOfCf{{ firstCap $contentType.Sys.ID }}() (vo *Cf{{ firstCap $contentType.Sys.ID }}) {
+func (ref ContentfulReferencedEntry) ToCf{{ firstCap $contentType.Sys.ID }}() (vo *Cf{{ firstCap $contentType.Sys.ID }}) {
 	byteArray, _ := json.Marshal(ref.Entry)
 	err := json.NewDecoder(bytes.NewReader(byteArray)).Decode(&vo)
 	if err != nil && vo.LogFn != nil {
-		vo.LogFn(ref.Entry.Sys.ContentType.Sys.ID, ref.Entry.Sys.ID, "ValueOfCf{{ firstCap $contentType.Sys.ID }}()", err)
+		vo.LogFn(ref.Entry.Sys.ContentType.Sys.ID, ref.Entry.Sys.ID, "ToCf{{ firstCap $contentType.Sys.ID }}()", err)
 		return
 	}
 	vo.Col = ref.Col
@@ -451,6 +441,22 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) PublishEntry(cc *ContentfulClien
 	err = cc.CMA.Entries.Publish(cc.SpaceID, cfEntry)
 	if err != nil {
 		return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} PublishEntry: publish operation failed: %s", err)
+	}
+	return
+}
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) UnpublishEntry(cc *ContentfulClient) (err error) {
+	cfEntry := &contentful.Entry{}
+	tmp, errMarshal := json.Marshal(vo)
+	if errMarshal != nil {
+		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} UnpublishEntry: Can't marshal JSON from VO")
+	}
+	errUnmarshal := json.Unmarshal(tmp, &cfEntry)
+	if errUnmarshal != nil {
+		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} UnpublishEntry: Can't unmarshal JSON into CF entry")
+	}
+	err = cc.CMA.Entries.Unpublish(cc.SpaceID, cfEntry)
+	if err != nil {
+		return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} UnpublishEntry: unpublish operation failed: %s", err)
 	}
 	return
 }
