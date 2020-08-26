@@ -36,13 +36,16 @@ func (cc *ContentfulClient) GetFiltered{{ firstCap $contentType.Sys.ID }}(query 
 		col.Query = *query
 	}
 	col.Query.ContentType("{{ $contentType.Sys.ID }}").Locale("*").Include(10)
-	col.GetAll()
+	_, err = col.GetAll()
+	if err != nil {
+		return nil, err
+	}
 	if col.Includes["Entry"] != nil {
 		for _, item := range col.Items { 
 			col.Includes["Entry"] = append(col.Includes["Entry"].([]interface{}), item)
 		}
 	}
-	return colToCf{{ firstCap $contentType.Sys.ID }}(col,cc.LogFn)
+	return ColToCf{{ firstCap $contentType.Sys.ID }}(col,cc.LogFn)
 }
 
 func (cc *ContentfulClient) Get{{ firstCap $contentType.Sys.ID }}ByID(id string) (vo *Cf{{ firstCap $contentType.Sys.ID }}, err error) {
@@ -51,11 +54,14 @@ func (cc *ContentfulClient) Get{{ firstCap $contentType.Sys.ID }}ByID(id string)
 	}
 	col := cc.CDA.Entries.List(cc.SpaceID)
 	col.Query.ContentType("{{ $contentType.Sys.ID }}").Locale("*").Equal("sys.id",id)
-	col.GetAll()
-	if len(col.Items) == 0 {
+	_, err = col.GetAll()
+	if err != nil {
+		return nil, err
+	}
+		if len(col.Items) == 0 {
 		return nil, fmt.Errorf("Get{{ firstCap $contentType.Sys.ID }}ByID: %s Not found", id)
 	}
-	vos, err := colToCf{{ firstCap $contentType.Sys.ID }}(col,cc.LogFn)
+	vos, err := ColToCf{{ firstCap $contentType.Sys.ID }}(col,cc.LogFn)
 	if err != nil {
 		return nil, fmt.Errorf("Get{{ firstCap $contentType.Sys.ID }}ByID: Error converting %s to VO: " + err.Error(), id)
 	}
@@ -76,13 +82,16 @@ func (cc *ContentfulClient) PreviewFiltered{{ firstCap $contentType.Sys.ID }}(qu
 		col.Query = *query
 	}
 	col.Query.ContentType("{{ $contentType.Sys.ID }}").Locale("*").Include(10)
-	col.GetAll()
+	_, err = col.GetAll()
+	if err != nil {
+		return nil, err
+	}
 	if col.Includes["Entry"] != nil {
 		for _, item := range col.Items { 
 			col.Includes["Entry"] = append(col.Includes["Entry"].([]interface{}), item)
 		}
 	}
-	return colToCf{{ firstCap $contentType.Sys.ID }}(col,cc.LogFn)
+	return ColToCf{{ firstCap $contentType.Sys.ID }}(col,cc.LogFn)
 }
 
 func (cc *ContentfulClient) Preview{{ firstCap $contentType.Sys.ID }}ByID(id string) (vo *Cf{{ firstCap $contentType.Sys.ID }}, err error) {
@@ -91,11 +100,14 @@ func (cc *ContentfulClient) Preview{{ firstCap $contentType.Sys.ID }}ByID(id str
 	}
 	col := cc.CPA.Entries.List(cc.SpaceID)
 	col.Query.ContentType("{{ $contentType.Sys.ID }}").Locale("*").Equal("sys.id",id)
-	col.GetAll()
+	_, err = col.GetAll()
+	if err != nil {
+		return nil, err
+	}
 	if len(col.Items) == 0 {
 		return nil, fmt.Errorf("Preview{{ firstCap $contentType.Sys.ID }}ByID: %s Not found", id)
 	}
-	vos, err := colToCf{{ firstCap $contentType.Sys.ID }}(col,cc.LogFn)
+	vos, err := ColToCf{{ firstCap $contentType.Sys.ID }}(col,cc.LogFn)
 	if err != nil {
 		return nil, fmt.Errorf("Preview{{ firstCap $contentType.Sys.ID }}ByID: Error converting %s to VO: " + err.Error(), id)
 	}
@@ -116,13 +128,16 @@ func (cc *ContentfulClient) ManageFiltered{{ firstCap $contentType.Sys.ID }}(que
 		col.Query = *query
 	}
 	col.Query.ContentType("{{ $contentType.Sys.ID }}").Locale("*").Include(10)
-	col.GetAll()
+	_, err = col.GetAll()
+	if err != nil {
+		return nil, err
+	}
 	if col.Includes["Entry"] != nil {
 		for _, item := range col.Items { 
 			col.Includes["Entry"] = append(col.Includes["Entry"].([]interface{}), item)
 		}
 	}
-	return colToCf{{ firstCap $contentType.Sys.ID }}(col,cc.LogFn)
+	return ColToCf{{ firstCap $contentType.Sys.ID }}(col,cc.LogFn)
 }
 
 func (cc *ContentfulClient) Manage{{ firstCap $contentType.Sys.ID }}ByID(id string) (vo *Cf{{ firstCap $contentType.Sys.ID }}, err error) {
@@ -131,11 +146,14 @@ func (cc *ContentfulClient) Manage{{ firstCap $contentType.Sys.ID }}ByID(id stri
 	}
 	col := cc.CMA.Entries.List(cc.SpaceID)
 	col.Query.ContentType("{{ $contentType.Sys.ID }}").Locale("*").Equal("sys.id",id)
-	col.GetAll()
+	_, err = col.GetAll()
+	if err != nil {
+		return nil, err
+	}
 	if len(col.Items) == 0 {
 		return nil, fmt.Errorf("Manage{{ firstCap $contentType.Sys.ID }}ByID: %s Not found", id)
 	}
-	vos, err := colToCf{{ firstCap $contentType.Sys.ID }}(col,cc.LogFn)
+	vos, err := ColToCf{{ firstCap $contentType.Sys.ID }}(col,cc.LogFn)
 	if err != nil {
 		return nil, fmt.Errorf("Manage{{ firstCap $contentType.Sys.ID }}ByID: Error converting %s to VO: " + err.Error(), id)
 	}
@@ -143,7 +161,7 @@ func (cc *ContentfulClient) Manage{{ firstCap $contentType.Sys.ID }}ByID(id stri
 	return
 }
 
-func colToCf{{ firstCap $contentType.Sys.ID }}(col *contentful.Collection, logFn func(string, string, string, error)) (vos []*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
+func ColToCf{{ firstCap $contentType.Sys.ID }}(col *contentful.Collection, logFn func(string, string, string, error)) (vos []*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
 	for _, item := range col.Items {
 		var vo Cf{{ firstCap $contentType.Sys.ID }}
 		byteArray, _ := json.Marshal(item)
@@ -250,7 +268,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) ValueOf{{ firstCap $field.ID }}(
 		}
 	}
 	for _, eachLocalized{{ firstCap $field.ID }} := range vo.Fields.{{ firstCap $field.ID }}[string(loc)] {
-		includeEntryMap := vo.Col.ToIncludesEntryMap()
+		includeEntryMap := vo.getIncludesEntryMap()
 		if _, ok := includeEntryMap[eachLocalized{{ firstCap $field.ID }}.Sys.ID]; !ok {
 			return nil, ErrRefNotIncludes
 		}
@@ -290,7 +308,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) ValueOf{{ firstCap $field.ID }}(
 		}
 	}
 	localized{{ firstCap $field.ID }} := vo.Fields.{{ firstCap $field.ID }}[string(loc)]
-	includesEntryMap := vo.Col.ToIncludesEntryMap()
+	includesEntryMap := vo.getIncludesEntryMap()
 	if _, ok := includesEntryMap[localized{{ firstCap $field.ID }}.Sys.ID]; !ok {
 		return nil, ErrRefNotIncludes
 	} 

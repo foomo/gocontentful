@@ -238,10 +238,16 @@ func htmlLinesToRichTextNode(htmlLines []string, start int, pendingTag string, m
 			case HtmlItalic, HtmlEm, HtmlBold, HtmlStrong, HtmlUnderline:
 				marks = append(marks, tt)
 			case HtmlBreak:
-				if len(nodeSlice) > 0 && nodeSlice[len(nodeSlice)-1].(RichTextNodeTextNode).NodeType == RichTextNodeText {
-					target := nodeSlice[len(nodeSlice)-1].(RichTextNodeTextNode)
-					target.Value += "\n"
-					nodeSlice[len(nodeSlice)-1] = target
+				if len(nodeSlice) > 0 {
+					myNode := nodeSlice[len(nodeSlice)-1]
+					switch myNode.(type) {
+					case RichTextNodeTextNode:
+						myNodeTyped := myNode.(RichTextNodeTextNode)
+						if myNodeTyped.NodeType == RichTextNodeText {
+							myNodeTyped.Value += "\n"
+							nodeSlice[len(nodeSlice)-1] = myNodeTyped
+						}
+					}
 				}
 			}
 			continue //unsupported tags will be ignored but content is preserved
@@ -437,7 +443,11 @@ func RichTextToHtml(rt interface{}) string {
 	node.renderHTML(w, func(url string) (transformedURL string, err error) {
 		return url, nil
 	})
-	return string(w.Bytes())
+	out := string(w.Bytes())
+	if out == "<p></p>" {
+		return ""
+	}
+	return out
 }
 
 // Other utils

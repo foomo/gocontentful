@@ -14,6 +14,14 @@ type Cf{{ firstCap $contentType.Sys.ID }} struct {
 		method string,
 		err error,
 	) `json:"-"`
+	includesEntryMap map[string]*contentful.Entry
+}
+
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) getIncludesEntryMap() map[string]*contentful.Entry {
+	if vo.includesEntryMap == nil {
+		vo.includesEntryMap = vo.Col.ToIncludesEntryMap()
+	}
+	return vo.includesEntryMap
 }
 
 // Cf{{ firstCap $contentType.Sys.ID }}Fields is a CfNameFields VO
