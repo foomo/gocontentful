@@ -223,7 +223,11 @@ func htmlLinesToRichTextNode(htmlLines []string, start int, pendingTag string, m
 				isBasic = false
 				currentNode.NodeType = RichTextNodeHyperlink
 				var nextLine int
-				currentNode.Data = RichTextData{URI: getAttribute(htmlLine, HtmlAttributeHref)}
+				anchorURI := getAttribute(htmlLine, HtmlAttributeHref)
+				if anchorURI == "" {
+					anchorURI = "/"
+				}
+				currentNode.Data = RichTextData{URI: anchorURI}
 				currentNode.Content, nextLine, isBasic = htmlLinesToRichTextNode(htmlLines, i+1, tt, marks, isBasic)
 				nodeSlice = append(nodeSlice, currentNode)
 				if nextLine == -1 {
