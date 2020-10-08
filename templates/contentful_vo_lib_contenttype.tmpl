@@ -380,24 +380,45 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) ValueOf{{ firstCap $field.ID }}(
 			return nil, ErrLocaleUnsupported
 		}
 	} 
-	if _, ok := vo.Fields.{{ firstCap $field.ID }}[string(loc)]; !ok {
-		if _, ok := localeFallback[loc]; !ok {
-			return nil, ErrNotSet
-		}
-		loc = localeFallback[loc]
-		if _, ok := vo.Fields.{{ firstCap $field.ID }}[string(loc)]; !ok {
-			return nil, ErrNotSetNoFallback
-		}
-	}
-	localized{{ firstCap $field.ID }} := vo.Fields.{{ firstCap $field.ID }}[string(loc)]
+	localized{{ firstCap $field.ID }} := vo.Fields.{{ firstCap $field.ID }}[string(defaultLocale)]
 	includesAssetMap := vo.Col.ToIncludesLocalizedAssetMap()
 	if _, ok := includesAssetMap[localized{{ firstCap $field.ID }}.Sys.ID]; !ok {
 		return nil, ErrRefNotIncludes
 	}
 	{{ $field.ID }}.Sys = includesAssetMap[localized{{ firstCap $field.ID }}.Sys.ID].Sys
-	{{ $field.ID }}.Fields.Title = includesAssetMap[localized{{ firstCap $field.ID }}.Sys.ID].Fields.Title[string(loc)]
-	{{ $field.ID }}.Fields.Description = includesAssetMap[localized{{ firstCap $field.ID }}.Sys.ID].Fields.Description[string(loc)]
-	{{ $field.ID }}.Fields.File = includesAssetMap[localized{{ firstCap $field.ID }}.Sys.ID].Fields.File[string(loc)]
+    locTitle := loc
+	hasLocTitle := true
+	if _, ok := includesAssetMap[localized{{ firstCap $field.ID }}.Sys.ID].Fields.Title[string(loc)]; !ok {
+		locTitle = localeFallback[loc]
+		if _, ok := includesAssetMap[localized{{ firstCap $field.ID }}.Sys.ID].Fields.Title[string(locTitle)]; !ok {
+			hasLocTitle = false
+		}
+	}
+	if hasLocTitle {
+		{{ $field.ID }}.Fields.Title = includesAssetMap[localized{{ firstCap $field.ID }}.Sys.ID].Fields.Title[string(locTitle)]
+	}	
+    locDescription := loc
+	hasLocDescription := true
+	if _, ok := includesAssetMap[localized{{ firstCap $field.ID }}.Sys.ID].Fields.Description[string(loc)]; !ok {
+		locDescription = localeFallback[loc]
+		if _, ok := includesAssetMap[localized{{ firstCap $field.ID }}.Sys.ID].Fields.Description[string(locDescription)]; !ok {
+			hasLocDescription = false
+		}
+	}
+	if hasLocDescription {
+		{{ $field.ID }}.Fields.Description = includesAssetMap[localized{{ firstCap $field.ID }}.Sys.ID].Fields.Description[string(locDescription)]
+	}	
+    locFile := loc
+	hasLocFile := true
+	if _, ok := includesAssetMap[localized{{ firstCap $field.ID }}.Sys.ID].Fields.File[string(loc)]; !ok {
+		locFile = localeFallback[loc]
+		if _, ok := includesAssetMap[localized{{ firstCap $field.ID }}.Sys.ID].Fields.File[string(locFile)]; !ok {
+			hasLocFile = false
+		}
+	}
+	if hasLocFile {
+		{{ $field.ID }}.Fields.File = includesAssetMap[localized{{ firstCap $field.ID }}.Sys.ID].Fields.File[string(locFile)]
+	}
 	return {{ $field.ID }}, nil
 }
 func (vo *Cf{{ firstCap $contentType.Sys.ID }}) ValueOf{{ firstCap $field.ID }}(locale ...Locale) (*contentful.AssetNoLocale) {
