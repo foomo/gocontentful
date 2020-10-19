@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 	"github.com/foomo/contentful"
 )
 
@@ -46,6 +47,27 @@ func (cc *ContentfulClient) GetFiltered{{ firstCap $contentType.Sys.ID }}(query 
 		}
 	}
 	return ColToCf{{ firstCap $contentType.Sys.ID }}(col,cc.LogFn)
+}
+
+func (cc *ContentfulClient) cacheGetAll{{ firstCap $contentType.Sys.ID }}() (vos map[string]*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
+	if cc.CDA == nil {
+		return nil, errors.New("cacheGetAll{{ firstCap $contentType.Sys.ID }}: No CDA client available")
+	}
+	start := time.Now()
+	col, err := cc.smartPageSizeGetAll("{{ $contentType.Sys.ID }}", 100)
+	if err != nil {
+		return nil, err
+	}
+	all{{ firstCap $contentType.Sys.ID }}, err := ColToCf{{ firstCap $contentType.Sys.ID }}(col,cc.LogFn)
+	if err != nil {
+		return nil, err
+	}
+	{{ $contentType.Sys.ID }}Map := map[string]*Cf{{ firstCap $contentType.Sys.ID }}{}
+	for _, {{ $contentType.Sys.ID }} := range all{{ firstCap $contentType.Sys.ID }} {
+		{{ $contentType.Sys.ID }}Map[{{ $contentType.Sys.ID }}.Sys.ID] = {{ $contentType.Sys.ID }}
+	}
+	fmt.Printf("Cached %d {{ firstCap $contentType.Sys.ID }} entries in %s\n", len({{ $contentType.Sys.ID }}Map), time.Since(start))
+	return {{ $contentType.Sys.ID }}Map, nil
 }
 
 func (cc *ContentfulClient) Get{{ firstCap $contentType.Sys.ID }}ByID(id string) (vo *Cf{{ firstCap $contentType.Sys.ID }}, err error) {
