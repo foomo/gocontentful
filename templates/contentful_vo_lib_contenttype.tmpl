@@ -34,8 +34,10 @@ func (cc *ContentfulClient) GetFiltered{{ firstCap $contentType.Sys.ID }}(query 
 	col := cc.CDA.Entries.List(cc.SpaceID)
 	if query != nil {
 		col.Query = *query
+	} else {
+		col.Query.Include(10)
 	}
-	col.Query.ContentType("{{ $contentType.Sys.ID }}").Locale("*").Include(10)
+	col.Query.ContentType("{{ $contentType.Sys.ID }}").Locale("*")
 	_, err = col.GetAll()
 	if err != nil {
 		return nil, err
