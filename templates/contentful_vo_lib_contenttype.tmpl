@@ -29,10 +29,10 @@ func (cc *ContentfulClient) GetAll{{ firstCap $contentType.Sys.ID }}() (vos []*C
 }
 
 func (cc *ContentfulClient) GetFiltered{{ firstCap $contentType.Sys.ID }}(query *contentful.Query) (vos []*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
-	if cc.CDA == nil {
+	if cc.Client == nil {
 		return nil, errors.New("getFiltered{{ firstCap $contentType.Sys.ID }}: No CDA client available")
 	}
-	col := cc.CDA.Entries.List(cc.SpaceID)
+	col := cc.Client.Entries.List(cc.SpaceID)
 	if query != nil {
 		col.Query = *query
 	}
@@ -50,11 +50,11 @@ func (cc *ContentfulClient) GetFiltered{{ firstCap $contentType.Sys.ID }}(query 
 }
 
 func (cc *ContentfulClient) cacheGetAll{{ firstCap $contentType.Sys.ID }}() (vos map[string]*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
-	if cc.CDA == nil {
+	if cc.Client == nil {
 		return nil, errors.New("cacheGetAll{{ firstCap $contentType.Sys.ID }}: No CDA client available")
 	}
 	start := time.Now()
-	col, err := cc.smartPageSizeGetAll("{{ $contentType.Sys.ID }}", 100)
+	col, err := cc.smartPageSizeGetAll("{{ $contentType.Sys.ID }}", cc.OptimisticPageSize)
 	if err != nil {
 		return nil, err
 	}
@@ -65,16 +65,17 @@ func (cc *ContentfulClient) cacheGetAll{{ firstCap $contentType.Sys.ID }}() (vos
 	{{ $contentType.Sys.ID }}Map := map[string]*Cf{{ firstCap $contentType.Sys.ID }}{}
 	for _, {{ $contentType.Sys.ID }} := range all{{ firstCap $contentType.Sys.ID }} {
 		{{ $contentType.Sys.ID }}Map[{{ $contentType.Sys.ID }}.Sys.ID] = {{ $contentType.Sys.ID }}
+		cc.Cache.IdContentTypeMap[{{ $contentType.Sys.ID }}.Sys.ID] = ContentType{{ firstCap $contentType.Sys.ID }}
 	}
 	fmt.Printf("Cached %d {{ firstCap $contentType.Sys.ID }} entries in %s\n", len({{ $contentType.Sys.ID }}Map), time.Since(start))
 	return {{ $contentType.Sys.ID }}Map, nil
 }
 
 func (cc *ContentfulClient) Get{{ firstCap $contentType.Sys.ID }}ByID(id string) (vo *Cf{{ firstCap $contentType.Sys.ID }}, err error) {
-	if cc.CDA == nil {
+	if cc.Client == nil {
 		return nil, errors.New("Get{{ firstCap $contentType.Sys.ID }}ByID: No CDA client available")
 	}
-	col := cc.CDA.Entries.List(cc.SpaceID)
+	col := cc.Client.Entries.List(cc.SpaceID)
 	col.Query.ContentType("{{ $contentType.Sys.ID }}").Locale("*").Equal("sys.id",id)
 	_, err = col.GetAll()
 	if err != nil {
@@ -96,10 +97,10 @@ func (cc *ContentfulClient) PreviewAll{{ firstCap $contentType.Sys.ID }}() (vos 
 }
 
 func (cc *ContentfulClient) PreviewFiltered{{ firstCap $contentType.Sys.ID }}(query *contentful.Query) (vos []*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
-	if cc.CPA == nil {
+	if cc.Client == nil {
 		return nil, errors.New("PreviewFiltered{{ firstCap $contentType.Sys.ID }}: No CPA client available")
 	}
-	col := cc.CPA.Entries.List(cc.SpaceID)
+	col := cc.Client.Entries.List(cc.SpaceID)
 	if query != nil {
 		col.Query = *query
 	}
@@ -117,10 +118,10 @@ func (cc *ContentfulClient) PreviewFiltered{{ firstCap $contentType.Sys.ID }}(qu
 }
 
 func (cc *ContentfulClient) Preview{{ firstCap $contentType.Sys.ID }}ByID(id string) (vo *Cf{{ firstCap $contentType.Sys.ID }}, err error) {
-	if cc.CPA == nil {
+	if cc.Client == nil {
 		return nil, errors.New("Preview{{ firstCap $contentType.Sys.ID }}ByID: No CPA client available")
 	}
-	col := cc.CPA.Entries.List(cc.SpaceID)
+	col := cc.Client.Entries.List(cc.SpaceID)
 	col.Query.ContentType("{{ $contentType.Sys.ID }}").Locale("*").Equal("sys.id",id)
 	_, err = col.GetAll()
 	if err != nil {
@@ -142,10 +143,10 @@ func (cc *ContentfulClient) ManageAll{{ firstCap $contentType.Sys.ID }}() (vos [
 }
 
 func (cc *ContentfulClient) ManageFiltered{{ firstCap $contentType.Sys.ID }}(query *contentful.Query) (vos []*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
-	if cc.CMA == nil {
+	if cc.Client == nil {
 		return nil, errors.New("ManageFiltered{{ firstCap $contentType.Sys.ID }}: No CMA client available")
 	}
-	col := cc.CMA.Entries.List(cc.SpaceID)
+	col := cc.Client.Entries.List(cc.SpaceID)
 	if query != nil {
 		col.Query = *query
 	}
@@ -163,10 +164,10 @@ func (cc *ContentfulClient) ManageFiltered{{ firstCap $contentType.Sys.ID }}(que
 }
 
 func (cc *ContentfulClient) Manage{{ firstCap $contentType.Sys.ID }}ByID(id string) (vo *Cf{{ firstCap $contentType.Sys.ID }}, err error) {
-	if cc.CMA == nil {
+	if cc.Client == nil {
 		return nil, errors.New("Manage{{ firstCap $contentType.Sys.ID }}ByID: No CMA client available")
 	}
-	col := cc.CMA.Entries.List(cc.SpaceID)
+	col := cc.Client.Entries.List(cc.SpaceID)
 	col.Query.ContentType("{{ $contentType.Sys.ID }}").Locale("*").Equal("sys.id",id)
 	_, err = col.GetAll()
 	if err != nil {
@@ -483,7 +484,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) UpsertEntry(cc *ContentfulClient
 		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} UpsertEntry: Can't unmarshal JSON into CF entry")
 	}
 
-	err = cc.CMA.Entries.Upsert(cc.SpaceID, cfEntry)
+	err = cc.Client.Entries.Upsert(cc.SpaceID, cfEntry)
 	if err != nil {
 		return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} UpsertEntry: Operation failed: %s", err)
 	}
@@ -499,7 +500,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) PublishEntry(cc *ContentfulClien
 	if errUnmarshal != nil {
 		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} PublishEntry: Can't unmarshal JSON into CF entry")
 	}
-	err = cc.CMA.Entries.Publish(cc.SpaceID, cfEntry)
+	err = cc.Client.Entries.Publish(cc.SpaceID, cfEntry)
 	if err != nil {
 		return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} PublishEntry: publish operation failed: %s", err)
 	}
@@ -515,7 +516,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) UnpublishEntry(cc *ContentfulCli
 	if errUnmarshal != nil {
 		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} UnpublishEntry: Can't unmarshal JSON into CF entry")
 	}
-	err = cc.CMA.Entries.Unpublish(cc.SpaceID, cfEntry)
+	err = cc.Client.Entries.Unpublish(cc.SpaceID, cfEntry)
 	if err != nil {
 		return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} UnpublishEntry: unpublish operation failed: %s", err)
 	}
@@ -532,7 +533,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) UpdateEntry(cc *ContentfulClient
 		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} UpdateEntry: Can't unmarshal JSON into CF entry")
 	}
 
-	err = cc.CMA.Entries.Upsert(cc.SpaceID, cfEntry)
+	err = cc.Client.Entries.Upsert(cc.SpaceID, cfEntry)
 	if err != nil {
 		return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} UpdateEntry: upsert operation failed: %s", err)
 	}
@@ -544,7 +545,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) UpdateEntry(cc *ContentfulClient
 	if errUnmarshal != nil {
 		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} UpdateEntry: Can't unmarshal JSON back into VO")
 	}
-	err = cc.CMA.Entries.Publish(cc.SpaceID, cfEntry)
+	err = cc.Client.Entries.Publish(cc.SpaceID, cfEntry)
 	if err != nil {
 		return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} UpdateEntry: publish operation failed: %s", err)
 	}
@@ -561,12 +562,12 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) DeleteEntry(cc *ContentfulClient
 		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} DeleteEntry: Can't unmarshal JSON into CF entry")
 	}
 	if cfEntry.Sys.PublishedCounter > 0 {
-		errUnpublish := cc.CMA.Entries.Unpublish(cc.SpaceID, cfEntry)
+		errUnpublish := cc.Client.Entries.Unpublish(cc.SpaceID, cfEntry)
 		if errUnpublish != nil {
 			return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} DeleteEntry: Unpublish entry failed: %w", errUnpublish)
 		}
 	}
-	errDelete := cc.CMA.Entries.Delete(cc.SpaceID, cfEntry.Sys.ID)
+	errDelete := cc.Client.Entries.Delete(cc.SpaceID, cfEntry.Sys.ID)
 	if errDelete != nil {
 		return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} DeleteEntry: Delete entry failed: %w", errDelete)
 	}
