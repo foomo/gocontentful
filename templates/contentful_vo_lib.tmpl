@@ -24,10 +24,10 @@ const (
 	ClientModeCMA ClientMode = "CMA"
 )
 
-{{ range $index , $locale := $locales }}const spaceLocale{{ onlyLetters $locale.Name }} Locale = "{{ $locale.Code }}"
+{{ range $index , $locale := $locales }}const SpaceLocale{{ onlyLetters $locale.Name }} Locale = "{{ $locale.Code }}"
 {{ end }}
-{{ range $index , $locale := $locales }}{{ if $locale.Default }}const defaultLocale Locale = spaceLocale{{ onlyLetters $locale.Name }}{{ end }}
-{{ end }}var localeFallback = map[Locale]Locale{ {{ range $index, $locale := $locales }}{{if $locale.FallbackCode}} spaceLocale{{ onlyLetters $locale.Name }}: {{ range $indexSearch, $localeSearch := $locales }}{{ if eq $localeSearch.Code $locale.FallbackCode}}spaceLocale{{ onlyLetters $localeSearch.Name }}{{ end }}{{ end }}, {{ else }}spaceLocale{{ onlyLetters $locale.Name }}: "", {{ end }}{{ end }}}
+{{ range $index , $locale := $locales }}{{ if $locale.Default }}const defaultLocale Locale = SpaceLocale{{ onlyLetters $locale.Name }}{{ end }}
+{{ end }}var localeFallback = map[Locale]Locale{ {{ range $index, $locale := $locales }}{{if $locale.FallbackCode}} SpaceLocale{{ onlyLetters $locale.Name }}: {{ range $indexSearch, $localeSearch := $locales }}{{ if eq $localeSearch.Code $locale.FallbackCode}}SpaceLocale{{ onlyLetters $localeSearch.Name }}{{ end }}{{ end }}, {{ else }}SpaceLocale{{ onlyLetters $locale.Name }}: "", {{ end }}{{ end }}}
 
 const (
 	assetPageSize = 1000
@@ -45,21 +45,23 @@ type ContentfulClient struct {
 	ClientMode ClientMode
 	Client     *contentful.Contentful
 	Debug   bool
+	Locales []Locale
 	LogFn   func(
 		contentType string,
 		entryID string,
 		method string,
 		err error,
 	)
-	OptimisticPageSize uint16
+	OptimisticPageSize uint16 // Start downloading entries at this page size
 	SpaceID string
 }
 
 type ContentfulCache struct {
-	ContentTypes []string
-	IdContentTypeMap map[string]string
-	EntryMaps CacheEntryMaps
 	Assets map[string]*contentful.Asset
+	ContentTypes []string
+	EntryMaps CacheEntryMaps
+	IdContentTypeMap map[string]string
+	ParentMap map[string][]string // Maps each entry ID to its parents' IDs
 }
 
 type CacheEntryMaps struct {
@@ -68,16 +70,14 @@ type CacheEntryMaps struct {
 }
 
 func NewContentfulClient(spaceID string, clientMode ClientMode, clientKey string, optimisticPageSize uint16, logFn func(contentType string, entryID string, method string, err error), debug bool) (*ContentfulClient, error) {
-	cc := &ContentfulClient{}
-	cc.LogFn = logFn
-	cc.OptimisticPageSize = optimisticPageSize
 	if spaceID == "" {
 		return nil, errors.New("NewContentfulClient: SpaceID cannot be empty")
 	}
-	cc.SpaceID = spaceID
+	cc := &ContentfulClient{}
 	if clientKey == "" {
 		return nil, errors.New("NewContentfulClient: Please provide an API key")
 	}
+	cc.ClientMode = clientMode
 	switch clientMode {
 	case ClientModeCDA:
 		cc.Client = contentful.NewCDA(clientKey)
@@ -88,10 +88,17 @@ func NewContentfulClient(spaceID string, clientMode ClientMode, clientKey string
 	default:
 		return nil, errors.New("NewContentfulClient: Unknown ClientMode")
 	}
-	cc.ClientMode = clientMode
 	cc.Client.Debug = debug
+	cc.Locales = []Locale{ {{ range $index , $locale := $locales }}SpaceLocale{{ onlyLetters $locale.Name }}, {{ end }} }
+	cc.LogFn = logFn
+	cc.OptimisticPageSize = optimisticPageSize
+	cc.SpaceID = spaceID
 	_, err := cc.Client.Spaces.Get(spaceID)
 	if err != nil {
+		_, ok := err.(contentful.NotFoundError)
+		if ok {
+			return nil, errors.New("NewContentfulClient: That is not the space you're looking for")
+		}
 		return nil, errors.New("NewContentfulClient: "+err.Error())
 	}
 	return cc, nil
@@ -99,14 +106,23 @@ func NewContentfulClient(spaceID string, clientMode ClientMode, clientKey string
 
 func (cc *ContentfulClient) UpdateCache(contentTypes []string, cacheAssets bool) error {
 	if cc.ClientMode != ClientModeCDA {
-		return errors.New("UpdateCache: Only available in CDA mode")
+		return errors.New("UpdateCache: Only available in ClientModeCDA")
 	}
 	cc.Cache = &ContentfulCache{}
 	cc.Cache.ContentTypes = contentTypes
 	cc.Cache.IdContentTypeMap = map[string]string{}
-	
-{{ range $index , $contentType := $contentTypes }}	if contentTypes == nil || (contentTypes != nil && stringSliceContains(contentTypes, ContentType{{ firstCap $contentType.Sys.ID }})) {
-		all{{ firstCap $contentType.Sys.ID }}, err := cc.cacheGetAll{{ firstCap $contentType.Sys.ID }}()
+	cc.Cache.ParentMap = map[string][]string{}
+
+	spaceContentTypes := []string{ {{ range $index , $contentType := $contentTypes }}ContentType{{ firstCap $contentType.Sys.ID }}, {{ end }} }
+	for _, contentType := range contentTypes {
+		if !stringSliceContains(spaceContentTypes, contentType) {
+			return errors.New("UpdateCache: Content Type '"+contentType+"' not available in this space")
+		}
+	}
+
+	{{ range $index , $contentType := $contentTypes }}
+	if contentTypes == nil || (contentTypes != nil && stringSliceContains(contentTypes, ContentType{{ firstCap $contentType.Sys.ID }})) {
+		all{{ firstCap $contentType.Sys.ID }}, err := cc.cacheAll{{ firstCap $contentType.Sys.ID }}()
 		if err != nil {
 			return err
 		}
@@ -114,7 +130,7 @@ func (cc *ContentfulClient) UpdateCache(contentTypes []string, cacheAssets bool)
 	}
 {{ end }}
 	if cacheAssets {
-		allAssets, err := cc.getAllAssets()
+		allAssets, err := cc.getAllAssets(false)
 		if err != nil {
 			return err
 		}
@@ -123,9 +139,41 @@ func (cc *ContentfulClient) UpdateCache(contentTypes []string, cacheAssets bool)
 	return nil
 }
 
-func (cc *ContentfulClient) smartPageSizeGetAll(contentType string, limit uint16) (*contentful.Collection, error) {
+func (cc *ContentfulClient) GetContentTypeOfID(id string) (string, error) {
+	if cc.Client == nil {
+		return "", errors.New("GetContentTypeOfID: No client available")
+	}
+	if cc.Cache != nil {
+		okVo := false
+		{{ range $index , $contentType := $contentTypes }}
+		_, okVo = cc.Cache.EntryMaps.{{ firstCap $contentType.Sys.ID }}[id]
+		if okVo {
+			return ContentType{{ firstCap $contentType.Sys.ID }}, nil
+		}
+		{{ end }}
+	}
 	col := cc.Client.Entries.List(cc.SpaceID)
-	col.Query.ContentType(contentType).Locale("*").Limit(limit)
+	col.Query.Include(0).Equal("sys.id",id)
+	_, err := col.GetAll()
+	if err != nil {
+		return "", errors.New("GetContentTypeOfID: "+err.Error())
+	}
+	if len(col.Items) == 0 {
+		return "", fmt.Errorf("GetContentTypeOfID: %s Not found", id)
+	}
+	var vo genericEntryNoFields
+	byteArray, _ := json.Marshal(col.Items[0])
+	err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&vo)
+	if err != nil {
+		return "", errors.New("GetContentTypeOfID: "+err.Error())
+	}
+	return vo.Sys.ContentType.Sys.ID, nil
+}
+
+
+func (cc *ContentfulClient) optimisticPageSizeGetAll(contentType string, limit uint16) (*contentful.Collection, error) {
+	col := cc.Client.Entries.List(cc.SpaceID)
+	col.Query.ContentType(contentType).Locale("*").Include(0).Limit(limit)
 	allItems := []interface{}{}
 	var err error
 	for {
@@ -142,7 +190,7 @@ func (cc *ContentfulClient) smartPageSizeGetAll(contentType string, limit uint16
 	if err != nil {
 		msg := err.(contentful.ErrorResponse).Message
 		if strings.Contains(msg, "Response size too big") && limit >= 20 {
-			smallerPageCol, err := cc.smartPageSizeGetAll(contentType, limit / 2 )
+			smallerPageCol, err := cc.optimisticPageSizeGetAll(contentType, limit / 2 )
 			return smallerPageCol, err
 		}
 		return nil, err
@@ -151,9 +199,13 @@ func (cc *ContentfulClient) smartPageSizeGetAll(contentType string, limit uint16
 }
 
 // Asset utils
-
-func (cc *ContentfulClient) getAllAssets() (map[string]*contentful.Asset, error) {
-	start := time.Now()
+func (cc *ContentfulClient) getAllAssets(tryCacheFirst bool) (map[string]*contentful.Asset, error) {
+	if cc.Client == nil {
+		return nil, errors.New("getAllAssets: No client available")
+	}
+	if cc.Cache != nil && cc.Cache.Assets != nil {
+		return cc.Cache.Assets, nil
+	}
 	col := cc.Client.Assets.List(cc.SpaceID)
 	col.Query.Locale("*").Limit(assetPageSize)
 	assets := map[string]*contentful.Asset{}
@@ -180,8 +232,41 @@ func (cc *ContentfulClient) getAllAssets() (map[string]*contentful.Asset, error)
 		}
 		assets[asset.Sys.ID] = &asset
 	}
-	fmt.Printf("Cached %d assets in %s\n", len(assets), time.Since(start))
 	return assets, nil
+}
+func (cc *ContentfulClient) GetAllAssets() (map[string]*contentful.Asset, error) {
+	return cc.getAllAssets(true)
+}
+func (cc *ContentfulClient) GetAssetByID(id string) (*contentful.Asset, error) {
+	if cc.Client == nil {
+		return nil, errors.New("GetAssetByID: No client available")
+	}
+	if cc.Cache != nil && cc.Cache.Assets != nil {
+		asset, okAsset := cc.Cache.Assets[id]
+		if okAsset {
+			return asset, nil
+		}
+	}
+	col := cc.Client.Assets.List(cc.SpaceID)
+	col.Query.Locale("*").Equal("sys.id",id)
+	_, err := col.Next()
+	if err != nil {
+		return nil, err
+	}
+	if len(col.Items) == 0 {
+		return nil, errors.New("GetAssetByID: Not found "+ id)
+	}
+	item := col.Items[0]
+	asset := contentful.Asset{}
+	byt, err := json.Marshal(item)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(byt, &asset)
+	if err != nil {
+		return nil, err
+	}
+	return &asset, nil
 }
 
 func NewAssetFromURL(id string, uploadUrl string, imageFileType string, title string, locale ...Locale) *contentful.Asset {
