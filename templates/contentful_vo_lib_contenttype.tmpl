@@ -39,9 +39,9 @@ func (cc *ContentfulClient) cacheAll{{ firstCap $contentType.Sys.ID }}() (vos ma
 					if okChildren {
 						for _, child := range children {
 							if cc.Cache.ParentMap[child.Sys.ID] == nil {
-								cc.Cache.ParentMap[child.Sys.ID] = []string{}
+								cc.Cache.ParentMap[child.Sys.ID] = []EntryParent{}
 							}
-							cc.Cache.ParentMap[child.Sys.ID] = append(cc.Cache.ParentMap[child.Sys.ID], {{ $contentType.Sys.ID }}.Sys.ID)
+							cc.Cache.ParentMap[child.Sys.ID] = append(cc.Cache.ParentMap[child.Sys.ID], EntryParent{ContentType: {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID, ID: {{ $contentType.Sys.ID }}.Sys.ID, VO: {{ $contentType.Sys.ID }} })
 						}
 					}
 				}
@@ -51,9 +51,9 @@ func (cc *ContentfulClient) cacheAll{{ firstCap $contentType.Sys.ID }}() (vos ma
 				child, okChild := {{ $contentType.Sys.ID }}.Fields.{{ firstCap $field.ID }}[string(loc)]
 				if okChild {
 					if cc.Cache.ParentMap[child.Sys.ID] == nil {
-						cc.Cache.ParentMap[child.Sys.ID] = []string{}
+						cc.Cache.ParentMap[child.Sys.ID] = []EntryParent{}
 					}
-					cc.Cache.ParentMap[child.Sys.ID] = append(cc.Cache.ParentMap[child.Sys.ID], {{ $contentType.Sys.ID }}.Sys.ID)
+					cc.Cache.ParentMap[child.Sys.ID] = append(cc.Cache.ParentMap[child.Sys.ID], EntryParent{ContentType: {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID, ID: {{ $contentType.Sys.ID }}.Sys.ID, VO: {{ $contentType.Sys.ID }} })
 					}
 				}
 				{{ end }}
@@ -79,9 +79,9 @@ func colToCf{{ firstCap $contentType.Sys.ID }}(col *contentful.Collection, cc *C
 
 // ---{{ firstCap $contentType.Sys.ID }} public methods---
 
-func (cc *ContentfulClient) GetAll{{ firstCap $contentType.Sys.ID }}() (voMap *map[string]*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
+func (cc *ContentfulClient) GetAll{{ firstCap $contentType.Sys.ID }}() (voMap map[string]*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
 	if cc.Cache != nil {
-		return &cc.Cache.EntryMaps.{{ firstCap $contentType.Sys.ID }}, nil
+		return cc.Cache.EntryMaps.{{ firstCap $contentType.Sys.ID }}, nil
 	}
 	col, err := cc.optimisticPageSizeGetAll("{{ $contentType.Sys.ID }}", cc.OptimisticPageSize)
 	if err != nil {
@@ -95,10 +95,10 @@ func (cc *ContentfulClient) GetAll{{ firstCap $contentType.Sys.ID }}() (voMap *m
 	for _, {{ $contentType.Sys.ID }} := range all{{ firstCap $contentType.Sys.ID }} {
 		{{ $contentType.Sys.ID }}Map[{{ $contentType.Sys.ID }}.Sys.ID] = {{ $contentType.Sys.ID }}
 	}
-	return &{{ $contentType.Sys.ID }}Map, nil
+	return {{ $contentType.Sys.ID }}Map, nil
 }
 
-func (cc *ContentfulClient) GetFiltered{{ firstCap $contentType.Sys.ID }}(query *contentful.Query) (voMap *map[string]*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
+func (cc *ContentfulClient) GetFiltered{{ firstCap $contentType.Sys.ID }}(query *contentful.Query) (voMap map[string]*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
 	if cc.Client == nil {
 		return nil, errors.New("getFiltered{{ firstCap $contentType.Sys.ID }}: No client available")
 	}
@@ -119,7 +119,7 @@ func (cc *ContentfulClient) GetFiltered{{ firstCap $contentType.Sys.ID }}(query 
 	for _, {{ $contentType.Sys.ID }} := range all{{ firstCap $contentType.Sys.ID }} {
 		{{ $contentType.Sys.ID }}Map[{{ $contentType.Sys.ID }}.Sys.ID] = {{ $contentType.Sys.ID }}
 	}
-	return &{{ $contentType.Sys.ID }}Map, nil
+	return {{ $contentType.Sys.ID }}Map, nil
 }
 
 func (cc *ContentfulClient) Get{{ firstCap $contentType.Sys.ID }}ByID(id string) (vo *Cf{{ firstCap $contentType.Sys.ID }}, err error) {
@@ -159,7 +159,49 @@ func NewCf{{ firstCap $contentType.Sys.ID }}() (cf{{ firstCap $contentType.Sys.I
 	cf{{ firstCap $contentType.Sys.ID }}.Sys.ContentType.Sys.LinkType = "ContentType"
 	return
 }
-
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) GetParents(contentType ...string) (parents []EntryParent, err error) {
+	parents = []EntryParent{}
+	if vo.CC.Cache != nil {
+		if len(contentType) != 0 {
+			for _, parent := range vo.CC.Cache.ParentMap[vo.Sys.ID] {
+				if parent.ContentType == contentType[0] {
+					parents = append(parents, parent)
+				}
+			}
+			return parents, nil
+		}
+		return vo.CC.Cache.ParentMap[vo.Sys.ID], nil
+	}
+	if len(contentType) != 1 {
+		return nil, errors.New("GetParents: uncached parentMap queries need a contentType")
+	}
+	col := vo.CC.Client.Entries.List(vo.CC.SpaceID)
+	col.Query.Equal("fields.nodes.sys.id", vo.Sys.ID).ContentType(contentType[0]).Locale("*")
+	_, err = col.GetAll()
+	if err != nil {
+		return nil, errors.New("GetParents: " + err.Error())
+	}
+	switch contentType[0] {
+	{{ range $index , $contentType := $contentTypes }}
+	case ContentType{{ firstCap $contentType.Sys.ID }}:
+		for _, item := range col.Items {
+			var parentVO Cf{{ firstCap $contentType.Sys.ID }}
+			byteArray, _ := json.Marshal(item)
+			err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&parentVO)
+			if err != nil {
+				return nil, errors.New("GetParents: "+err.Error())
+			}
+			parentVO.CC = vo.CC
+			parents = append(parents, EntryParent{
+				ContentType: contentType[0],
+				ID: parentVO.Sys.ID,
+				VO: &parentVO,
+			})
+		}
+	{{ end }}
+	}
+	return parents, nil
+}
 // {{ firstCap $contentType.Sys.ID }} Field getters
 {{ range $fieldIndex, $field := $contentType.Fields }}
 {{ if fieldIsBasic $field }}

@@ -31,7 +31,10 @@ const (
 
 const (
 	assetPageSize = 1000
+	assetWorkerType = "_asset"
 )
+
+const cacheUpdateConcurrency = 4
 
 var (
 	ErrLocaleUnsupported = errors.New("Locale not supported by this space")
@@ -61,7 +64,13 @@ type ContentfulCache struct {
 	ContentTypes []string
 	EntryMaps CacheEntryMaps
 	IdContentTypeMap map[string]string
-	ParentMap map[string][]string // Maps each entry ID to its parents' IDs
+	ParentMap map[string][]EntryParent // Maps each entry ID to its parents' IDs
+}
+
+type EntryParent struct {
+	ContentType string
+	ID string
+	VO interface{}
 }
 
 type CacheEntryMaps struct {
@@ -103,6 +112,32 @@ func NewContentfulClient(spaceID string, clientMode ClientMode, clientKey string
 	}
 	return cc, nil
 }
+func updateCacheWorker(cc *ContentfulClient, queue chan string, done chan bool,ks chan bool) error {
+	for {
+		select {
+		case contentType := <-queue:
+			switch contentType {
+			{{ range $index , $contentType := $contentTypes }}
+			case ContentType{{ firstCap $contentType.Sys.ID }}:
+				allShopBrands, err := cc.cacheAll{{ firstCap $contentType.Sys.ID }}()
+				if err != nil {
+					done <- false
+				}
+				cc.Cache.EntryMaps.{{ firstCap $contentType.Sys.ID }} = allShopBrands
+			{{ end }}
+			case assetWorkerType:
+				allAssets, err := cc.getAllAssets(false)
+				if err != nil {
+					done <- false
+				}
+				cc.Cache.Assets = allAssets
+			}
+			done <- true
+		case <-ks:
+			return nil
+		}
+	}
+}
 
 func (cc *ContentfulClient) UpdateCache(contentTypes []string, cacheAssets bool) error {
 	if cc.ClientMode != ClientModeCDA {
@@ -111,31 +146,35 @@ func (cc *ContentfulClient) UpdateCache(contentTypes []string, cacheAssets bool)
 	cc.Cache = &ContentfulCache{}
 	cc.Cache.ContentTypes = contentTypes
 	cc.Cache.IdContentTypeMap = map[string]string{}
-	cc.Cache.ParentMap = map[string][]string{}
-
+	cc.Cache.ParentMap = map[string][]EntryParent{}
 	spaceContentTypes := []string{ {{ range $index , $contentType := $contentTypes }}ContentType{{ firstCap $contentType.Sys.ID }}, {{ end }} }
 	for _, contentType := range contentTypes {
 		if !stringSliceContains(spaceContentTypes, contentType) {
-			return errors.New("UpdateCache: Content Type '"+contentType+"' not available in this space")
+			return errors.New("UpdateCache: Content Type '" + contentType + "' not available in this space")
 		}
 	}
-
-	{{ range $index , $contentType := $contentTypes }}
-	if contentTypes == nil || (contentTypes != nil && stringSliceContains(contentTypes, ContentType{{ firstCap $contentType.Sys.ID }})) {
-		all{{ firstCap $contentType.Sys.ID }}, err := cc.cacheAll{{ firstCap $contentType.Sys.ID }}()
-		if err != nil {
-			return err
-		}
-		cc.Cache.EntryMaps.{{ firstCap $contentType.Sys.ID }} = all{{ firstCap $contentType.Sys.ID }}
-	}
-{{ end }}
 	if cacheAssets {
-		allAssets, err := cc.getAllAssets(false)
-		if err != nil {
-			return err
-		}
-		cc.Cache.Assets = allAssets
+		contentTypes = append([]string{assetWorkerType}, contentTypes...)
 	}
+	queue := make(chan string)
+	done := make(chan bool)
+	killsignal := make(chan bool)
+	for i := 0; i < cacheUpdateConcurrency; i++ {
+		go updateCacheWorker(cc,queue,done, killsignal)
+	}
+	for j := 0; j < len(contentTypes); j++ {
+		go func(j int) {
+			queue <- contentTypes[j]
+		}(j)
+	}
+	for c := 0; c < len(contentTypes); c++ {
+		result := <-done
+		if !result {
+			close(killsignal)
+			return errors.New("UpdateCache: A worker returned an error")
+		}
+	}
+	close(killsignal)
 	return nil
 }
 
