@@ -36,6 +36,13 @@ const (
 
 const cacheUpdateConcurrency = 4
 
+const (
+	LogNone = 0
+	LogInfo = 1
+	LogWarn = 2
+	LogError = 3
+)
+
 var (
 	ErrLocaleUnsupported = errors.New("Locale not supported by this space")
 	ErrNotSet            = errors.New("Field value not set")
@@ -53,8 +60,10 @@ type ContentfulClient struct {
 		contentType string,
 		entryID string,
 		method string,
-		err error,
+		level int,
+		args interface{},
 	)
+	LogLevel int
 	OptimisticPageSize uint16 // Start downloading entries at this page size
 	SpaceID string
 }
@@ -64,10 +73,10 @@ type ContentfulCache struct {
 	ContentTypes []string
 	EntryMaps CacheEntryMaps
 	IdContentTypeMap map[string]string
-	ParentMap map[string][]EntryParent // Maps each entry ID to its parents' IDs
+	ParentMap map[string][]EntryReference // Maps each entry ID to its parents' IDs
 }
 
-type EntryParent struct {
+type EntryReference struct {
 	ContentType string
 	ID string
 	VO interface{}
@@ -78,7 +87,7 @@ type CacheEntryMaps struct {
 	{{ end }}
 }
 
-func NewContentfulClient(spaceID string, clientMode ClientMode, clientKey string, optimisticPageSize uint16, logFn func(contentType string, entryID string, method string, err error), debug bool) (*ContentfulClient, error) {
+func NewContentfulClient(spaceID string, clientMode ClientMode, clientKey string, optimisticPageSize uint16, logFn func(contentType string, entryID string, method string, level int, args interface{}), logLevel int, debug bool) (*ContentfulClient, error) {
 	if spaceID == "" {
 		return nil, errors.New("NewContentfulClient: SpaceID cannot be empty")
 	}
@@ -100,6 +109,7 @@ func NewContentfulClient(spaceID string, clientMode ClientMode, clientKey string
 	cc.Client.Debug = debug
 	cc.Locales = []Locale{ {{ range $index , $locale := $locales }}SpaceLocale{{ onlyLetters $locale.Name }}, {{ end }} }
 	cc.LogFn = logFn
+	cc.LogLevel = logLevel
 	cc.OptimisticPageSize = optimisticPageSize
 	cc.SpaceID = spaceID
 	_, err := cc.Client.Spaces.Get(spaceID)
@@ -146,7 +156,7 @@ func (cc *ContentfulClient) UpdateCache(contentTypes []string, cacheAssets bool)
 	cc.Cache = &ContentfulCache{}
 	cc.Cache.ContentTypes = contentTypes
 	cc.Cache.IdContentTypeMap = map[string]string{}
-	cc.Cache.ParentMap = map[string][]EntryParent{}
+	cc.Cache.ParentMap = map[string][]EntryReference{}
 	spaceContentTypes := []string{ {{ range $index , $contentType := $contentTypes }}ContentType{{ firstCap $contentType.Sys.ID }}, {{ end }} }
 	for _, contentType := range contentTypes {
 		if !stringSliceContains(spaceContentTypes, contentType) {
@@ -269,6 +279,11 @@ func (cc *ContentfulClient) getAllAssets(tryCacheFirst bool) (map[string]*conten
 		if err != nil {
 			return nil, err
 		}
+		for _, loc := range []Locale{ {{ range $index , $locale := $locales }}SpaceLocale{{ onlyLetters $locale.Name }},{{end}} } {
+			if _, ok := asset.Fields.File[string(loc)]; ok {
+				asset.Fields.File[string(loc)].URL = "https:" + asset.Fields.File[string(loc)].URL
+			}
+		}
 		assets[asset.Sys.ID] = &asset
 	}
 	return assets, nil
@@ -304,6 +319,11 @@ func (cc *ContentfulClient) GetAssetByID(id string) (*contentful.Asset, error) {
 	err = json.Unmarshal(byt, &asset)
 	if err != nil {
 		return nil, err
+	}
+	for _, loc := range []Locale{ {{ range $index , $locale := $locales }}SpaceLocale{{ onlyLetters $locale.Name }},{{end}} } {
+		if _, ok := asset.Fields.File[string(loc)]; ok {
+			asset.Fields.File[string(loc)].URL = "https:" + asset.Fields.File[string(loc)].URL
+		}
 	}
 	return &asset, nil
 }
