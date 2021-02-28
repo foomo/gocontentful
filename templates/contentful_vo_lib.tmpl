@@ -37,7 +37,7 @@ const (
 const cacheUpdateConcurrency = 4
 
 const (
-	LogNone = 0
+	LogDebug = 0
 	LogInfo = 1
 	LogWarn = 2
 	LogError = 3
@@ -48,6 +48,10 @@ var (
 	ErrNotSet            = errors.New("Field value not set")
 	ErrNotSetNoFallback  = errors.New("Field value not set and no fallback locale available")
 	ErrRefNotIncludes    = errors.New("Referenced entry not found in includes")
+	ErrNoTypeOfRefEntry  = errors.New("Couldn't get contentType of referenced entry")
+	ErrNoTypeOfRefAsset  = errors.New("Couldn't get contentType of referenced asset")
+	InfoCachedAllEntries = "Cached all entries of content type"
+	InfoUpdateCacheTime = "Space caching done, time recorded"
 )
 
 type ContentfulClient struct {
@@ -57,11 +61,9 @@ type ContentfulClient struct {
 	Debug   bool
 	Locales []Locale
 	LogFn   func(
-		contentType string,
-		entryID string,
-		method string,
+		fields map[string]interface{},
 		level int,
-		args interface{},
+		args ...interface{},
 	)
 	LogLevel int
 	OptimisticPageSize uint16 // Start downloading entries at this page size
@@ -87,7 +89,7 @@ type CacheEntryMaps struct {
 	{{ end }}
 }
 
-func NewContentfulClient(spaceID string, clientMode ClientMode, clientKey string, optimisticPageSize uint16, logFn func(contentType string, entryID string, method string, level int, args interface{}), logLevel int, debug bool) (*ContentfulClient, error) {
+func NewContentfulClient(spaceID string, clientMode ClientMode, clientKey string, optimisticPageSize uint16, logFn func(fields map[string]interface{}, level int, args ...interface{}), logLevel int, debug bool) (*ContentfulClient, error) {
 	if spaceID == "" {
 		return nil, errors.New("NewContentfulClient: SpaceID cannot be empty")
 	}
@@ -129,11 +131,14 @@ func updateCacheWorker(cc *ContentfulClient, queue chan string, done chan bool,k
 			switch contentType {
 			{{ range $index , $contentType := $contentTypes }}
 			case ContentType{{ firstCap $contentType.Sys.ID }}:
-				allShopBrands, err := cc.cacheAll{{ firstCap $contentType.Sys.ID }}()
+				all{{ firstCap $contentType.Sys.ID }}, err := cc.cacheAll{{ firstCap $contentType.Sys.ID }}()
 				if err != nil {
 					done <- false
 				}
-				cc.Cache.EntryMaps.{{ firstCap $contentType.Sys.ID }} = allShopBrands
+				cc.Cache.EntryMaps.{{ firstCap $contentType.Sys.ID }} = all{{ firstCap $contentType.Sys.ID }}
+				if cc.LogFn != nil && cc.LogLevel <= LogInfo {
+					cc.LogFn(map[string]interface{}{"contentType":"{{ $contentType.Sys.ID }}", "method": "updateCacheWorker", "size":len(all{{ firstCap $contentType.Sys.ID }})}, LogInfo, InfoCachedAllEntries)
+				}
 			{{ end }}
 			case assetWorkerType:
 				allAssets, err := cc.getAllAssets(false)
@@ -150,6 +155,7 @@ func updateCacheWorker(cc *ContentfulClient, queue chan string, done chan bool,k
 }
 
 func (cc *ContentfulClient) UpdateCache(contentTypes []string, cacheAssets bool) error {
+	start := time.Now()
 	if cc.ClientMode != ClientModeCDA {
 		return errors.New("UpdateCache: Only available in ClientModeCDA")
 	}
@@ -185,6 +191,9 @@ func (cc *ContentfulClient) UpdateCache(contentTypes []string, cacheAssets bool)
 		}
 	}
 	close(killsignal)
+	if cc.LogFn != nil && cc.LogLevel <= LogInfo {
+		cc.LogFn(map[string]interface{}{"time elapsed":time.Since(start), "method": "UpdateCache"}, LogInfo, InfoUpdateCacheTime)
+	}
 	return nil
 }
 

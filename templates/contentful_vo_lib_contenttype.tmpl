@@ -209,22 +209,22 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 		loc = locale[0]
 		if _, ok := localeFallback[loc]; !ok {
 			if vo.CC.LogFn != nil && vo.CC.LogLevel <= LogError {
-				vo.CC.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "{{ firstCap $field.ID }}()", LogError, ErrLocaleUnsupported)
+				vo.CC.LogFn(map[string]interface{}{"content type":vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method":"{{ firstCap $field.ID }}()"}, LogError, ErrLocaleUnsupported)
 			}
 			return {{ mapFieldTypeLiteral $contentType.Sys.ID $field }}
 		}
 	} 
 	if _, ok := vo.Fields.{{ firstCap $field.ID }}[string(loc)]; !ok {
 		if _, ok := localeFallback[loc]; !ok {
-			if vo.CC.LogFn != nil && vo.CC.LogLevel <= LogWarn {
-				vo.CC.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "{{ firstCap $field.ID }}()", LogWarn, ErrNotSet)
+			if vo.CC.LogFn != nil && vo.CC.LogLevel == LogDebug {
+				vo.CC.LogFn(map[string]interface{}{"content type":vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method":"{{ firstCap $field.ID }}()"}, LogWarn, ErrNotSet)
 			}
 			return {{ mapFieldTypeLiteral $contentType.Sys.ID $field }}
 		}
 		loc = localeFallback[loc]
 		if _, ok := vo.Fields.{{ firstCap $field.ID }}[string(loc)]; !ok {
-			if vo.CC.LogFn != nil && vo.CC.LogLevel <= LogWarn {
-				vo.CC.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "{{ firstCap $field.ID }}()", LogWarn, ErrNotSetNoFallback)
+			if vo.CC.LogFn != nil && vo.CC.LogLevel == LogDebug {
+				vo.CC.LogFn(map[string]interface{}{"content type":vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method":"{{ firstCap $field.ID }}()"}, LogWarn, ErrNotSetNoFallback)
 			}
 			return {{ mapFieldTypeLiteral $contentType.Sys.ID $field }}
 		}
@@ -242,22 +242,22 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 		loc = locale[0]
 		if _, ok := localeFallback[loc]; !ok {
 			if vo.CC.LogFn != nil && vo.CC.LogLevel <= LogError {
-				vo.CC.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "{{ firstCap $field.ID }}()", LogError, ErrLocaleUnsupported)
+				vo.CC.LogFn(map[string]interface{}{"content type":vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method":"{{ firstCap $field.ID }}()"}, LogError, ErrLocaleUnsupported)
 			}
 			return {{ mapFieldTypeLiteral $contentType.Sys.ID $field }}
 		}
 	} 
 	if _, ok := vo.Fields.{{ firstCap $field.ID }}[string(loc)]; !ok {
 		if _, ok := localeFallback[loc]; !ok {
-			if vo.CC.LogFn != nil && vo.CC.LogLevel <= LogWarn {
-				vo.CC.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "{{ firstCap $field.ID }}()", LogWarn, ErrNotSet)
+			if vo.CC.LogFn != nil && vo.CC.LogLevel == LogDebug {
+				vo.CC.LogFn(map[string]interface{}{"content type":vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method":"{{ firstCap $field.ID }}()"}, LogWarn, ErrNotSet)
 			}
 			return {{ mapFieldTypeLiteral $contentType.Sys.ID $field }}
 		}
 		loc = localeFallback[loc]
 		if _, ok := vo.Fields.{{ firstCap $field.ID }}[string(loc)]; !ok {
-			if vo.CC.LogFn != nil && vo.CC.LogLevel <= LogWarn {
-				vo.CC.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "{{ firstCap $field.ID }}()", LogWarn, ErrNotSetNoFallback)
+			if vo.CC.LogFn != nil && vo.CC.LogLevel == LogDebug {
+				vo.CC.LogFn(map[string]interface{}{"content type":vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method":"{{ firstCap $field.ID }}()"}, LogWarn, ErrNotSetNoFallback)
 			}
 			return {{ mapFieldTypeLiteral $contentType.Sys.ID $field }}
 		}
@@ -277,22 +277,22 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 		loc = locale[0]
 		if _, ok := localeFallback[loc]; !ok {
 			if vo.CC.LogFn != nil && vo.CC.LogLevel <= LogError {
-				vo.CC.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "{{ firstCap $field.ID }}()", LogError, ErrLocaleUnsupported)
+				vo.CC.LogFn(map[string]interface{}{"content type":vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method":"{{ firstCap $field.ID }}()"}, LogError, ErrLocaleUnsupported)
 			}
 			return {{ mapFieldTypeLiteral $contentType.Sys.ID $field }}
 		}
 	}
 	if _, ok := vo.Fields.{{ firstCap $field.ID }}[string(loc)]; !ok {
 		if _, ok := localeFallback[loc]; !ok {
-			if vo.CC.LogFn != nil && vo.CC.LogLevel <= LogWarn  {
-				vo.CC.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "{{ firstCap $field.ID }}()", LogWarn, ErrNotSet)
+			if vo.CC.LogFn != nil && vo.CC.LogLevel == LogDebug  {
+				vo.CC.LogFn(map[string]interface{}{"content type":vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method":"{{ firstCap $field.ID }}()"}, LogWarn, ErrNotSet)
 			}
 			return {{ mapFieldTypeLiteral $contentType.Sys.ID $field }}
 		}
 		loc = localeFallback[loc]
 		if _, ok := vo.Fields.{{ firstCap $field.ID }}[string(loc)]; !ok {
-			if vo.CC.LogFn != nil && vo.CC.LogLevel <= LogWarn  {
-				vo.CC.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "{{ firstCap $field.ID }}()", LogWarn, ErrNotSetNoFallback)
+			if vo.CC.LogFn != nil && vo.CC.LogLevel == LogDebug  {
+				vo.CC.LogFn(map[string]interface{}{"content type":vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method":"{{ firstCap $field.ID }}()"}, LogWarn, ErrNotSetNoFallback)
 			}
 			return {{ mapFieldTypeLiteral $contentType.Sys.ID $field }}
 		}
@@ -301,7 +301,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 		contentType, err := vo.CC.GetContentTypeOfID(eachLocalized{{ firstCap $field.ID }}.Sys.ID)
 		if err != nil {
 			if vo.CC.LogFn != nil && vo.CC.LogLevel <= LogError {
-				vo.CC.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "{{ firstCap $field.ID }}()", LogError, errors.New("Couldn't get contentType of referenced entry"))
+				vo.CC.LogFn(map[string]interface{}{"content type":vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method":"{{ firstCap $field.ID }}()"}, LogError, ErrNoTypeOfRefEntry)
 			}
 			return nil
 		}
@@ -311,7 +311,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 			referencedVO, err := vo.CC.Get{{ firstCap $contentType.Sys.ID }}ByID(eachLocalized{{ firstCap $field.ID }}.Sys.ID)
 			if err != nil {
 			if vo.CC.LogFn != nil && vo.CC.LogLevel <= LogError {
-				vo.CC.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "{{ firstCap $field.ID }}()", LogError, err)
+				vo.CC.LogFn(map[string]interface{}{"content type":vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method":"{{ firstCap $field.ID }}()"}, LogError, err)
 			}
 			return nil
 		}
@@ -332,22 +332,22 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 		loc = locale[0]
 		if _, ok := localeFallback[loc]; !ok {
 			if vo.CC.LogFn != nil && vo.CC.LogLevel <= LogError {
-				vo.CC.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "{{ firstCap $field.ID }}()", LogError, ErrLocaleUnsupported)
+				vo.CC.LogFn(map[string]interface{}{"content type":vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method":"{{ firstCap $field.ID }}()"}, LogError, ErrLocaleUnsupported)
 			}
 			return {{ mapFieldTypeLiteral $contentType.Sys.ID $field }}
 		}
 	}
 	if _, ok := vo.Fields.{{ firstCap $field.ID }}[string(loc)]; !ok {
 		if _, ok := localeFallback[loc]; !ok {
-			if vo.CC.LogFn != nil && vo.CC.LogLevel <= LogWarn {
-				vo.CC.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "{{ firstCap $field.ID }}()", LogWarn, ErrNotSet)
+			if vo.CC.LogFn != nil && vo.CC.LogLevel == LogDebug {
+				vo.CC.LogFn(map[string]interface{}{"content type":vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method":"{{ firstCap $field.ID }}()"}, LogWarn, ErrNotSet)
 			}
 			return {{ mapFieldTypeLiteral $contentType.Sys.ID $field }}
 		}
 		loc = localeFallback[loc]
 		if _, ok := vo.Fields.{{ firstCap $field.ID }}[string(loc)]; !ok {
-			if vo.CC.LogFn != nil && vo.CC.LogLevel <= LogWarn {
-				vo.CC.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "{{ firstCap $field.ID }}()", LogWarn, ErrNotSetNoFallback)
+			if vo.CC.LogFn != nil && vo.CC.LogLevel == LogDebug {
+				vo.CC.LogFn(map[string]interface{}{"content type":vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method":"{{ firstCap $field.ID }}()"}, LogWarn, ErrNotSetNoFallback)
 			}
 			return {{ mapFieldTypeLiteral $contentType.Sys.ID $field }}
 		}
@@ -356,7 +356,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 	contentType, err := vo.CC.GetContentTypeOfID(localized{{ firstCap $field.ID }}.Sys.ID)
 	if err != nil {
 		if vo.CC.LogFn != nil && vo.CC.LogLevel <= LogError {
-			vo.CC.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "{{ firstCap $field.ID }}()", LogError, errors.New("Couldn't get contentType of referenced entry"))
+			vo.CC.LogFn(map[string]interface{}{"content type":vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method":"{{ firstCap $field.ID }}()"}, LogError, ErrNoTypeOfRefEntry)
 		}
 		return nil
 	}
@@ -366,7 +366,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 		referencedVO, err := vo.CC.Get{{ firstCap $contentType.Sys.ID }}ByID(localized{{ firstCap $field.ID }}.Sys.ID)
 		if err != nil {
 			if vo.CC.LogFn != nil && vo.CC.LogLevel <= LogError {
-				vo.CC.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "{{ firstCap $field.ID }}()", LogError, err)
+				vo.CC.LogFn(map[string]interface{}{"content type":vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method":"{{ firstCap $field.ID }}()"}, LogError, err)
 			}
 			return nil
 		}
@@ -387,22 +387,22 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 		loc = locale[0]
 		if _, ok := localeFallback[loc]; !ok {
 			if vo.CC.LogFn != nil && vo.CC.LogLevel <= LogError {
-				vo.CC.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "{{ firstCap $field.ID }}()", LogError, ErrLocaleUnsupported)
+				vo.CC.LogFn(map[string]interface{}{"content type":vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method":"{{ firstCap $field.ID }}()"}, LogError, ErrLocaleUnsupported)
 			}
 			return nil
 		}
 	}
 	if _, ok := vo.Fields.{{ firstCap $field.ID }}[string(loc)]; !ok {
 		if _, ok := localeFallback[loc]; !ok {
-			if vo.CC.LogFn != nil && vo.CC.LogLevel <= LogWarn {
-				vo.CC.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "{{ firstCap $field.ID }}()", LogWarn, ErrNotSet)
+			if vo.CC.LogFn != nil && vo.CC.LogLevel == LogDebug {
+				vo.CC.LogFn(map[string]interface{}{"content type":vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method":"{{ firstCap $field.ID }}()"}, LogWarn, ErrNotSet)
 			}
 			return nil
 		}
 		loc = localeFallback[loc]
 		if _, ok := vo.Fields.{{ firstCap $field.ID }}[string(loc)]; !ok {
-			if vo.CC.LogFn != nil && vo.CC.LogLevel <= LogWarn {
-				vo.CC.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "{{ firstCap $field.ID }}()", LogWarn, ErrNotSetNoFallback)
+			if vo.CC.LogFn != nil && vo.CC.LogLevel == LogDebug {
+				vo.CC.LogFn(map[string]interface{}{"content type":vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method":"{{ firstCap $field.ID }}()"}, LogWarn, ErrNotSetNoFallback)
 			}
 			return nil
 		}
@@ -410,8 +410,8 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 	for _, eachLocalized{{ firstCap $field.ID }} := range vo.Fields.{{ firstCap $field.ID }}[string(loc)] {
 		asset, err := vo.CC.GetAssetByID(eachLocalized{{ firstCap $field.ID }}.Sys.ID)
 		if err != nil {
-			if vo.CC.LogFn != nil && vo.CC.LogLevel <= LogWarn {
-				vo.CC.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "{{ firstCap $field.ID }}()", LogWarn, ErrNotSetNoFallback)
+			if vo.CC.LogFn != nil && vo.CC.LogLevel == LogDebug {
+				vo.CC.LogFn(map[string]interface{}{"content type":vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method":"{{ firstCap $field.ID }}()"}, LogError, ErrNoTypeOfRefAsset)
 			}
 			return nil
 		}
@@ -437,22 +437,22 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 		loc = locale[0]
 		if _, ok := localeFallback[loc]; !ok {
 			if vo.CC.LogFn != nil && vo.CC.LogLevel <= LogError {
-				vo.CC.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "{{ firstCap $field.ID }}()", LogError, ErrLocaleUnsupported)
+				vo.CC.LogFn(map[string]interface{}{"content type":vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method":"{{ firstCap $field.ID }}()"}, LogError, ErrLocaleUnsupported)
 			}
 			return nil
 		}
 	}
 	if _, ok := vo.Fields.{{ firstCap $field.ID }}[string(loc)]; !ok {
 		if _, ok := localeFallback[loc]; !ok {
-			if vo.CC.LogFn != nil && vo.CC.LogLevel <= LogWarn {
-				vo.CC.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "{{ firstCap $field.ID }}()", LogWarn, ErrNotSet)
+			if vo.CC.LogFn != nil && vo.CC.LogLevel == LogDebug {
+				vo.CC.LogFn(map[string]interface{}{"content type":vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method":"{{ firstCap $field.ID }}()"}, LogWarn, ErrNotSet)
 			}
 			return nil
 		}
 		loc = localeFallback[loc]
 		if _, ok := vo.Fields.{{ firstCap $field.ID }}[string(loc)]; !ok {
-			if vo.CC.LogFn != nil && vo.CC.LogLevel <= LogWarn {
-				vo.CC.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "{{ firstCap $field.ID }}()", LogWarn, ErrNotSetNoFallback)
+			if vo.CC.LogFn != nil && vo.CC.LogLevel == LogDebug {
+				vo.CC.LogFn(map[string]interface{}{"content type":vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method":"{{ firstCap $field.ID }}()"}, LogWarn, ErrNotSetNoFallback)
 			}
 			return nil
 		}
@@ -460,8 +460,8 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 	localized{{ firstCap $field.ID }} := vo.Fields.{{ firstCap $field.ID }}[string(loc)]
 	asset, err := vo.CC.GetAssetByID(localized{{ firstCap $field.ID }}.Sys.ID)
 	if err != nil {
-		if vo.CC.LogFn != nil && vo.CC.LogLevel <= LogWarn {
-			vo.CC.LogFn(vo.Sys.ContentType.Sys.ID, vo.Sys.ID, "{{ firstCap $field.ID }}()", LogWarn, ErrNotSetNoFallback)
+		if vo.CC.LogFn != nil && vo.CC.LogLevel == LogDebug {
+			vo.CC.LogFn(map[string]interface{}{"content type":vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method":"{{ firstCap $field.ID }}()"}, LogError, ErrNoTypeOfRefAsset)
 		}
 		return nil
 	}
