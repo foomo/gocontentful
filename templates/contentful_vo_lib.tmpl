@@ -610,8 +610,14 @@ func (ts htmlTags) close(w io.Writer) {
 }
 
 type LinkResolverFunc func(url string) (resolvedURL string, resolveError error)
+type ImageResolverFunc func(assetID string) (attrs map[string]string, resolveError error)
 
-func (n *RichTextGenericNode) renderHTML(w io.Writer, linkResolver LinkResolverFunc) (err error) {
+func (n *RichTextGenericNode) renderHTML(w io.Writer, linkResolver LinkResolverFunc, imageResolver ImageResolverFunc) (err error) {
+	if linkResolver == nil {
+		linkResolver = func(url string) (transformedURL string, err error) {
+			return url, nil
+		}
+	}
 
 	tags := htmlTags{}
 
@@ -660,6 +666,24 @@ func (n *RichTextGenericNode) renderHTML(w io.Writer, linkResolver LinkResolverF
 
 		}
 		tags = []htmlTag{htmlTag{name: HtmlAnchor, attrs: attrs}}
+	case RichTextNodeEmbeddedAsset:
+		if imageResolver == nil {
+			return errors.New("Can't resolve image asset URL")
+		}
+		dataObj := RichTextData{}
+		byt, err := json.Marshal(n.Data)
+		if err != nil {
+			return err
+		}
+		err = json.Unmarshal(byt, &dataObj)
+		if dataObj.Target == nil {
+			return errors.New("Data target is empty")
+		}
+		attrs, err := imageResolver(dataObj.Target.Sys.ID)
+		if err != nil {
+			return err
+		}
+		tags = []htmlTag{htmlTag{name: HtmlImage, attrs: attrs}}
 	default:
 	}
 	for _, m := range n.Marks {
@@ -684,7 +708,7 @@ func (n *RichTextGenericNode) renderHTML(w io.Writer, linkResolver LinkResolverF
 	tags.open(w)
 	w.Write([]byte(html.EscapeString(n.Value)))
 	for _, subNode := range n.Content {
-		errSubNode := subNode.renderHTML(w, linkResolver)
+		errSubNode := subNode.renderHTML(w, linkResolver, imageResolver)
 		if errSubNode != nil {
 			err = errSubNode
 			return
@@ -694,25 +718,26 @@ func (n *RichTextGenericNode) renderHTML(w io.Writer, linkResolver LinkResolverF
 	return
 }
 
-func RichTextToHtml(rt interface{}) string {
+func RichTextToHtml(rt interface{}, linkResolver LinkResolverFunc, imageResolver ImageResolverFunc) (string, error) {
 	w := bytes.NewBuffer([]byte{})
 	node := &RichTextGenericNode{}
 	byt, err := json.Marshal(rt)
 	if err != nil {
-		return ""
+		return "", err
 	}
 	err = json.Unmarshal(byt, node)
 	if err != nil {
-		return ""
+		return "", err
 	}
-	node.renderHTML(w, func(url string) (transformedURL string, err error) {
-		return url, nil
-	})
+	err = node.renderHTML(w, linkResolver, imageResolver)
+	if err != nil {
+		return "", err
+	}
 	out := string(w.Bytes())
 	if out == "<p></p>" {
-		return ""
+		return "", nil
 	}
-	return out
+	return out, nil
 }
 
 // Other utils
