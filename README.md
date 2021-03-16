@@ -119,7 +119,9 @@ Note that constants are available for all locales supported by the space. If a s
 
 Contentful supports Rich Text editing and sooner or later you'll want to convert that to HTML:
 
-`htmlText := people.RichTextToHtml(person.Resume())`
+`htmlText := people.RichTextToHtml(person.Resume(), linkResolver, imageResolver)`
+
+_Note: linkResolver and imageResolver are two functions that resolve URLs for links and attributes for embedded image assets. See API documentation below._
 
 ...or the other way around (often used when digesting data from external sources):
 
@@ -309,9 +311,14 @@ Converts the asset to a reference. You need to do this before you add the asset 
 
 Converts an HTML fragment to a RichTextNode. This is far from complete but useful to migrate data from third-party systems to Contentful. It currently supports headings, paragraphs, hyperlinks, italic and bold tags, horizontal rules, blockquote, ordered and unordered lists, code. Unknown tags are stripped. This function doesn't return any error as it converts the input text into something as good as possible, without  validation.
 
->**RichTextToHtml**(rt interface{}) string
+>**RichTextToHtml**(rt interface{}, linkResolver LinkResolverFunc, imageResolver ImageResolverFunc) (string, error)
 
-Converts an interface representing a Contentful RichText value (usually from a field getter) into HTML. It currently supports all tags except for embedded and inline entries and assets.
+Converts an interface representing a Contentful RichText value (usually from a field getter) into HTML. It currently supports all tags except for embedded and inline entries and assets. It takes in two functions to resolve hyperlink URLs (if passed as null this will return the href unchanged) and to derive IMG tag attributes for embedded image assets (you usually want this customized in your application code). The two functions have this signature:
+
+>type LinkResolverFunc func(url string) (resolvedURL string, resolveError error)
+
+>type ImageResolverFunc func(assetID string) (attrs map[string]string, resolveError error)
+
 
 ---
 
