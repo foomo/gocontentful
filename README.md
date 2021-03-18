@@ -40,7 +40,7 @@ ERROR: Please specify the Contentful space ID and access Key
 SYNOPSIS
      gocontentful -spaceid SpaceID -cmakey CMAKey [-contenttypes firsttype,secondtype...lasttype] path/to/target/package
 
-Usage of /var/folders/hy/xggk1mb1409g93q1c_r14ltw0000gn/T/go-build1029582693/b001/exe/main:
+Usage of gocontentful:
   -cmakey string
     	Contentful CMA key
   -contenttypes string
