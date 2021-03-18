@@ -1,4 +1,4 @@
-# Contentful ERM
+# gocontentful
 
 A Contentful Entry-Reference Mapping code generator for Go. Initial features:
 

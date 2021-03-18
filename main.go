@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/foomo/contentful-erm/erm"
+	"github.com/foomo/gocontentful/erm"
 )
 
 func usageError(comment string) {

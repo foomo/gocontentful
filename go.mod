@@ -1,4 +1,4 @@
-module github.com/foomo/contentful-erm
+module github.com/foomo/gocontentful
 
 go 1.16
 

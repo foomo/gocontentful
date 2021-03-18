@@ -8,7 +8,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/foomo/contentful-erm/erm/templates"
+	"github.com/foomo/gocontentful/erm/templates"
 	"golang.org/x/tools/imports"
 )
 
