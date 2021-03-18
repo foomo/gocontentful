@@ -1,11 +1,11 @@
 package erm
 
-import "strings"
+import (
+	"regexp"
+	"strings"
+)
 
-import "regexp"
-
-// SliceIncludes returns true if slice includes string
-func SliceIncludes(slice []string, key string) bool {
+func sliceIncludes(slice []string, key string) bool {
 	for _, val := range slice {
 		if val == key {
 			return true

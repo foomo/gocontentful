@@ -35,34 +35,34 @@ func getFuncMap() template.FuncMap {
 // and returns a string that matches the type of the map[string] for the VO
 func mapFieldType(contentTypeName string, field ContentTypeField) string {
 	switch field.Type {
-	case FieldTypeArray: // It's either a text list or a multiple reference
+	case fieldTypeArray: // It's either a text list or a multiple reference
 		switch field.Items.Type {
-		case FieldItemsTypeSymbol:
+		case fieldItemsTypeSymbol:
 			return "[]string"
-		case FieldItemsTypeLink:
+		case fieldItemsTypeLink:
 			return "[]ContentTypeSys"
 		default:
 			return ""
 		}
-	case FieldTypeBoolean:
+	case fieldTypeBoolean:
 		return "bool"
-	case FieldTypeDate:
+	case fieldTypeDate:
 		return "string"
-	case FieldTypeInteger:
+	case fieldTypeInteger:
 		return "float64"
-	case FieldTypeLink: // A single reference
+	case fieldTypeLink: // A single reference
 		return "ContentTypeSys"
-	case FieldTypeLocation:
+	case fieldTypeLocation:
 		return "ContentTypeFieldLocation"
-	case FieldTypeNumber: // Floating point
+	case fieldTypeNumber: // Floating point
 		return "float64"
-	case FieldTypeJSON: // JSON field
+	case fieldTypeJSON: // JSON field
 		return "interface{}"
-	case FieldTypeRichText:
+	case fieldTypeRichText:
 		return "interface{}"
-	case FieldTypeSymbol: // It's a text field
+	case fieldTypeSymbol: // It's a text field
 		return "string"
-	case FieldTypeText: // It's a text field
+	case fieldTypeText: // It's a text field
 		return "string"
 	default:
 		return ""
@@ -73,13 +73,13 @@ func mapFieldType(contentTypeName string, field ContentTypeField) string {
 // and returns an empty literal that matches the type of the map[string] for the VO
 func mapFieldTypeLiteral(contentTypeName string, field ContentTypeField) string {
 	switch field.Type {
-	case FieldTypeBoolean:
+	case fieldTypeBoolean:
 		return "false"
-	case FieldTypeDate, FieldTypeSymbol, FieldTypeText:
+	case fieldTypeDate, fieldTypeSymbol, fieldTypeText:
 		return `""`
-	case FieldTypeInteger, FieldTypeNumber:
+	case fieldTypeInteger, fieldTypeNumber:
 		return "0"
-	case FieldTypeArray, FieldTypeLink, FieldTypeLocation, FieldTypeJSON, FieldTypeRichText:
+	case fieldTypeArray, fieldTypeLink, fieldTypeLocation, fieldTypeJSON, fieldTypeRichText:
 		return "nil"
 	default:
 		return ""
@@ -87,67 +87,67 @@ func mapFieldTypeLiteral(contentTypeName string, field ContentTypeField) string 
 }
 
 func fieldIsAsset(field ContentTypeField) bool {
-	return field.Type == FieldTypeLink && field.LinkType == FieldLinkTypeAsset
+	return field.Type == fieldTypeLink && field.LinkType == fieldLinkTypeAsset
 }
 
 func fieldIsBoolean(field ContentTypeField) bool {
-	return field.Type == FieldTypeBoolean
+	return field.Type == fieldTypeBoolean
 }
 
 func fieldIsDate(field ContentTypeField) bool {
-	return field.Type == FieldTypeDate
+	return field.Type == fieldTypeDate
 }
 
 func fieldIsInteger(field ContentTypeField) bool {
-	return field.Type == FieldTypeInteger
+	return field.Type == fieldTypeInteger
 }
 
 func fieldIsJSON(field ContentTypeField) bool {
-	return field.Type == FieldTypeJSON
+	return field.Type == fieldTypeJSON
 }
 
 func fieldIsLink(field ContentTypeField) bool {
-	return field.Type == FieldTypeLink
+	return field.Type == fieldTypeLink
 }
 
 func fieldIsLocation(field ContentTypeField) bool {
-	return field.Type == FieldTypeLocation
+	return field.Type == fieldTypeLocation
 }
 
 func fieldIsMultipleAsset(field ContentTypeField) bool {
-	return field.Type == FieldTypeArray && field.Items.Type == FieldItemsTypeLink && field.Items.LinkType == FieldLinkTypeAsset
+	return field.Type == fieldTypeArray && field.Items.Type == fieldItemsTypeLink && field.Items.LinkType == fieldLinkTypeAsset
 }
 func fieldIsMultipleReference(field ContentTypeField) bool {
-	return field.Type == FieldTypeArray && field.Items.Type == FieldItemsTypeLink && field.Items.LinkType == FieldLinkTypeEntry
+	return field.Type == fieldTypeArray && field.Items.Type == fieldItemsTypeLink && field.Items.LinkType == fieldLinkTypeEntry
 }
 
 func fieldIsNumber(field ContentTypeField) bool {
-	return field.Type == FieldTypeNumber
+	return field.Type == fieldTypeNumber
 }
 
 func fieldIsReference(field ContentTypeField) bool {
-	return field.Type == FieldTypeLink && field.LinkType == FieldLinkTypeEntry
+	return field.Type == fieldTypeLink && field.LinkType == fieldLinkTypeEntry
 }
 
 func fieldIsRichText(field ContentTypeField) bool {
-	return field.Type == FieldTypeRichText
+	return field.Type == fieldTypeRichText
 }
 
 func fieldIsSymbol(field ContentTypeField) bool {
-	return field.Type == FieldTypeSymbol
+	return field.Type == fieldTypeSymbol
 }
 
 func fieldIsSymbolList(field ContentTypeField) bool {
-	return field.Type == FieldTypeArray && field.Items.Type == FieldItemsTypeSymbol
+	return field.Type == fieldTypeArray && field.Items.Type == fieldItemsTypeSymbol
 }
 
 func fieldIsText(field ContentTypeField) bool {
-	return field.Type == FieldTypeText
+	return field.Type == fieldTypeText
 }
 
 func fieldIsBasic(field ContentTypeField) bool {
 	return fieldIsSymbolList(field) || fieldIsBoolean(field) || fieldIsInteger(field) || fieldIsNumber(field) || fieldIsSymbol(field) || fieldIsText(field) || fieldIsDate(field)
 }
 func fieldIsComplex(field ContentTypeField) bool {
-	return field.Type == FieldTypeJSON || field.Type == FieldTypeLocation || field.Type == FieldTypeRichText
+	return field.Type == fieldTypeJSON || field.Type == fieldTypeLocation || field.Type == fieldTypeRichText
 }
