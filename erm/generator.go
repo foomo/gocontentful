@@ -52,9 +52,9 @@ func generate(filename string, tpl []byte, conf spaceConf) error {
 // generateCode generates API to and value objects for the space
 func generateCode(conf spaceConf) (err error) {
 	for file, tpl := range map[string][]byte{
-		filepath.Join(conf.PackageDir, "contentfulvobase"+goExt): templates.TemplateVoBase,
-		filepath.Join(conf.PackageDir, "contentfulvo"+goExt):     templates.TemplateVo,
-		filepath.Join(conf.PackageDir, "contentfulvolib"+goExt):  templates.TemplateVoLib,
+		filepath.Join(conf.PackageDir, "gocontentfulvobase"+goExt): templates.TemplateVoBase,
+		filepath.Join(conf.PackageDir, "gocontentfulvo"+goExt):     templates.TemplateVo,
+		filepath.Join(conf.PackageDir, "gocontentfulvolib"+goExt):  templates.TemplateVoLib,
 	} {
 		errGenerate := generate(file, tpl, conf)
 		if errGenerate != nil {
@@ -64,7 +64,7 @@ func generateCode(conf spaceConf) (err error) {
 	for _, contentType := range conf.ContentTypes {
 		conf.ContentType = contentType
 		errGenerate := generate(
-			filepath.Join(conf.PackageDir, "contentfulvolib"+strings.ToLower(contentType.Sys.ID)+goExt),
+			filepath.Join(conf.PackageDir, "gocontentfulvolib"+strings.ToLower(contentType.Sys.ID)+goExt),
 			templates.TemplateVoLibContentType,
 			conf,
 		)

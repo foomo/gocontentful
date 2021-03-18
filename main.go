@@ -12,8 +12,11 @@ import (
 )
 
 func usageError(comment string) {
-	fmt.Println(comment)
+	fmt.Println("ERROR:", comment)
+	fmt.Printf("\nSYNOPSIS\n")
+	fmt.Printf("     gocontentful -spaceid SpaceID -cmakey CMAKey [-contenttypes firsttype,secondtype...lasttype] path/to/target/package\n\n")
 	flag.Usage()
+	fmt.Printf("\nNote: The last segment of the path/to/target/package will be used as package name\n\n")
 	os.Exit(1)
 }
 
@@ -23,7 +26,7 @@ func fatal(infos ...interface{}) {
 }
 
 func main() {
-	fmt.Println("Contentful Entry-Reference Mapping Generator starting...")
+	fmt.Printf("Contentful API Generator starting...\n\n")
 	// Get parameters from cmd line flags
 	flagSpaceID := flag.String("spaceid", "", "Contentful space ID")
 	flagCMAKey := flag.String("cmakey", "", "Contentful CMA key")
@@ -36,7 +39,7 @@ func main() {
 	}
 
 	if len(flag.Args()) != 1 {
-		usageError("missing arg path/to/target/package")
+		usageError("Missing arg path/to/target/package")
 	}
 
 	path := flag.Arg(0)

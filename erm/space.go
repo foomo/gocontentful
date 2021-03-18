@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/foomo/contentful"
 )
@@ -90,7 +91,11 @@ func getData(spaceID, cmaKey string, flagContentTypes []string) (finalContentTyp
 			}
 		}
 	}
-	fmt.Println("Filtered Content types:", len(finalContentTypes), finalContentTypes)
+	var finalContentTypesString []string
+	for _, finalContentType := range finalContentTypes {
+		finalContentTypesString = append(finalContentTypesString, finalContentType.Name)
+	}
+	fmt.Println("Filtered Content types:", len(finalContentTypes), strings.Join(finalContentTypesString, ", "))
 	return finalContentTypes, locales, nil
 }
 

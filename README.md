@@ -1,16 +1,16 @@
 # gocontentful
 
-A Contentful Entry-Reference Mapping code generator for Go. Initial features:
+A Contentful API code generator for Go. Initial features:
 
 - Creation of Value Objects from Contentful content model
 - CDA, CPA, CMA support for CRUD operations
-- Automatic management/resolution of references
+- Automatic management/resolution of references and parents
 - Many utility functions, like converting to/from RichText to HTML and easy access to Assets
 
 Rationale
 -----------------------------------------
 
-While an unofficial/experimental Go client by Contentful has been available for a long time (see credits at the end of this document), working with the response of a JSON REST API is far from optimal. 
+While an unofficial/experimental Go client by Contentful Labs has been available for a long time (see credits at the end of this document), working with the response of a JSON REST API is far from optimal. 
 
 Loading and converting data into (and from) Go value objects can quickly become a nightmare and the amount of code to access each field of each content type of a complex space can literally explode and if you're not careful how and when you interact with an API over the Internet, performance can be impacted dramatically. Not to mention what happens to your code if you need to make a significant change the space data model. 
 
@@ -23,32 +23,59 @@ How much code is that? As an example of a real-world scenario, a space content m
 Quickstart
 -----------------------------------------
 
-Case: you want to generate a package named "people" and manipulate entries of content types with ID "person" and "pet". From the main directory run this:
+### Installation
 
-<pre><code>export SPACEID=YOUR_SPACE_ID
-export CMAKEY=YOUR_CMA_KEY
-export PACKAGE=people
-export CONTENTTYPES=person,pet
+Prerequisite: you need Go 1.16+. Upgrade if you still haven't, then run:
 
-make</code></pre>
+> go get github.com/foomo/gocontentful
 
-Note: the Makefile requires _sed_ and _gofmt_ to be available in your shell path. This will generally be the case for Go developers and makes the generated files nice and tidy.
+Test the installation (make sure $GOPATH/bin is in your $PATH):
 
-The script will scan the space, download locales and content types and generate some files in a directory named after the package inside the "generated" directory:
+>gocontentful
 
-<pre><code>generated/people
-|-contentful_vo_base.go
-|-contentful_vo_lib_person.go // One file for each content type
-|-contentful_vo_lib_pet.go    // One file for each content type
-|-contentful_vo_lib.go
-|-contentful_vo.go
+<pre><code>Contentful API Generator starting...
+
+ERROR: Please specify the Contentful space ID and access Key
+
+SYNOPSIS
+     gocontentful -spaceid SpaceID -cmakey CMAKey [-contenttypes firsttype,secondtype...lasttype] path/to/target/package
+
+Usage of /var/folders/hy/xggk1mb1409g93q1c_r14ltw0000gn/T/go-build1029582693/b001/exe/main:
+  -cmakey string
+    	Contentful CMA key
+  -contenttypes string
+    	[Optional] Content type IDs to parse, comma separated
+  -spaceid string
+    	Contentful space ID
+
+Note: The last segment of the path/to/target/package will be used as package name
 </code></pre>
 
-Copy these files into a subdirectory of your project and import the "people" package. 
+###Use case
+
+- You want to generate a package named "people" and manipulate entries of content types with ID "person" and "pet".
+
+Run the following:
+
+>gocontentful -spaceid YOUR_SPACE_ID -cmakey YOUR_CMA_API_TOKEN -contenttypes person,pet path/to/your/go/project/folder/people 
+
+The -contenttypes parameter is optional. If not specified, an API for all content types of the space will be generated.
+
+The script will scan the space, download locales and content types and generate the Go API files in the target path:
+
+<pre><code>path/to/your/go/project/folder/people
+|-gocontentfulvobase.go
+|-gocontentfulvolib_person.go // One file for each content type
+|-gocontentfulvolib_pet.go    // One file for each content type
+|-gocontentfulvolib.go
+|-gocontentfulvo.go
+</code></pre>
 
 _Note: Do NOT modify these files! If you change the content model in Contentful you will need to run the generator again and overwrite the files._
 
 ### Get a client
+
+The generated files will be in the "people" subdirectory of your project. Your go program can get a Contentful client from them:
 
 `cc, err := people.NewContentfulClient(YOUR_SPACE_ID, people.ClientModeCDA, YOUR_API_KEY, 1000, contentfulLogger, people.LogDebug,false)`
 
