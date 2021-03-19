@@ -1,6 +1,7 @@
 package erm
 
 import (
+	"fmt"
 	"go/format"
 	"io/ioutil"
 	"os"
@@ -29,6 +30,7 @@ func formatAndFixImports(filename string) error {
 }
 
 func generate(filename string, tpl []byte, conf spaceConf) error {
+	fmt.Println("Processing", filename)
 	tmpl, err := template.New("generate-" + filename).Funcs(conf.FuncMap).Parse(string(tpl))
 	if err != nil {
 		return err
