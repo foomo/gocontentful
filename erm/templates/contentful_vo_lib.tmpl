@@ -3,6 +3,7 @@
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"golang.org/x/sync/errgroup"
 	"github.com/foomo/contentful"
 )
 
@@ -51,8 +53,11 @@ var (
 	ErrNoTypeOfRefEntry  = errors.New("Couldn't get contentType of referenced entry")
 	ErrNoTypeOfRefAsset  = errors.New("Couldn't get contentType of referenced asset")
 	InfoCachedAllEntries = "Cached all entries of content type"
+	InfoCachedAllAssets  = "Cached all assets"
 	InfoUpdateCacheTime = "Space caching done, time recorded"
 )
+
+var spaceContentTypes = []string{ {{ range $index , $contentType := $contentTypes }}ContentType{{ firstCap $contentType.Sys.ID }}, {{ end }} }
 
 type ContentfulClient struct {
 	Cache  *ContentfulCache
@@ -124,73 +129,78 @@ func NewContentfulClient(spaceID string, clientMode ClientMode, clientKey string
 	}
 	return cc, nil
 }
-func updateCacheWorker(cc *ContentfulClient, tempCache *ContentfulCache, queue chan string, done chan bool,ks chan bool) error {
-	for {
-		select {
-		case contentType := <-queue:
-			switch contentType {
-			{{ range $index , $contentType := $contentTypes }}
-			case ContentType{{ firstCap $contentType.Sys.ID }}:
-				all{{ firstCap $contentType.Sys.ID }}, err := cc.cacheAll{{ firstCap $contentType.Sys.ID }}(tempCache)
-				if err != nil {
-					done <- false
-				}
-				tempCache.EntryMaps.{{ firstCap $contentType.Sys.ID }} = all{{ firstCap $contentType.Sys.ID }}
-				if cc.LogFn != nil && cc.LogLevel <= LogInfo {
-					cc.LogFn(map[string]interface{}{"contentType":"{{ $contentType.Sys.ID }}", "method": "updateCacheWorker", "size":len(all{{ firstCap $contentType.Sys.ID }})}, LogInfo, InfoCachedAllEntries)
-				}
-			{{ end }}
-			case assetWorkerType:
-				allAssets, err := cc.getAllAssets(false)
-				if err != nil {
-					done <- false
-				}
-				tempCache.Assets = allAssets
-			}
-			done <- true
-		case <-ks:
-			return nil
+func updateCacheForContentType(ctx context.Context, cc *ContentfulClient, tempCache *ContentfulCache, contentType string) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	switch contentType {
+	{{ range $index , $contentType := $contentTypes }}
+	case ContentType{{ firstCap $contentType.Sys.ID }}:
+		all{{ firstCap $contentType.Sys.ID }}, err := cc.cacheAll{{ firstCap $contentType.Sys.ID }}(tempCache)
+		if err != nil {
+			return err
+		}
+		tempCache.EntryMaps.{{ firstCap $contentType.Sys.ID }} = all{{ firstCap $contentType.Sys.ID }}
+		if cc.LogFn != nil && cc.LogLevel <= LogInfo {
+			cc.LogFn(map[string]interface{}{"contentType":"{{ $contentType.Sys.ID }}", "method": "updateCacheForContentType", "size":len(all{{ firstCap $contentType.Sys.ID }})}, LogInfo, InfoCachedAllEntries)
+		}
+	{{ end }}
+	case assetWorkerType:
+		allAssets, err := cc.getAllAssets(false)
+		if err != nil {
+			return err
+		}
+		tempCache.Assets = allAssets
+		if cc.LogFn != nil && cc.LogLevel <= LogInfo {
+			cc.LogFn(map[string]interface{}{"contentType": "asset", "method": "updateCacheForContentType", "size": len(allAssets)}, LogInfo, InfoCachedAllAssets)
 		}
 	}
+	return nil
 }
 
-func (cc *ContentfulClient) UpdateCache(contentTypes []string, cacheAssets bool) error {
+func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []string, cacheAssets bool) error {
 	start := time.Now()
 	if cc.ClientMode != ClientModeCDA {
-		return errors.New("UpdateCache: Only available in ClientModeCDA")
+		return errors.New("updateCache: Only available in ClientModeCDA")
 	}
-	tempCache := &ContentfulCache{}
-	tempCache.ContentTypes = contentTypes
-	tempCache.IdContentTypeMap = map[string]string{}
-	tempCache.ParentMap = map[string][]EntryReference{}
-	spaceContentTypes := []string{ {{ range $index , $contentType := $contentTypes }}ContentType{{ firstCap $contentType.Sys.ID }}, {{ end }} }
+	tempCache := &ContentfulCache{
+		ContentTypes:     contentTypes,
+		IdContentTypeMap: map[string]string{},
+		ParentMap:        map[string][]EntryReference{},
+	}
 	for _, contentType := range contentTypes {
 		if !stringSliceContains(spaceContentTypes, contentType) {
-			return errors.New("UpdateCache: Content Type '" + contentType + "' not available in this space")
+			return fmt.Errorf("updateCache: Content Type %q not available in this space", contentType)
 		}
 	}
 	if cacheAssets {
 		contentTypes = append([]string{assetWorkerType}, contentTypes...)
 	}
-	queue := make(chan string)
-	done := make(chan bool)
-	killsignal := make(chan bool)
+	contentTypeChan := make(chan string)
+	group, gctx := errgroup.WithContext(ctx)
 	for i := 0; i < cacheUpdateConcurrency; i++ {
-		go updateCacheWorker(cc,tempCache,queue,done, killsignal)
+		group.Go(func() error {
+			for contentType := range contentTypeChan {
+				err := updateCacheForContentType(gctx, cc, tempCache, contentType)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		})
 	}
-	for j := 0; j < len(contentTypes); j++ {
-		go func(j int) {
-			queue <- contentTypes[j]
-		}(j)
-	}
-	for c := 0; c < len(contentTypes); c++ {
-		result := <-done
-		if !result {
-			close(killsignal)
-			return errors.New("UpdateCache: A worker returned an error")
+	go func() {
+		for _, contentType := range contentTypes {
+			contentTypeChan <- contentType
 		}
+		close(contentTypeChan)
+	}()
+	err := group.Wait()
+	if err != nil {
+		// drain contentTypeChan
+		for _ = range contentTypeChan {	}
+		return err
 	}
-	close(killsignal)
 	if cc.LogFn != nil && cc.LogLevel <= LogInfo {
 		cc.LogFn(map[string]interface{}{"time elapsed":time.Since(start), "method": "UpdateCache"}, LogInfo, InfoUpdateCacheTime)
 	}
