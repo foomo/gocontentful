@@ -12,8 +12,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
-	"golang.org/x/sync/errgroup"
 	"github.com/foomo/contentful"
+	"golang.org/x/sync/errgroup"
 )
 
 type Locale string
@@ -61,18 +61,18 @@ var spaceContentTypes = []string{ {{ range $index , $contentType := $contentType
 
 type ContentfulClient struct {
 	Cache  *ContentfulCache
-	ClientMode ClientMode
+	clientMode ClientMode
 	Client     *contentful.Contentful
-	Debug   bool
-	Locales []Locale
-	LogFn   func(
-		fields map[string]interface{},
-		level int,
-		args ...interface{},
+	debug      bool
+	locales    []Locale
+	logFn      func(
+			fields map[string]interface{},
+			level int,
+			args ...interface{},
 	)
-	LogLevel int
-	OptimisticPageSize uint16 // Start downloading entries at this page size
-	SpaceID string
+	logLevel           int
+	optimisticPageSize uint16 // Start downloading entries at this page size
+	SpaceID            string
 }
 
 type ContentfulCache struct {
@@ -98,28 +98,24 @@ func NewContentfulClient(spaceID string, clientMode ClientMode, clientKey string
 	if spaceID == "" {
 		return nil, errors.New("NewContentfulClient: SpaceID cannot be empty")
 	}
-	cc := &ContentfulClient{}
 	if clientKey == "" {
 		return nil, errors.New("NewContentfulClient: Please provide an API key")
 	}
-	cc.ClientMode = clientMode
-	switch clientMode {
-	case ClientModeCDA:
-		cc.Client = contentful.NewCDA(clientKey)
-	case ClientModeCPA:
-		cc.Client = contentful.NewCPA(clientKey)
-	case ClientModeCMA:
-		cc.Client = contentful.NewCMA(clientKey)
-	default:
-		return nil, errors.New("NewContentfulClient: Unknown ClientMode")
+	apiClient, err := getContentfulAPIClient(clientMode, clientKey)
+	if err != nil {
+		return nil, err
 	}
-	cc.Client.Debug = debug
-	cc.Locales = []Locale{ {{ range $index , $locale := $locales }}SpaceLocale{{ onlyLetters $locale.Name }}, {{ end }} }
-	cc.LogFn = logFn
-	cc.LogLevel = logLevel
-	cc.OptimisticPageSize = optimisticPageSize
-	cc.SpaceID = spaceID
-	_, err := cc.Client.Spaces.Get(spaceID)
+	cc := &ContentfulClient{
+		clientMode:         clientMode,
+		Client:             apiClient,
+		debug:              debug,
+		locales:			[]Locale{ {{ range $index , $locale := $locales }}SpaceLocale{{ onlyLetters $locale.Name }}, {{ end }} },
+		logFn:              logFn,
+		logLevel:           logLevel,
+		optimisticPageSize: optimisticPageSize,
+		SpaceID:            spaceID,
+	}
+	_, err = cc.Client.Spaces.Get(spaceID)
 	if err != nil {
 		_, ok := err.(contentful.NotFoundError)
 		if ok {
@@ -129,6 +125,20 @@ func NewContentfulClient(spaceID string, clientMode ClientMode, clientKey string
 	}
 	return cc, nil
 }
+
+func getContentfulAPIClient(clientMode ClientMode, clientKey string) (*contentful.Contentful, error) {
+	switch clientMode {
+	case ClientModeCDA:
+		return contentful.NewCDA(clientKey), nil
+	case ClientModeCPA:
+		return contentful.NewCPA(clientKey), nil
+	case ClientModeCMA:
+		return contentful.NewCMA(clientKey), nil
+	default:
+		return nil, errors.New("NewContentfulClient: Unknown ClientMode")
+	}
+}
+
 func updateCacheForContentType(ctx context.Context, cc *ContentfulClient, tempCache *ContentfulCache, contentType string) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
@@ -141,8 +151,8 @@ func updateCacheForContentType(ctx context.Context, cc *ContentfulClient, tempCa
 			return err
 		}
 		tempCache.EntryMaps.{{ firstCap $contentType.Sys.ID }} = all{{ firstCap $contentType.Sys.ID }}
-		if cc.LogFn != nil && cc.LogLevel <= LogInfo {
-			cc.LogFn(map[string]interface{}{"contentType":"{{ $contentType.Sys.ID }}", "method": "updateCacheForContentType", "size":len(all{{ firstCap $contentType.Sys.ID }})}, LogInfo, InfoCachedAllEntries)
+		if cc.logFn != nil && cc.logLevel <= LogInfo {
+			cc.logFn(map[string]interface{}{"contentType":"{{ $contentType.Sys.ID }}", "method": "updateCacheForContentType", "size":len(all{{ firstCap $contentType.Sys.ID }})}, LogInfo, InfoCachedAllEntries)
 		}
 	{{ end }}
 	case assetWorkerType:
@@ -151,8 +161,8 @@ func updateCacheForContentType(ctx context.Context, cc *ContentfulClient, tempCa
 			return err
 		}
 		tempCache.Assets = allAssets
-		if cc.LogFn != nil && cc.LogLevel <= LogInfo {
-			cc.LogFn(map[string]interface{}{"contentType": "asset", "method": "updateCacheForContentType", "size": len(allAssets)}, LogInfo, InfoCachedAllAssets)
+		if cc.logFn != nil && cc.logLevel <= LogInfo {
+			cc.logFn(map[string]interface{}{"contentType": "asset", "method": "updateCacheForContentType", "size": len(allAssets)}, LogInfo, InfoCachedAllAssets)
 		}
 	}
 	return nil
@@ -160,8 +170,8 @@ func updateCacheForContentType(ctx context.Context, cc *ContentfulClient, tempCa
 
 func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []string, cacheAssets bool) error {
 	start := time.Now()
-	if cc.ClientMode != ClientModeCDA {
-		return errors.New("updateCache: Only available in ClientModeCDA")
+	if cc.clientMode != ClientModeCDA {
+		return errors.New("UpdateCache: Only available in ClientModeCDA")
 	}
 	tempCache := &ContentfulCache{
 		ContentTypes:     contentTypes,
@@ -170,7 +180,7 @@ func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []stri
 	}
 	for _, contentType := range contentTypes {
 		if !stringSliceContains(spaceContentTypes, contentType) {
-			return fmt.Errorf("updateCache: Content Type %q not available in this space", contentType)
+			return fmt.Errorf("UpdateCache: Content Type %q not available in this space", contentType)
 		}
 	}
 	if cacheAssets {
@@ -201,8 +211,8 @@ func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []stri
 		for _ = range contentTypeChan {	}
 		return err
 	}
-	if cc.LogFn != nil && cc.LogLevel <= LogInfo {
-		cc.LogFn(map[string]interface{}{"time elapsed":time.Since(start), "method": "UpdateCache"}, LogInfo, InfoUpdateCacheTime)
+	if cc.logFn != nil && cc.logLevel <= LogInfo {
+		cc.logFn(map[string]interface{}{"time elapsed":time.Since(start), "method": "UpdateCache"}, LogInfo, InfoUpdateCacheTime)
 	}
 	cc.Cache = tempCache
 	return nil
@@ -272,7 +282,7 @@ func (cc *ContentfulClient) getAllAssets(tryCacheFirst bool) (map[string]*conten
 	if cc.Client == nil {
 		return nil, errors.New("getAllAssets: No client available")
 	}
-	if cc.Cache != nil && cc.Cache.Assets != nil {
+	if cc.Cache != nil && cc.Cache.Assets != nil && tryCacheFirst {
 		return cc.Cache.Assets, nil
 	}
 	col := cc.Client.Assets.List(cc.SpaceID)
