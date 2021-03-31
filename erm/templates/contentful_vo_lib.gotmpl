@@ -402,6 +402,24 @@ func ToAssetReference(asset *contentful.Asset) (refSys ContentTypeSys) {
 	return
 }
 
+func (cc *ContentfulClient) DeleteAsset(asset *contentful.Asset) error {
+	if cc.Client == nil {
+		return errors.New("DeleteAsset: No client available")
+	}
+	if cc.clientMode != ClientModeCMA {
+		return errors.New("DeleteAsset: Only available in ClientModeCMA")
+	}
+	errUnpublish := cc.Client.Assets.Unpublish(cc.SpaceID, asset)
+	if errUnpublish != nil && !strings.Contains(errUnpublish.Error(), "Not published") {
+		return errUnpublish
+	}
+	errDelete := cc.Client.Assets.Delete(cc.SpaceID, asset)
+	if errDelete != nil {
+		return errDelete
+	}
+	return nil
+}
+
 // RichText utils
 
 func HtmlToRichText(htmlSrc string) *RichTextNode {
