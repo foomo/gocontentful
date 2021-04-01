@@ -94,6 +94,12 @@ type CacheEntryMaps struct {
 	{{ end }}
 }
 
+type ContentTypeResult struct {
+	EntryID     string
+	ContentType string
+	References  map[string][]EntryReference
+}
+
 func NewContentfulClient(spaceID string, clientMode ClientMode, clientKey string, optimisticPageSize uint16, logFn func(fields map[string]interface{}, level int, args ...interface{}), logLevel int, debug bool) (*ContentfulClient, error) {
 	if spaceID == "" {
 		return nil, errors.New("NewContentfulClient: SpaceID cannot be empty")
@@ -139,14 +145,14 @@ func getContentfulAPIClient(clientMode ClientMode, clientKey string) (*contentfu
 	}
 }
 
-func updateCacheForContentType(ctx context.Context, cc *ContentfulClient, tempCache *ContentfulCache, contentType string) error {
+func updateCacheForContentType(ctx context.Context, results chan ContentTypeResult, cc *ContentfulClient, tempCache *ContentfulCache, contentType string) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 	switch contentType {
 	{{ range $index , $contentType := $contentTypes }}
 	case ContentType{{ firstCap $contentType.Sys.ID }}:
-		all{{ firstCap $contentType.Sys.ID }}, err := cc.cacheAll{{ firstCap $contentType.Sys.ID }}(tempCache)
+		all{{ firstCap $contentType.Sys.ID }}, err := cc.cacheAll{{ firstCap $contentType.Sys.ID }}(ctx, results)
 		if err != nil {
 			return err
 		}
@@ -186,12 +192,14 @@ func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []stri
 	if cacheAssets {
 		contentTypes = append([]string{assetWorkerType}, contentTypes...)
 	}
+	results := make(chan ContentTypeResult, 16)
+	resultsDone := make(chan struct{})
 	contentTypeChan := make(chan string)
 	group, gctx := errgroup.WithContext(ctx)
 	for i := 0; i < cacheUpdateConcurrency; i++ {
 		group.Go(func() error {
 			for contentType := range contentTypeChan {
-				err := updateCacheForContentType(gctx, cc, tempCache, contentType)
+				err := updateCacheForContentType(gctx, results, cc, tempCache, contentType)
 				if err != nil {
 					return err
 				}
@@ -205,12 +213,25 @@ func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []stri
 		}
 		close(contentTypeChan)
 	}()
+	go func() {
+		for res := range results {
+			tempCache.IdContentTypeMap[res.EntryID] = res.ContentType
+			for childID, references := range res.References {
+				tempCache.ParentMap[childID] = append(tempCache.ParentMap[childID], references...)
+			}
+		}
+		resultsDone <- struct{}{}
+	}()
 	err := group.Wait()
+	close(results)
 	if err != nil {
 		// drain contentTypeChan
 		for _ = range contentTypeChan {	}
 		return err
 	}
+	// Signal that the cache build is done
+	<-resultsDone
+
 	if cc.logFn != nil && cc.logLevel <= LogInfo {
 		cc.logFn(map[string]interface{}{"time elapsed":time.Since(start), "method": "UpdateCache"}, LogInfo, InfoUpdateCacheTime)
 	}

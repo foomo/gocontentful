@@ -3,6 +3,7 @@
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,7 +13,7 @@ import (
 const ContentType{{ firstCap $contentType.Sys.ID }} = "{{ $contentType.Sys.ID }}"
 // ---{{ firstCap $contentType.Sys.ID }} private methods---
 
-func (cc *ContentfulClient) cacheAll{{ firstCap $contentType.Sys.ID }}(tempCache *ContentfulCache) (vos map[string]*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
+func (cc *ContentfulClient) cacheAll{{ firstCap $contentType.Sys.ID }}(ctx context.Context, resultChan chan<- ContentTypeResult) (vos map[string]*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
 	if cc.Client == nil {
 		return nil, errors.New("cacheAll{{ firstCap $contentType.Sys.ID }}: No CDA client available")
 	}
@@ -27,17 +28,25 @@ func (cc *ContentfulClient) cacheAll{{ firstCap $contentType.Sys.ID }}(tempCache
 	{{ $contentType.Sys.ID }}Map := map[string]*Cf{{ firstCap $contentType.Sys.ID }}{}
 	for _, {{ $contentType.Sys.ID }} := range all{{ firstCap $contentType.Sys.ID }} {
 		{{ $contentType.Sys.ID }}Map[{{ $contentType.Sys.ID }}.Sys.ID] = {{ $contentType.Sys.ID }}
-		tempCache.IdContentTypeMap[{{ $contentType.Sys.ID }}.Sys.ID] = ContentType{{ firstCap $contentType.Sys.ID }}
-		{{ range $fieldIndex, $field := $contentType.Fields }}
+			result := ContentTypeResult{
+				EntryID: {{ $contentType.Sys.ID }}.Sys.ID,
+				ContentType: ContentType{{ firstCap $contentType.Sys.ID }},
+				References:  map[string][]EntryReference{},
+			}
+			addEntry := func(id string, refs EntryReference){
+				if result.References[id] == nil {
+					result.References[id] = []EntryReference{}
+				}
+				result.References[id] = append(result.References[id], refs)
+			}
+			_ = addEntry
+			{{ range $fieldIndex, $field := $contentType.Fields }}
 			{{ if fieldIsMultipleReference $field }}
 				for _, loc := range cc.locales {
 					children, okChildren := {{ $contentType.Sys.ID }}.Fields.{{ firstCap $field.ID }}[string(loc)]
 					if okChildren {
 						for _, child := range children {
-							if tempCache.ParentMap[child.Sys.ID] == nil {
-								tempCache.ParentMap[child.Sys.ID] = []EntryReference{}
-							}
-							tempCache.ParentMap[child.Sys.ID] = append(tempCache.ParentMap[child.Sys.ID], EntryReference{ContentType: {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID, ID: {{ $contentType.Sys.ID }}.Sys.ID, VO: {{ $contentType.Sys.ID }} })
+							addEntry(child.Sys.ID, EntryReference{ContentType: {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID, ID: {{ $contentType.Sys.ID }}.Sys.ID, VO: {{ $contentType.Sys.ID }}})
 						}
 					}
 				}
@@ -46,14 +55,15 @@ func (cc *ContentfulClient) cacheAll{{ firstCap $contentType.Sys.ID }}(tempCache
 			for _, loc := range cc.locales {
 				child, okChild := {{ $contentType.Sys.ID }}.Fields.{{ firstCap $field.ID }}[string(loc)]
 				if okChild {
-					if tempCache.ParentMap[child.Sys.ID] == nil {
-						tempCache.ParentMap[child.Sys.ID] = []EntryReference{}
-					}
-					tempCache.ParentMap[child.Sys.ID] = append(tempCache.ParentMap[child.Sys.ID], EntryReference{ContentType: {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID, ID: {{ $contentType.Sys.ID }}.Sys.ID, VO: {{ $contentType.Sys.ID }} })
-					}
+					addEntry(child.Sys.ID, EntryReference{ContentType: {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID, ID: {{ $contentType.Sys.ID }}.Sys.ID, VO: {{ $contentType.Sys.ID }}})
+				}
 				}
 				{{ end }}
 		{{ end }}
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		resultChan <- result
 	}
 	return {{ $contentType.Sys.ID }}Map, nil
 }
