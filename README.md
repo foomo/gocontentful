@@ -107,12 +107,14 @@ The parameters to pass to NewContentfulClient are:
 ### Caching
 
 <pre><code>contentTypes := []string{"person", "pet"}
-err = cc.UpdateCache(contentTypes, true)
+err = cc.UpdateCache(context, contentTypes, true)
 </code></pre>
 
 If your client mode is ClientModeCDA you can ask the client to cache the space (limited to the content types you pass to the UpdateCache function call). The client will download all the entries, convert and store them in the case as native Go value objects. This makes subsequent accesses to the space data an in-memory operation removing all the HTTP overhead you'd normally experience.
 
-The second parameter of UpdateCache toggles asset caching on or off. If you deal with assets you want this to be always on.
+The first parameter is the context. If you don't use a context in your application or service just pass _context.TODO()_
+
+The third parameter of UpdateCache toggles asset caching on or off. If you deal with assets you want this to be always on.
 
 The cache update uses 4 workers to speed up the process. This is safe since Contentful allows up to 5 concurrent connections. If you have content types that have a lot of entries, it might make sense to keep them close to each other in the content types slice passed to UpdateCache(), so that they will run in parallel and not one after the other (in case you have more than 4 content types, that is). 
 
@@ -269,7 +271,7 @@ Returns the Contentful content type of an entry ID.
 
 ---
 
-**FIELD GETTERS**
+**ENTRY FIELD GETTERS**
 
 Field getters are named after the field ID in Contentful and return the proper type. For example, if the Person content type has a Symbol (short text) field named 'Name', this will be the getter:
 
@@ -292,7 +294,7 @@ If logLevel is set to LogDebug retrieving the value of a field that is not set a
 
 ---
 
-**FIELD SETTERS**
+**ENTRY FIELD SETTERS  (only available for _ClientModeCMA_)**
 
 Field setters are named after the field ID in Contentful and require to pass in the proper type. See FIELD GETTERS above for a reference. Example:
 
@@ -300,7 +302,7 @@ Field setters are named after the field ID in Contentful and require to pass in 
 
 ---
 
-**WRITE OPERATIONS**
+**ENTRY WRITE OPERATIONS  (only available for _ClientModeCMA_)**
 
 >(vo *CfPerson) **UpsertEntry**(cc *ContentfulClient) (err error) 
 
@@ -323,16 +325,30 @@ Shortcut function that upserts and publishes the entry. Note that before calling
 Unpublishes and deletes the entry
 
 ---
+**ASSET FUNCTIONS**
 
-**UTILITY FUNCTIONS**
+>(cc *ContentfulClient) **GetAllAssets()** (map[string]*contentful.Asset, error)
+
+Retrieve all assets from a space
+
+>(cc *ContentfulClient) **GetAssetByID**(id string) (*contentful.Asset, error)
+
+Retrieve an asset from a space by its ID
 
 >**NewAssetFromURL**(id string, uploadUrl string, imageFileType string, title string, locale ...string) *contentful.Asset
 
 Creates an Asset from an URL of an existing file online (you still need to upsert it later).
 
->**ToAssetReference**(asset *contentful.Asset) (refSys ContentTypeSys) 
+>**ToAssetReference**(asset *contentful.Asset) (refSys ContentTypeSys)
 
 Converts the asset to a reference. You need to do this before you add the asset to a reference field of an entry.
+
+>(cc *ContentfulClient) **DeleteAsset**(asset *contentful.Asset) error
+
+Deletes an asset from a space by its ID (only available for _ClientModeCMA_)
+
+---
+**UTILITY FUNCTIONS**
 
 >**HtmlToRichText**(htmlSrc string) *RichTextNode
 
