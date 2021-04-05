@@ -4,7 +4,6 @@
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"html"
@@ -121,13 +120,11 @@ func NewContentfulClient(spaceID string, clientMode ClientMode, clientKey string
 		optimisticPageSize: optimisticPageSize,
 		SpaceID:            spaceID,
 	}
-	_, err = cc.Client.Spaces.Get(spaceID)
-	if err != nil {
-		_, ok := err.(contentful.NotFoundError)
-		if ok {
+	if _, err := cc.Client.Spaces.Get(spaceID); err != nil {
+		if _, ok := err.(contentful.NotFoundError); ok {
 			return nil, errors.New("NewContentfulClient: That is not the space you're looking for")
 		}
-		return nil, errors.New("NewContentfulClient: "+err.Error())
+		return nil, fmt.Errorf("NewContentfulClient: %w", err)
 	}
 	return cc, nil
 }
@@ -140,14 +137,13 @@ func getContentfulAPIClient(clientMode ClientMode, clientKey string) (*contentfu
 		return contentful.NewCPA(clientKey), nil
 	case ClientModeCMA:
 		return contentful.NewCMA(clientKey), nil
-	default:
-		return nil, errors.New("NewContentfulClient: Unknown ClientMode")
 	}
+	return nil, errors.New("NewContentfulClient: Unknown ClientMode")
 }
 
 func updateCacheForContentType(ctx context.Context, results chan ContentTypeResult, cc *ContentfulClient, tempCache *ContentfulCache, contentType string) error {
-	if ctx.Err() != nil {
-		return ctx.Err()
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 	switch contentType {
 	{{ range $index , $contentType := $contentTypes }}
@@ -199,8 +195,7 @@ func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []stri
 	for i := 0; i < cacheUpdateConcurrency; i++ {
 		group.Go(func() error {
 			for contentType := range contentTypeChan {
-				err := updateCacheForContentType(gctx, results, cc, tempCache, contentType)
-				if err != nil {
+				if err := updateCacheForContentType(gctx, results, cc, tempCache, contentType); err != nil {
 					return err
 				}
 			}
@@ -254,18 +249,15 @@ func (cc *ContentfulClient) GetContentTypeOfID(id string) (string, error) {
 	}
 	col := cc.Client.Entries.List(cc.SpaceID)
 	col.Query.Include(0).Equal("sys.id",id)
-	_, err := col.GetAll()
-	if err != nil {
-		return "", errors.New("GetContentTypeOfID: "+err.Error())
+	if _, err := col.GetAll(); err != nil {
+		return "", fmt.Errorf("GetContentTypeOfID: %w", err)
 	}
 	if len(col.Items) == 0 {
 		return "", fmt.Errorf("GetContentTypeOfID: %s Not found", id)
 	}
 	var vo genericEntryNoFields
-	byteArray, _ := json.Marshal(col.Items[0])
-	err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&vo)
-	if err != nil {
-		return "", errors.New("GetContentTypeOfID: "+err.Error())
+	if err := transcodeJSON(col.Items[0], &vo); err != nil {
+		return err
 	}
 	return vo.Sys.ContentType.Sys.ID, nil
 }
@@ -277,8 +269,7 @@ func (cc *ContentfulClient) optimisticPageSizeGetAll(contentType string, limit u
 	allItems := []interface{}{}
 	var err error
 	for {
-		_, err = col.Next()
-		if err != nil {
+		if _, err = col.Next(); err != nil {
 			break
 		}
 		allItems = append(allItems, col.Items...)
@@ -311,8 +302,7 @@ func (cc *ContentfulClient) getAllAssets(tryCacheFirst bool) (map[string]*conten
 	assets := map[string]*contentful.Asset{}
 	allItems := []interface{}{}
 	for {
-		_, err := col.Next()
-		if err != nil {
+		if _, err := col.Next(); err != nil {
 			return nil, err
 		}
 		allItems = append(allItems, col.Items...)
@@ -321,13 +311,8 @@ func (cc *ContentfulClient) getAllAssets(tryCacheFirst bool) (map[string]*conten
 		}
 	}
 	for _, item := range allItems {
-		asset := contentful.Asset{}
-		byt, err := json.Marshal(item)
-		if err != nil {
-			return nil, err
-		}
-		err = json.Unmarshal(byt, &asset)
-		if err != nil {
+		var asset contentful.Asset
+		if err := transcodeJSON(item, &asset); err != nil {
 			return nil, err
 		}
 		for _, loc := range []Locale{ {{ range $index , $locale := $locales }}SpaceLocale{{ onlyLetters $locale.Name }},{{end}} } {
@@ -354,22 +339,16 @@ func (cc *ContentfulClient) GetAssetByID(id string) (*contentful.Asset, error) {
 	}
 	col := cc.Client.Assets.List(cc.SpaceID)
 	col.Query.Locale("*").Equal("sys.id",id)
-	_, err := col.Next()
-	if err != nil {
+	if _, err := col.Next(); err != nil {
 		return nil, err
 	}
 	if len(col.Items) == 0 {
 		return nil, errors.New("GetAssetByID: Not found "+ id)
 	}
 	item := col.Items[0]
-	asset := contentful.Asset{}
-	byt, err := json.Marshal(item)
-	if err != nil {
-		return nil, err
-	}
-	err = json.Unmarshal(byt, &asset)
-	if err != nil {
-		return nil, err
+	var asset contentful.Asset
+	if err := transcodeJSON(item, &asset); err != nil {
+		return err
 	}
 	for _, loc := range []Locale{ {{ range $index , $locale := $locales }}SpaceLocale{{ onlyLetters $locale.Name }},{{end}} } {
 		if _, ok := asset.Fields.File[string(loc)]; ok {
@@ -430,15 +409,11 @@ func (cc *ContentfulClient) DeleteAsset(asset *contentful.Asset) error {
 	if cc.clientMode != ClientModeCMA {
 		return errors.New("DeleteAsset: Only available in ClientModeCMA")
 	}
-	errUnpublish := cc.Client.Assets.Unpublish(cc.SpaceID, asset)
-	if errUnpublish != nil && !strings.Contains(errUnpublish.Error(), "Not published") {
-		return errUnpublish
+	if err := cc.Client.Assets.Unpublish(cc.SpaceID, asset); err != nil &&
+		!strings.Contains(err.Error(), "Not published") {
+		return err
 	}
-	errDelete := cc.Client.Assets.Delete(cc.SpaceID, asset)
-	if errDelete != nil {
-		return errDelete
-	}
-	return nil
+	return cc.Client.Assets.Delete(cc.SpaceID, asset)
 }
 
 // RichText utils
@@ -658,25 +633,22 @@ func (ts htmlTags) open(w io.Writer) {
 				tagString += " " + name + `="` + html.EscapeString(value) + `"`
 			}
 		}
-		w.Write([]byte(tagString + ">"))
+		_, _ = w.Write([]byte(tagString + ">"))
 	}
 }
 
 func (ts htmlTags) close(w io.Writer) {
-
 	for _, t := range ts {
-		w.Write([]byte("</" + t.name + ">"))
+		_, _ = w.Write([]byte("</" + t.name + ">"))
 	}
 }
 
 type LinkResolverFunc func(url string) (resolvedURL string, resolveError error)
 type ImageResolverFunc func(assetID string) (attrs map[string]string, resolveError error)
 
-func (n *RichTextGenericNode) renderHTML(w io.Writer, linkResolver LinkResolverFunc, imageResolver ImageResolverFunc) (err error) {
+func (n *RichTextGenericNode) renderHTML(w io.Writer, linkResolver LinkResolverFunc, imageResolver ImageResolverFunc) error {
 	if linkResolver == nil {
-		linkResolver = func(url string) (transformedURL string, err error) {
-			return url, nil
-		}
+		linkResolver = func(url string) (string, error) { return url, nil }
 	}
 
 	tags := htmlTags{}
@@ -730,12 +702,10 @@ func (n *RichTextGenericNode) renderHTML(w io.Writer, linkResolver LinkResolverF
 		if imageResolver == nil {
 			return errors.New("Can't resolve image asset URL")
 		}
-		dataObj := RichTextData{}
-		byt, err := json.Marshal(n.Data)
-		if err != nil {
+		var dataObj RichTextData
+		if err := transcodeJSON(n.Data, &dataObj); err != nil {
 			return err
 		}
-		err = json.Unmarshal(byt, &dataObj)
 		if dataObj.Target == nil {
 			return errors.New("Data target is empty")
 		}
@@ -766,31 +736,23 @@ func (n *RichTextGenericNode) renderHTML(w io.Writer, linkResolver LinkResolverF
 	}
 
 	tags.open(w)
-	w.Write([]byte(strings.Replace(html.EscapeString(n.Value), "\n", "<br/>", -1)))
+	_, _ = w.Write([]byte(strings.Replace(html.EscapeString(n.Value), "\n", "<br/>", -1)))
 	for _, subNode := range n.Content {
-		errSubNode := subNode.renderHTML(w, linkResolver, imageResolver)
-		if errSubNode != nil {
-			err = errSubNode
-			return
+		if err := subNode.renderHTML(w, linkResolver, imageResolver); err != nil {
+			return err
 		}
 	}
 	tags.close(w)
-	return
+	return nil
 }
 
 func RichTextToHtml(rt interface{}, linkResolver LinkResolverFunc, imageResolver ImageResolverFunc) (string, error) {
 	w := bytes.NewBuffer([]byte{})
-	node := &RichTextGenericNode{}
-	byt, err := json.Marshal(rt)
-	if err != nil {
-		return "", err
+	var node RichTextGenericNode
+	if err := transcodeJSON(rt, &node); err != nil {
+		return err
 	}
-	err = json.Unmarshal(byt, node)
-	if err != nil {
-		return "", err
-	}
-	err = node.renderHTML(w, linkResolver, imageResolver)
-	if err != nil {
+	if err := node.renderHTML(w, linkResolver, imageResolver); err != nil {
 		return "", err
 	}
 	out := string(w.Bytes())

@@ -141,3 +141,17 @@ type htmlTag struct {
 }
 
 type htmlTags []htmlTag
+
+// transcodeJSON encodes src to JSON and decodes it into dest.
+func transcodeJSON(src, dest interface{}) error {
+	b, err := json.Marshal(src)
+	if err != nil {
+		return fmt.Errorf("encoding: %w", err)
+	}
+	d := json.NewDecoder(bytes.NewReader(b))
+	d.DisallowUnknownFields()
+	if err := d.Decode(dest); err != nil {
+		return fmt.Errorf("decoding: %w", err)
+	}
+	return nil
+}
