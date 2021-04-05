@@ -113,7 +113,7 @@ func (cc *ContentfulClient) GetFiltered{{ firstCap $contentType.Sys.ID }}(query 
 	}
 	all{{ firstCap $contentType.Sys.ID }}, err := colToCf{{ firstCap $contentType.Sys.ID }}(col,cc)
 	if err != nil {
-		return nil, fmt.Errorf("getFiltered{{ firstCap $contentType.Sys.ID }}: %w" + err)
+		return nil, fmt.Errorf("getFiltered{{ firstCap $contentType.Sys.ID }}: %w", err)
 	}
 	{{ $contentType.Sys.ID }}Map := map[string]*Cf{{ firstCap $contentType.Sys.ID }}{}
 	for _, {{ $contentType.Sys.ID }} := range all{{ firstCap $contentType.Sys.ID }} {
