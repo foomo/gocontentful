@@ -425,7 +425,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 		tempAsset.Fields.File.URL = "https:" + tempAsset.Fields.File.URL
 		{{ $field.ID }} = append({{ $field.ID }}, tempAsset)
 	}
-	return {{ $field.ID }}, nil
+	return {{ $field.ID }}
 }
 {{ end }}
 {{ if fieldIsAsset $field }}
@@ -540,7 +540,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) UnpublishEntry() error {
 	if err := transcodeJSON(vo, cfEntry); err != nil {
 		return err
 	}
-	if err = vo.CC.Client.Entries.Unpublish(vo.CC.SpaceID, cfEntry); err != nil {
+	if err := vo.CC.Client.Entries.Unpublish(vo.CC.SpaceID, cfEntry); err != nil {
 		return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} UnpublishEntry: unpublish operation failed: %w", err)
 	}
 	return nil
