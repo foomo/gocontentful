@@ -15,7 +15,7 @@ import (
 func fatal(comment string) {
 	fmt.Println("ERROR:", comment)
 	fmt.Printf("\nSYNOPSIS\n")
-	fmt.Printf("     gocontentful -spaceid SpaceID -cmakey CMAKey [-contenttypes firsttype,secondtype...lasttype] path/to/target/package\n\n")
+	fmt.Printf("     CMAKEY=cmakey gocontentful -spaceid SpaceID [-contenttypes firsttype,secondtype...lasttype] path/to/target/package\n\n")
 	flag.Usage()
 	fmt.Printf("\nNote: The last segment of the path/to/target/package will be used as package name\n\n")
 	os.Exit(1)
