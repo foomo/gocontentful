@@ -60,7 +60,7 @@ func main() {
 		envCMAKey,
 		flagContentTypesSlice,
 	); err != nil {
-		log.Fatal("generating API:", err)
+		log.Fatal("generating API: ", err)
 	}
 	fmt.Println("ALL DONE!")
 
