@@ -31,8 +31,11 @@ func main() {
 
 	envCMAKey := os.Getenv("CMAKEY")
 
-	if *flagSpaceID == "" || envCMAKey == "" {
-		fatal("Please specify the Contentful space ID and access Key")
+	if *flagSpaceID == "" {
+		fatal("Please, specify the Contentful space ID")
+	}
+	if envCMAKey == "" {
+		fatal("Please, provide the Contentful Content Management API (CMA) access key")
 	}
 
 	if len(flag.Args()) != 1 {
