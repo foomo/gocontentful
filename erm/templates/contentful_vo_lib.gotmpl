@@ -257,7 +257,7 @@ func (cc *ContentfulClient) GetContentTypeOfID(id string) (string, error) {
 	}
 	vo := new(genericEntryNoFields)
 	if err := transcodeJSON(col.Items[0], vo); err != nil {
-		return err
+		return "", err
 	}
 	return vo.Sys.ContentType.Sys.ID, nil
 }
@@ -348,7 +348,7 @@ func (cc *ContentfulClient) GetAssetByID(id string) (*contentful.Asset, error) {
 	item := col.Items[0]
 	asset := new(contentful.Asset)
 	if err := transcodeJSON(item, asset); err != nil {
-		return err
+		return nil, err
 	}
 	for _, loc := range []Locale{ {{ range $index , $locale := $locales }}SpaceLocale{{ onlyLetters $locale.Name }},{{end}} } {
 		if _, ok := asset.Fields.File[string(loc)]; ok {
@@ -687,10 +687,9 @@ func (n *RichTextGenericNode) renderHTML(w io.Writer, linkResolver LinkResolverF
 		case string:
 			uriString := uri.(string)
 			if uriString != "" {
-				resolvedURL, errResolveURL := linkResolver(uriString)
-				if errResolveURL != nil {
-					err = errResolveURL
-					return
+				resolvedURL, err := linkResolver(uriString)
+				if err != nil {
+					return err
 				}
 
 				attrs["href"] = resolvedURL
@@ -750,7 +749,7 @@ func RichTextToHtml(rt interface{}, linkResolver LinkResolverFunc, imageResolver
 	w := bytes.NewBuffer([]byte{})
 	node := new(RichTextGenericNode)
 	if err := transcodeJSON(rt, node); err != nil {
-		return err
+		return "", err
 	}
 	if err := node.renderHTML(w, linkResolver, imageResolver); err != nil {
 		return "", err

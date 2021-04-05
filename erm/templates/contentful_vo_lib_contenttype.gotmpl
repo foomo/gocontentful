@@ -583,7 +583,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) DeleteEntry() error {
 		return err
 	}
 	if cfEntry.Sys.PublishedCounter > 0 {
-		if err := vo.CC.Client.Entries.Unpublish(vo.CC.SpaceID, cfEntry); != nil &&
+		if err := vo.CC.Client.Entries.Unpublish(vo.CC.SpaceID, cfEntry); err != nil &&
 			!strings.Contains(err.Error(), "Not published")  {
 			return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} DeleteEntry: Unpublish entry failed: %w", err)
 		}
