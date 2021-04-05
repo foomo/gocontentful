@@ -25,12 +25,13 @@ func main() {
 	fmt.Printf("Contentful API Generator starting...\n\n")
 	// Get parameters from cmd line flags
 	flagSpaceID := flag.String("spaceid", "", "Contentful space ID")
-	flagCMAKey := flag.String("cmakey", "", "Contentful CMA key")
 	flagContentTypes := flag.String("contenttypes", "", "[Optional] Content type IDs to parse, comma separated")
 
 	flag.Parse()
 
-	if *flagSpaceID == "" || *flagCMAKey == "" {
+	envCMAKey := os.Getenv("CMAKEY")
+
+	if *flagSpaceID == "" || envCMAKey == "" {
 		fatal("Please specify the Contentful space ID and access Key")
 	}
 
@@ -56,7 +57,7 @@ func main() {
 		filepath.Dir(path),
 		packageName,
 		*flagSpaceID,
-		*flagCMAKey,
+		envCMAKey,
 		flagContentTypesSlice,
 	); err != nil {
 		log.Fatal("generating API:", err)
