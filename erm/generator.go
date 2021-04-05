@@ -3,7 +3,6 @@ package erm
 import (
 	"fmt"
 	"go/format"
-	"io/ioutil" // TODO: replace deprecated ioutil with os
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,7 +13,7 @@ import (
 )
 
 func formatAndFixImports(filename string) error {
-	sourceBytes, err := ioutil.ReadFile(filename)
+	sourceBytes, err := os.ReadFile(filename)
 	if err != nil {
 		return err
 	}
@@ -26,7 +25,7 @@ func formatAndFixImports(filename string) error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(filename, finalSource, 0644)
+	return os.WriteFile(filename, finalSource, 0644)
 }
 
 func generate(filename string, tpl []byte, conf spaceConf) error {
