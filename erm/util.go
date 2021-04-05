@@ -2,7 +2,6 @@ package erm
 
 import (
 	"regexp"
-	"strings"
 )
 
 func sliceIncludes(slice []string, key string) bool {
@@ -12,11 +11,6 @@ func sliceIncludes(slice []string, key string) bool {
 		}
 	}
 	return false
-}
-
-func firstCap(inputString string) (outputString string) {
-	outputString = strings.Title(inputString)
-	return
 }
 
 func onlyLetters(inputString string) (outputString string) {
