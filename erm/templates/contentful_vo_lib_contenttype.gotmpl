@@ -4,7 +4,6 @@
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/foomo/contentful"
@@ -61,7 +60,7 @@ func (cc *ContentfulClient) cacheAll{{ firstCap $contentType.Sys.ID }}(ctx conte
 				{{ end }}
 		{{ end }}
 		if err := ctx.Err(); err != nil {
-			return nil, err
+			return nil, ctx.Err()
 		}
 		resultChan <- result
 	}
