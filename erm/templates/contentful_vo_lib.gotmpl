@@ -696,7 +696,9 @@ func (n *RichTextGenericNode) renderHTML(w io.Writer, linkResolver LinkResolverF
 			}
 
 		}
-		tags = []htmlTag{{name: HtmlAnchor, attrs: attrs}}
+		tags = []htmlTag{
+			{name: HtmlAnchor, attrs: attrs},
+		}
 	case RichTextNodeEmbeddedAsset:
 		if imageResolver == nil {
 			return errors.New("Can't resolve image asset URL")
@@ -712,7 +714,9 @@ func (n *RichTextGenericNode) renderHTML(w io.Writer, linkResolver LinkResolverF
 		if err != nil {
 			return err
 		}
-		tags = []htmlTag{{name: HtmlImage, attrs: attrs}}
+		tags = []htmlTag{
+			{name: HtmlImage, attrs: attrs},
+		}
 	default:
 	}
 	for _, m := range n.Marks {
