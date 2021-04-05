@@ -146,7 +146,7 @@ func (cc *ContentfulClient) Get{{ firstCap $contentType.Sys.ID }}ByID(id string)
 }
 
 func NewCf{{ firstCap $contentType.Sys.ID }}() (cf{{ firstCap $contentType.Sys.ID }} *Cf{{ firstCap $contentType.Sys.ID }}) {
-	cf{{ firstCap $contentType.Sys.ID }} = &Cf{{ firstCap $contentType.Sys.ID }}{}
+	cf{{ firstCap $contentType.Sys.ID }} = new(Cf{{ firstCap $contentType.Sys.ID }})
 	{{ range $fieldIndex, $field := $contentType.Fields }}
 		cf{{ firstCap $contentType.Sys.ID }}.Fields.{{ firstCap $field.ID }} = map[string]{{ mapFieldType $contentType.Sys.ID $field }}{}
 	{{ end }}
@@ -183,15 +183,15 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) GetParents(contentType ...string
 	{{ range $index , $contentType := $contentTypes }}
 	case ContentType{{ firstCap $contentType.Sys.ID }}:
 		for _, item := range col.Items {
-			var parentVO Cf{{ firstCap $contentType.Sys.ID }}
-			if err := transcodeJSON(item, &parentVO); err != nil {
+			parentVO := new(Cf{{ firstCap $contentType.Sys.ID }})
+			if err := transcodeJSON(item, parentVO); err != nil {
 				return nil, err
 			}
 			parentVO.CC = vo.CC
 			parents = append(parents, EntryReference{
 				ContentType: contentType[0],
 				ID: parentVO.Sys.ID,
-				VO: &parentVO,
+				VO: parentVO,
 			})
 		}
 	{{ end }}
@@ -416,7 +416,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 			}
 			return nil
 		}
-		tempAsset := &contentful.AssetNoLocale{}
+		tempAsset := new(contentful.AssetNoLocale)
 		tempAsset.Sys = asset.Sys
 		tempAsset.Fields = &contentful.FileFieldsNoLocale{}
 		tempAsset.Fields.Title = asset.Fields.Title[string(loc)]
@@ -466,7 +466,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 		}
 		return nil
 	}
-	tempAsset := &contentful.AssetNoLocale{}
+	tempAsset := new(contentful.AssetNoLocale)
 	tempAsset.Sys = asset.Sys
 	tempAsset.Fields = &contentful.FileFieldsNoLocale{}
 	tempAsset.Fields.Title = asset.Fields.Title[string(loc)]
@@ -505,8 +505,8 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) UpsertEntry() error {
 	if vo.CC.clientMode != ClientModeCMA {
 		return errors.New("UpsertEntry: Only available in ClientModeCMA")
 	}
-	cfEntry := &contentful.Entry{}
-	if err := transcodeJSON(vo, &cfEntry); err != nil {
+	cfEntry := new(contentful.Entry)
+	if err := transcodeJSON(vo, cfEntry); err != nil {
 		return err
 	}
 	if err := vo.CC.Client.Entries.Upsert(vo.CC.SpaceID, cfEntry); err != nil {
@@ -522,8 +522,8 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) PublishEntry() error {
 	if vo.CC.clientMode != ClientModeCMA {
 		return errors.New("PublishEntry: Only available in ClientModeCMA")
 	}
-	var cfEntry contentful.Entry
-	if err := transcodeJSON(vo, &cfEntry); err != nil {
+	cfEntry := new(contentful.Entry)
+	if err := transcodeJSON(vo, cfEntry); err != nil {
 		return err
 	}
 	if err := vo.CC.Client.Entries.Publish(vo.CC.SpaceID, cfEntry); err != nil {
@@ -536,8 +536,8 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) UnpublishEntry() error {
 	if vo.CC.clientMode != ClientModeCMA {
 		return errors.New("UnpublishEntry: Only available in ClientModeCMA")
 	}
-	var cfEntry contentful.Entry
-	if err := transcodeJSON(vo, &cfEntry); err != nil {
+	cfEntry := new(contentful.Entry)
+	if err := transcodeJSON(vo, cfEntry); err != nil {
 		return err
 	}
 	if err = vo.CC.Client.Entries.Unpublish(vo.CC.SpaceID, cfEntry); err != nil {
@@ -553,15 +553,15 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) UpdateEntry() error {
 	if vo.CC.clientMode != ClientModeCMA {
 		return errors.New("UpdateEntry: Only available in ClientModeCMA")
 	}
-	var cfEntry contentful.Entry
-	if err := transcodeJSON(vo, &cfEntry); err != nil {
+	cfEntry := new(contentful.Entry)
+	if err := transcodeJSON(vo, cfEntry); err != nil {
 		return err
 	}
 
 	if err := vo.CC.Client.Entries.Upsert(vo.CC.SpaceID, cfEntry); err != nil {
 		return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} UpdateEntry: upsert operation failed: %w", err)
 	}
-	if err := transcodeJSON(cfEntry, &vo); err != nil {
+	if err := transcodeJSON(cfEntry, vo); err != nil {
 		return err
 	}
 
@@ -578,8 +578,8 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) DeleteEntry() error {
 	if vo.CC.clientMode != ClientModeCMA {
 		return errors.New("DeleteEntry: Only available in ClientModeCMA")
 	}
-	var cfEntry contentful.Entry
-	if err := transcodeJSON(vo, &cfEntry); err != nil {
+	cfEntry := new(contentful.Entry)
+	if err := transcodeJSON(vo, cfEntry); err != nil {
 		return err
 	}
 	if cfEntry.Sys.PublishedCounter > 0 {

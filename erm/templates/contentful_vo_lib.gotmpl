@@ -255,8 +255,8 @@ func (cc *ContentfulClient) GetContentTypeOfID(id string) (string, error) {
 	if len(col.Items) == 0 {
 		return "", fmt.Errorf("GetContentTypeOfID: %s Not found", id)
 	}
-	var vo genericEntryNoFields
-	if err := transcodeJSON(col.Items[0], &vo); err != nil {
+	vo := new(genericEntryNoFields)
+	if err := transcodeJSON(col.Items[0], vo); err != nil {
 		return err
 	}
 	return vo.Sys.ContentType.Sys.ID, nil
@@ -311,8 +311,8 @@ func (cc *ContentfulClient) getAllAssets(tryCacheFirst bool) (map[string]*conten
 		}
 	}
 	for _, item := range allItems {
-		var asset contentful.Asset
-		if err := transcodeJSON(item, &asset); err != nil {
+		asset := new(contentful.Asset)
+		if err := transcodeJSON(item, asset); err != nil {
 			return nil, err
 		}
 		for _, loc := range []Locale{ {{ range $index , $locale := $locales }}SpaceLocale{{ onlyLetters $locale.Name }},{{end}} } {
@@ -320,7 +320,7 @@ func (cc *ContentfulClient) getAllAssets(tryCacheFirst bool) (map[string]*conten
 				asset.Fields.File[string(loc)].URL = "https:" + asset.Fields.File[string(loc)].URL
 			}
 		}
-		assets[asset.Sys.ID] = &asset
+		assets[asset.Sys.ID] = asset
 	}
 	return assets, nil
 }
@@ -346,8 +346,8 @@ func (cc *ContentfulClient) GetAssetByID(id string) (*contentful.Asset, error) {
 		return nil, errors.New("GetAssetByID: Not found "+ id)
 	}
 	item := col.Items[0]
-	var asset contentful.Asset
-	if err := transcodeJSON(item, &asset); err != nil {
+	asset := new(contentful.Asset)
+	if err := transcodeJSON(item, asset); err != nil {
 		return err
 	}
 	for _, loc := range []Locale{ {{ range $index , $locale := $locales }}SpaceLocale{{ onlyLetters $locale.Name }},{{end}} } {
@@ -355,7 +355,7 @@ func (cc *ContentfulClient) GetAssetByID(id string) (*contentful.Asset, error) {
 			asset.Fields.File[string(loc)].URL = "https:" + asset.Fields.File[string(loc)].URL
 		}
 	}
-	return &asset, nil
+	return asset, nil
 }
 
 func NewAssetFromURL(id string, uploadUrl string, imageFileType string, title string, locale ...Locale) *contentful.Asset {
@@ -702,8 +702,8 @@ func (n *RichTextGenericNode) renderHTML(w io.Writer, linkResolver LinkResolverF
 		if imageResolver == nil {
 			return errors.New("Can't resolve image asset URL")
 		}
-		var dataObj RichTextData
-		if err := transcodeJSON(n.Data, &dataObj); err != nil {
+		dataObj := new(RichTextData)
+		if err := transcodeJSON(n.Data, dataObj); err != nil {
 			return err
 		}
 		if dataObj.Target == nil {
@@ -748,8 +748,8 @@ func (n *RichTextGenericNode) renderHTML(w io.Writer, linkResolver LinkResolverF
 
 func RichTextToHtml(rt interface{}, linkResolver LinkResolverFunc, imageResolver ImageResolverFunc) (string, error) {
 	w := bytes.NewBuffer([]byte{})
-	var node RichTextGenericNode
-	if err := transcodeJSON(rt, &node); err != nil {
+	node := new(RichTextGenericNode)
+	if err := transcodeJSON(rt, node); err != nil {
 		return err
 	}
 	if err := node.renderHTML(w, linkResolver, imageResolver); err != nil {
