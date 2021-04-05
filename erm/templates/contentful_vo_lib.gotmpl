@@ -755,7 +755,7 @@ func RichTextToHtml(rt interface{}, linkResolver LinkResolverFunc, imageResolver
 	if err := node.renderHTML(w, linkResolver, imageResolver); err != nil {
 		return "", err
 	}
-	out := string(w.Bytes())
+	out := w.String()
 	if out == "<p></p>" {
 		return "", nil
 	}
