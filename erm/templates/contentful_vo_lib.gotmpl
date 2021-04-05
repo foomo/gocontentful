@@ -221,7 +221,7 @@ func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []stri
 	close(results)
 	if err != nil {
 		// drain contentTypeChan
-		for _ = range contentTypeChan {	}
+		for range contentTypeChan {	}
 		return err
 	}
 	// Signal that the cache build is done
@@ -696,7 +696,7 @@ func (n *RichTextGenericNode) renderHTML(w io.Writer, linkResolver LinkResolverF
 			}
 
 		}
-		tags = []htmlTag{htmlTag{name: HtmlAnchor, attrs: attrs}}
+		tags = []htmlTag{{name: HtmlAnchor, attrs: attrs}}
 	case RichTextNodeEmbeddedAsset:
 		if imageResolver == nil {
 			return errors.New("Can't resolve image asset URL")
@@ -712,7 +712,7 @@ func (n *RichTextGenericNode) renderHTML(w io.Writer, linkResolver LinkResolverF
 		if err != nil {
 			return err
 		}
-		tags = []htmlTag{htmlTag{name: HtmlImage, attrs: attrs}}
+		tags = []htmlTag{{name: HtmlImage, attrs: attrs}}
 	default:
 	}
 	for _, m := range n.Marks {
