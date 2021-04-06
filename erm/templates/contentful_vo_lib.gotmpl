@@ -110,10 +110,10 @@ func NewContentfulClient(spaceID string, clientMode ClientMode, clientKey string
 	if err != nil {
 		return nil, err
 	}
+	apiClient.Debug = debug
 	cc := &ContentfulClient{
 		clientMode:         clientMode,
 		Client:             apiClient,
-		debug:              debug,
 		locales:			[]Locale{ {{ range $index , $locale := $locales }}SpaceLocale{{ onlyLetters $locale.Name }}, {{ end }} },
 		logFn:              logFn,
 		logLevel:           logLevel,
