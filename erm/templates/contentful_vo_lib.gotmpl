@@ -176,9 +176,6 @@ func updateCacheForContentType(ctx context.Context, results chan ContentTypeResu
 
 func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []string, cacheAssets bool) error {
 	start := time.Now()
-	if cc.clientMode != ClientModeCDA {
-		return errors.New("UpdateCache: Only available in ClientModeCDA")
-	}
 	tempCache := &ContentfulCache{
 		ContentTypes:     contentTypes,
 		IdContentTypeMap: map[string]string{},
@@ -233,7 +230,7 @@ func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []stri
 	<-resultsDone
 
 	if cc.logFn != nil && cc.logLevel <= LogInfo {
-		cc.logFn(map[string]interface{}{"time elapsed":time.Since(start), "method": "UpdateCache"}, LogInfo, InfoUpdateCacheTime)
+		cc.logFn(map[string]interface{}{"time elapsed":fmt.Sprint(time.Since(start)), "method": "UpdateCache"}, LogInfo, InfoUpdateCacheTime)
 	}
 	cc.Cache = tempCache
 	return nil
