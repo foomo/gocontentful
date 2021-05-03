@@ -36,6 +36,11 @@ const (
 	assetWorkerType = "_asset"
 )
 
+const (
+	sysTypeEntry = "Entry"
+	sysTypeAsset = "Asset"
+)
+
 const cacheUpdateConcurrency = 4
 
 const (
@@ -46,15 +51,16 @@ const (
 )
 
 var (
-	ErrLocaleUnsupported = errors.New("Locale not supported by this space")
-	ErrNotSet            = errors.New("Field value not set")
-	ErrNotSetNoFallback  = errors.New("Field value not set and no fallback locale available")
-	ErrRefNotIncludes    = errors.New("Referenced entry not found in includes")
-	ErrNoTypeOfRefEntry  = errors.New("Couldn't get contentType of referenced entry")
-	ErrNoTypeOfRefAsset  = errors.New("Couldn't get contentType of referenced asset")
-	InfoCachedAllEntries = "Cached all entries of content type"
-	InfoCachedAllAssets  = "Cached all assets"
-	InfoUpdateCacheTime = "Space caching done, time recorded"
+	ErrLocaleUnsupported   = errors.New("locale not supported by this space")
+	ErrNotSet              = errors.New("field value not set")
+	ErrNotSetNoFallback    = errors.New("field value not set and no fallback locale available")
+	ErrRefNotIncludes      = errors.New("referenced entry not found in includes")
+	ErrNoTypeOfRefEntry    = errors.New("couldn't get contentType of referenced entry")
+	ErrNoTypeOfRefAsset    = errors.New("couldn't get contentType of referenced asset")
+	InfoUpdatedEntityCache = "updated cache for entity"
+	InfoCachedAllEntries   = "cached all entries of content type"
+	InfoCachedAllAssets    = "cached all assets"
+	InfoUpdateCacheTime    = "space caching done, time recorded"
 )
 
 var spaceContentTypes = []string{ {{ range $index , $contentType := $contentTypes }}ContentType{{ firstCap $contentType.Sys.ID }}, {{ end }} }
@@ -145,6 +151,18 @@ func getContentfulAPIClient(clientMode ClientMode, clientKey string) (*contentfu
 	}
 }
 
+func (cc *ContentfulClient) entryMapForContentTypeIsNil(contentType string) bool {
+	switch contentType {
+	{{ range $index , $contentType := $contentTypes }}
+	case ContentType{{ firstCap $contentType.Sys.ID }}:
+		if cc.Cache.EntryMaps.{{ firstCap $contentType.Sys.ID }} == nil {
+			return true
+		}
+	{{ end }}
+	}
+	return false
+}
+
 func updateCacheForContentType(ctx context.Context, results chan ContentTypeResult, cc *ContentfulClient, tempCache *ContentfulCache, contentType string) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
@@ -173,6 +191,26 @@ func updateCacheForContentType(ctx context.Context, results chan ContentTypeResu
 	}
 	return nil
 }
+
+func updateCacheForContentTypeAndEntity(ctx context.Context, cc *ContentfulClient, sysType string, contentType string, entityID string) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	switch contentType {
+	{{ range $index , $contentType := $contentTypes }}
+	case ContentType{{ firstCap $contentType.Sys.ID }}:
+		err := cc.cache{{ firstCap $contentType.Sys.ID }}ByID(ctx, entityID)
+		if err != nil {
+			return err
+		}
+		if cc.logFn != nil && cc.logLevel <= LogInfo {
+			cc.logFn(map[string]interface{}{"contentType": "{{ $contentType.Sys.ID }}", "method": "updateCacheForContentType", "entityID": entityID}, LogInfo, InfoUpdatedEntityCache)
+		}
+	{{ end }}
+	}
+	return nil
+}
+
 
 func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []string, cacheAssets bool) error {
 	start := time.Now()
@@ -235,6 +273,24 @@ func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []stri
 	cc.Cache = tempCache
 	return nil
 }
+
+func (cc *ContentfulClient) UpdateCacheForEntity(ctx context.Context, sysType string, contentType string, entityID string) error {
+	if sysType == sysTypeEntry && cc.entryMapForContentTypeIsNil(contentType) {
+		return fmt.Errorf("UpdateCacheForEntity: Content Type %q not available in cache", contentType)
+	}
+	if sysType == sysTypeAsset {
+		contentType = assetWorkerType
+	}
+	if !stringSliceContains(spaceContentTypes, contentType) {
+		return fmt.Errorf("UpdateCache: Content Type %q not available in this space", contentType)
+	}
+	err := updateCacheForContentTypeAndEntity(ctx, cc, sysType, contentType, entityID)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 
 func (cc *ContentfulClient) GetContentTypeOfID(id string) (string, error) {
 	if cc.Client == nil {
