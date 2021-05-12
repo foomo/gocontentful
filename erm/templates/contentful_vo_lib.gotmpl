@@ -16,14 +16,66 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-type Locale string
+type CacheEntryMaps struct {
+	{{ range $index , $contentType := $contentTypes }}	{{ firstCap $contentType.Sys.ID }} map[string]*Cf{{ firstCap $contentType.Sys.ID }}
+	{{ end }}
+}
 
 type ClientMode string
+
+type ContentfulCache struct {
+	Assets map[string]*contentful.Asset
+	ContentTypes []string
+	EntryMaps CacheEntryMaps
+	IdContentTypeMap map[string]string
+	ParentMap map[string][]EntryReference // Maps each entry ID to its parents' IDs
+}
+
+type ContentfulClient struct {
+	Cache  *ContentfulCache
+	clientMode ClientMode
+	Client     *contentful.Contentful
+	locales    []Locale
+	logFn      func(
+			fields map[string]interface{},
+			level int,
+			args ...interface{},
+	)
+	logLevel           int
+	optimisticPageSize uint16 // Start downloading entries at this page size
+	SpaceID            string
+}
+
+type ContentTypeResult struct {
+	EntryID     string
+	ContentType string
+	References  map[string][]EntryReference
+}
+
+type EntryReference struct {
+	ContentType string
+	ID string
+	VO interface{}
+}
+
+type ImageResolverFunc func(assetID string) (attrs map[string]string, resolveError error)
+
+type EntryLinkResolverFunc func(entryID string, locale Locale) (resolvedAttrs map[string]string, resolveError error)
+type LinkResolverFunc func(url string) (resolvedAttrs map[string]string, resolveError error)
+
+type Locale string
 
 const (
 	ClientModeCDA ClientMode = "CDA"
 	ClientModeCPA ClientMode = "CPA"
 	ClientModeCMA ClientMode = "CMA"
+)
+
+const (
+	LogDebug = 0
+	LogInfo = 1
+	LogWarn = 2
+	LogError = 3
 )
 
 {{ range $index , $locale := $locales }}const SpaceLocale{{ onlyLetters $locale.Name }} Locale = "{{ $locale.Code }}"
@@ -36,18 +88,11 @@ const (
 	assetWorkerType = "_asset"
 )
 
-const (
-	sysTypeEntry = "Entry"
-	sysTypeAsset = "Asset"
-)
-
 const cacheUpdateConcurrency = 4
 
 const (
-	LogDebug = 0
-	LogInfo = 1
-	LogWarn = 2
-	LogError = 3
+	sysTypeEntry = "Entry"
+	sysTypeAsset = "Asset"
 )
 
 var (
@@ -65,45 +110,164 @@ var (
 
 var spaceContentTypes = []string{ {{ range $index , $contentType := $contentTypes }}ContentType{{ firstCap $contentType.Sys.ID }}, {{ end }} }
 
-type ContentfulClient struct {
-	Cache  *ContentfulCache
-	clientMode ClientMode
-	Client     *contentful.Contentful
-	debug      bool
-	locales    []Locale
-	logFn      func(
-			fields map[string]interface{},
-			level int,
-			args ...interface{},
-	)
-	logLevel           int
-	optimisticPageSize uint16 // Start downloading entries at this page size
-	SpaceID            string
+func (ref ContentfulReferencedEntry) ContentType() (contentType string) {
+	return ref.Entry.Sys.ContentType.Sys.ID
 }
 
-type ContentfulCache struct {
-	Assets map[string]*contentful.Asset
-	ContentTypes []string
-	EntryMaps CacheEntryMaps
-	IdContentTypeMap map[string]string
-	ParentMap map[string][]EntryReference // Maps each entry ID to its parents' IDs
+func (cc *ContentfulClient) DeleteAsset(asset *contentful.Asset) error {
+	if cc.Client == nil {
+		return errors.New("DeleteAsset: No client available")
+	}
+	if cc.clientMode != ClientModeCMA {
+		return errors.New("DeleteAsset: Only available in ClientModeCMA")
+	}
+	errUnpublish := cc.Client.Assets.Unpublish(cc.SpaceID, asset)
+	if errUnpublish != nil && !strings.Contains(errUnpublish.Error(), "Not published") {
+		return errUnpublish
+	}
+	errDelete := cc.Client.Assets.Delete(cc.SpaceID, asset)
+	if errDelete != nil {
+		return errDelete
+	}
+	return nil
 }
 
-type EntryReference struct {
-	ContentType string
-	ID string
-	VO interface{}
+func (cc *ContentfulClient) GetAllAssets() (map[string]*contentful.Asset, error) {
+	return cc.getAllAssets(true)
 }
 
-type CacheEntryMaps struct {
-	{{ range $index , $contentType := $contentTypes }}	{{ firstCap $contentType.Sys.ID }} map[string]*Cf{{ firstCap $contentType.Sys.ID }}
-	{{ end }}
+func (cc *ContentfulClient) GetAssetByID(id string) (*contentful.Asset, error) {
+	if cc.Client == nil {
+		return nil, errors.New("GetAssetByID: No client available")
+	}
+	if cc.Cache != nil && cc.Cache.Assets != nil {
+		asset, okAsset := cc.Cache.Assets[id]
+		if okAsset {
+			return asset, nil
+		}
+	}
+	col := cc.Client.Assets.List(cc.SpaceID)
+	col.Query.Locale("*").Equal("sys.id",id)
+	_, err := col.Next()
+	if err != nil {
+		return nil, err
+	}
+	if len(col.Items) == 0 {
+		return nil, errors.New("GetAssetByID: Not found "+ id)
+	}
+	item := col.Items[0]
+	asset := contentful.Asset{}
+	byt, err := json.Marshal(item)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(byt, &asset)
+	if err != nil {
+		return nil, err
+	}
+	for _, loc := range []Locale{ {{ range $index , $locale := $locales }}SpaceLocale{{ onlyLetters $locale.Name }},{{end}} } {
+		if _, ok := asset.Fields.File[string(loc)]; ok {
+			asset.Fields.File[string(loc)].URL = "https:" + asset.Fields.File[string(loc)].URL
+		}
+	}
+	return &asset, nil
 }
 
-type ContentTypeResult struct {
-	EntryID     string
-	ContentType string
-	References  map[string][]EntryReference
+func (cc *ContentfulClient) GetContentTypeOfID(id string) (string, error) {
+	if cc.Client == nil {
+		return "", errors.New("GetContentTypeOfID: No client available")
+	}
+	if cc.Cache != nil {
+		okVo := false
+		{{ range $index , $contentType := $contentTypes }}
+		_, okVo = cc.Cache.EntryMaps.{{ firstCap $contentType.Sys.ID }}[id]
+		if okVo {
+			return ContentType{{ firstCap $contentType.Sys.ID }}, nil
+		}
+		{{ end }}
+	}
+	col := cc.Client.Entries.List(cc.SpaceID)
+	col.Query.Include(0).Equal("sys.id",id)
+	_, err := col.GetAll()
+	if err != nil {
+		return "", errors.New("GetContentTypeOfID: "+err.Error())
+	}
+	if len(col.Items) == 0 {
+		return "", fmt.Errorf("GetContentTypeOfID: %s Not found", id)
+	}
+	var vo genericEntryNoFields
+	byteArray, _ := json.Marshal(col.Items[0])
+	err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&vo)
+	if err != nil {
+		return "", errors.New("GetContentTypeOfID: "+err.Error())
+	}
+	return vo.Sys.ContentType.Sys.ID, nil
+}
+
+func HtmlToRichText(htmlSrc string) *RichTextNode {
+	htmlClean := strings.TrimSpace(htmlSrc)
+	htmlClean = strings.ReplaceAll(htmlClean, `&nbsp;`, ` `)
+	htmlClean = strings.ReplaceAll(htmlClean, "\t", "")
+	htmlClean = regexp.MustCompile(`[\s]{2,}`).ReplaceAllString(htmlClean, " ")
+	re := regexp.MustCompile(`>([^\n])`)
+	htmlClean = re.ReplaceAllString(htmlClean, fmt.Sprintf(">\n"+`$1`))
+	re = regexp.MustCompile(`(.{1})<`)
+	htmlClean = re.ReplaceAllString(htmlClean, `$1`+fmt.Sprintf("\n<"))
+	htmlLines := strings.Split(htmlClean, "\n")
+	rtnd := &RichTextNode{
+		NodeType: RichTextNodeDocument,
+	}
+	var isBasic bool
+	rtnd.Content, _, isBasic = richTextHtmlLinesToNode(htmlLines, 0, "", nil, true)
+	if isBasic {
+		basicRich := &RichTextNode{
+			NodeType: RichTextNodeDocument,
+		}
+		par := RichTextNode{
+			NodeType: RichTextNodeParagraph,
+		}
+		par.Content = rtnd.Content
+		basicRich.Content = append(basicRich.Content, par)
+		return basicRich
+	}
+	return rtnd
+}
+
+func NewAssetFromURL(id string, uploadUrl string, imageFileType string, title string, locale ...Locale) *contentful.Asset {
+	autoID := fmt.Sprintf("%d", time.Now().UnixNano()/int64(time.Millisecond))
+	if id == "" {
+		id = autoID
+	}
+	if title == "" {
+		title = id
+	}
+	var loc Locale
+	if len(locale) != 0 {
+		loc = locale[0]
+		if localeFallback[loc]!="" {
+			return nil
+		}
+	} else {
+		loc = defaultLocale
+	}
+	asset := &contentful.Asset{
+		Sys: &contentful.Sys{
+			ID: id,
+		},
+		Fields: &contentful.FileFields{
+			File: map[string]*contentful.File{
+				string(loc): {
+					UploadURL:   uploadUrl,
+					ContentType: imageFileType,
+					Name:        id,
+				},
+			},
+			Title: map[string]string{
+				string(loc): title,
+			},
+		},
+	}
+	return asset
 }
 
 func NewContentfulClient(spaceID string, clientMode ClientMode, clientKey string, optimisticPageSize uint16, logFn func(fields map[string]interface{}, level int, args ...interface{}), logLevel int, debug bool) (*ContentfulClient, error) {
@@ -117,10 +281,10 @@ func NewContentfulClient(spaceID string, clientMode ClientMode, clientKey string
 	if err != nil {
 		return nil, err
 	}
+	apiClient.Debug = debug
 	cc := &ContentfulClient{
 		clientMode:         clientMode,
 		Client:             apiClient,
-		debug:              debug,
 		locales:			[]Locale{ {{ range $index , $locale := $locales }}SpaceLocale{{ onlyLetters $locale.Name }}, {{ end }} },
 		logFn:              logFn,
 		logLevel:           logLevel,
@@ -138,79 +302,27 @@ func NewContentfulClient(spaceID string, clientMode ClientMode, clientKey string
 	return cc, nil
 }
 
-func getContentfulAPIClient(clientMode ClientMode, clientKey string) (*contentful.Contentful, error) {
-	switch clientMode {
-	case ClientModeCDA:
-		return contentful.NewCDA(clientKey), nil
-	case ClientModeCPA:
-		return contentful.NewCPA(clientKey), nil
-	case ClientModeCMA:
-		return contentful.NewCMA(clientKey), nil
-	default:
-		return nil, errors.New("NewContentfulClient: Unknown ClientMode")
+func RichTextToHtml(rt interface{}, linkResolver LinkResolverFunc, entryLinkResolver EntryLinkResolverFunc, imageResolver ImageResolverFunc, locale Locale) (string, error) {
+	w := bytes.NewBuffer([]byte{})
+	node := &RichTextGenericNode{}
+	byt, err := json.Marshal(rt)
+	if err != nil {
+		return "", err
 	}
+	err = json.Unmarshal(byt, node)
+	if err != nil {
+		return "", err
+	}
+	err = node.richTextRenderHTML(w, linkResolver, entryLinkResolver, imageResolver, locale)
+	if err != nil {
+		return "", err
+	}
+	out := string(w.Bytes())
+	if out == "<p></p>" {
+		return "", nil
+	}
+	return out, nil
 }
-
-func (cc *ContentfulClient) entryMapForContentTypeIsNil(contentType string) bool {
-	switch contentType {
-	{{ range $index , $contentType := $contentTypes }}
-	case ContentType{{ firstCap $contentType.Sys.ID }}:
-		if cc.Cache.EntryMaps.{{ firstCap $contentType.Sys.ID }} == nil {
-			return true
-		}
-	{{ end }}
-	}
-	return false
-}
-
-func updateCacheForContentType(ctx context.Context, results chan ContentTypeResult, cc *ContentfulClient, tempCache *ContentfulCache, contentType string) error {
-	if ctx.Err() != nil {
-		return ctx.Err()
-	}
-	switch contentType {
-	{{ range $index , $contentType := $contentTypes }}
-	case ContentType{{ firstCap $contentType.Sys.ID }}:
-		all{{ firstCap $contentType.Sys.ID }}, err := cc.cacheAll{{ firstCap $contentType.Sys.ID }}(ctx, results)
-		if err != nil {
-			return err
-		}
-		tempCache.EntryMaps.{{ firstCap $contentType.Sys.ID }} = all{{ firstCap $contentType.Sys.ID }}
-		if cc.logFn != nil && cc.logLevel <= LogInfo {
-			cc.logFn(map[string]interface{}{"contentType":"{{ $contentType.Sys.ID }}", "method": "updateCacheForContentType", "size":len(all{{ firstCap $contentType.Sys.ID }})}, LogInfo, InfoCachedAllEntries)
-		}
-	{{ end }}
-	case assetWorkerType:
-		allAssets, err := cc.getAllAssets(false)
-		if err != nil {
-			return err
-		}
-		tempCache.Assets = allAssets
-		if cc.logFn != nil && cc.logLevel <= LogInfo {
-			cc.logFn(map[string]interface{}{"contentType": "asset", "method": "updateCacheForContentType", "size": len(allAssets)}, LogInfo, InfoCachedAllAssets)
-		}
-	}
-	return nil
-}
-
-func updateCacheForContentTypeAndEntity(ctx context.Context, cc *ContentfulClient, sysType string, contentType string, entityID string) error {
-	if ctx.Err() != nil {
-		return ctx.Err()
-	}
-	switch contentType {
-	{{ range $index , $contentType := $contentTypes }}
-	case ContentType{{ firstCap $contentType.Sys.ID }}:
-		err := cc.cache{{ firstCap $contentType.Sys.ID }}ByID(ctx, entityID)
-		if err != nil {
-			return err
-		}
-		if cc.logFn != nil && cc.logLevel <= LogInfo {
-			cc.logFn(map[string]interface{}{"contentType": "{{ $contentType.Sys.ID }}", "method": "updateCacheForContentType", "entityID": entityID}, LogInfo, InfoUpdatedEntityCache)
-		}
-	{{ end }}
-	}
-	return nil
-}
-
 
 func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []string, cacheAssets bool) error {
 	start := time.Now()
@@ -274,6 +386,13 @@ func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []stri
 	return nil
 }
 
+func ToAssetReference(asset *contentful.Asset) (refSys ContentTypeSys) {
+	refSys.Sys.ID = asset.Sys.ID
+	refSys.Sys.Type = FieldTypeLink
+	refSys.Sys.LinkType = FieldLinkTypeAsset
+	return
+}
+
 func (cc *ContentfulClient) UpdateCacheForEntity(ctx context.Context, sysType string, contentType string, entityID string) error {
 	if sysType == sysTypeEntry && cc.entryMapForContentTypeIsNil(contentType) {
 		return fmt.Errorf("UpdateCacheForEntity: Content Type %q not available in cache", contentType)
@@ -291,67 +410,31 @@ func (cc *ContentfulClient) UpdateCacheForEntity(ctx context.Context, sysType st
 	return nil
 }
 
-
-func (cc *ContentfulClient) GetContentTypeOfID(id string) (string, error) {
-	if cc.Client == nil {
-		return "", errors.New("GetContentTypeOfID: No client available")
+func (cc *ContentfulClient) entryMapForContentTypeIsNil(contentType string) bool {
+	switch contentType {
+	{{ range $index , $contentType := $contentTypes }}
+	case ContentType{{ firstCap $contentType.Sys.ID }}:
+		if cc.Cache.EntryMaps.{{ firstCap $contentType.Sys.ID }} == nil {
+		return true
 	}
-	if cc.Cache != nil {
-		okVo := false
-		{{ range $index , $contentType := $contentTypes }}
-		_, okVo = cc.Cache.EntryMaps.{{ firstCap $contentType.Sys.ID }}[id]
-		if okVo {
-			return ContentType{{ firstCap $contentType.Sys.ID }}, nil
-		}
-		{{ end }}
+	{{ end }}
 	}
-	col := cc.Client.Entries.List(cc.SpaceID)
-	col.Query.Include(0).Equal("sys.id",id)
-	_, err := col.GetAll()
-	if err != nil {
-		return "", errors.New("GetContentTypeOfID: "+err.Error())
-	}
-	if len(col.Items) == 0 {
-		return "", fmt.Errorf("GetContentTypeOfID: %s Not found", id)
-	}
-	var vo genericEntryNoFields
-	byteArray, _ := json.Marshal(col.Items[0])
-	err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&vo)
-	if err != nil {
-		return "", errors.New("GetContentTypeOfID: "+err.Error())
-	}
-	return vo.Sys.ContentType.Sys.ID, nil
+	return false
 }
 
-
-func (cc *ContentfulClient) optimisticPageSizeGetAll(contentType string, limit uint16) (*contentful.Collection, error) {
-	col := cc.Client.Entries.List(cc.SpaceID)
-	col.Query.ContentType(contentType).Locale("*").Include(0).Limit(limit)
-	allItems := []interface{}{}
-	var err error
-	for {
-		_, err = col.Next()
-		if err != nil {
-			break
-		}
-		allItems = append(allItems, col.Items...)
-		if uint16(len(col.Items)) < limit {
-			break
-		}
+func getContentfulAPIClient(clientMode ClientMode, clientKey string) (*contentful.Contentful, error) {
+	switch clientMode {
+	case ClientModeCDA:
+		return contentful.NewCDA(clientKey), nil
+	case ClientModeCPA:
+		return contentful.NewCPA(clientKey), nil
+	case ClientModeCMA:
+		return contentful.NewCMA(clientKey), nil
+	default:
+		return nil, errors.New("NewContentfulClient: Unknown ClientMode")
 	}
-	col.Items = allItems
-	if err != nil {
-		msg := err.(contentful.ErrorResponse).Message
-		if strings.Contains(msg, "Response size too big") && limit >= 20 {
-			smallerPageCol, err := cc.optimisticPageSizeGetAll(contentType, limit / 2 )
-			return smallerPageCol, err
-		}
-		return nil, err
-	}
-	return col, nil
 }
 
-// Asset utils
 func (cc *ContentfulClient) getAllAssets(tryCacheFirst bool) (map[string]*contentful.Asset, error) {
 	if cc.Client == nil {
 		return nil, errors.New("getAllAssets: No client available")
@@ -392,140 +475,48 @@ func (cc *ContentfulClient) getAllAssets(tryCacheFirst bool) (map[string]*conten
 	}
 	return assets, nil
 }
-func (cc *ContentfulClient) GetAllAssets() (map[string]*contentful.Asset, error) {
-	return cc.getAllAssets(true)
-}
-func (cc *ContentfulClient) GetAssetByID(id string) (*contentful.Asset, error) {
-	if cc.Client == nil {
-		return nil, errors.New("GetAssetByID: No client available")
-	}
-	if cc.Cache != nil && cc.Cache.Assets != nil {
-		asset, okAsset := cc.Cache.Assets[id]
-		if okAsset {
-			return asset, nil
+
+func (cc *ContentfulClient) optimisticPageSizeGetAll(contentType string, limit uint16) (*contentful.Collection, error) {
+	col := cc.Client.Entries.List(cc.SpaceID)
+	col.Query.ContentType(contentType).Locale("*").Include(0).Limit(limit)
+	allItems := []interface{}{}
+	var err error
+	for {
+		_, err = col.Next()
+		if err != nil {
+			break
+		}
+		allItems = append(allItems, col.Items...)
+		if uint16(len(col.Items)) < limit {
+			break
 		}
 	}
-	col := cc.Client.Assets.List(cc.SpaceID)
-	col.Query.Locale("*").Equal("sys.id",id)
-	_, err := col.Next()
-	if err != nil {
+	col.Items = allItems
+	switch err.(type) {
+	case contentful.ErrorResponse:
+		msg := err.(contentful.ErrorResponse).Message
+		if strings.Contains(msg, "Response size too big") && limit >= 20 {
+			smallerPageCol, err := cc.optimisticPageSizeGetAll(contentType, limit/2)
+			return smallerPageCol, err
+		}
+		return nil, err
+	case nil:
+	default:
 		return nil, err
 	}
-	if len(col.Items) == 0 {
-		return nil, errors.New("GetAssetByID: Not found "+ id)
-	}
-	item := col.Items[0]
-	asset := contentful.Asset{}
-	byt, err := json.Marshal(item)
-	if err != nil {
-		return nil, err
-	}
-	err = json.Unmarshal(byt, &asset)
-	if err != nil {
-		return nil, err
-	}
-	for _, loc := range []Locale{ {{ range $index , $locale := $locales }}SpaceLocale{{ onlyLetters $locale.Name }},{{end}} } {
-		if _, ok := asset.Fields.File[string(loc)]; ok {
-			asset.Fields.File[string(loc)].URL = "https:" + asset.Fields.File[string(loc)].URL
-		}
-	}
-	return &asset, nil
+	return col, nil
 }
 
-func NewAssetFromURL(id string, uploadUrl string, imageFileType string, title string, locale ...Locale) *contentful.Asset {
-	autoID := fmt.Sprintf("%d", time.Now().UnixNano()/int64(time.Millisecond))
-	if id == "" {
-		id = autoID
+func richTextGetAttribute(htmlLine string, attribute string) string {
+	re := regexp.MustCompile(` href=["']([^"']+)["']`)
+	matches := re.FindStringSubmatch(htmlLine)
+	if len(matches) == 2 {
+		return strings.ToLower(matches[1])
 	}
-	if title == "" {
-		title = id
-	}
-	var loc Locale
-	if len(locale) != 0 {
-		loc = locale[0]
-		if localeFallback[loc]!="" {
-			return nil
-		}
-	} else {
-		loc = defaultLocale
-	}
-	asset := &contentful.Asset{
-		Sys: &contentful.Sys{
-			ID: id,
-		},
-		Fields: &contentful.FileFields{
-			File: map[string]*contentful.File{
-				string(loc): {
-					UploadURL:   uploadUrl,
-					ContentType: imageFileType,
-					Name:        id,
-				},
-			},
-			Title: map[string]string{
-				string(loc): title,
-			},
-		},
-	}
-	return asset
+	return ""
 }
 
-func ToAssetReference(asset *contentful.Asset) (refSys ContentTypeSys) {
-	refSys.Sys.ID = asset.Sys.ID
-	refSys.Sys.Type = FieldTypeLink
-	refSys.Sys.LinkType = FieldLinkTypeAsset
-	return
-}
-
-func (cc *ContentfulClient) DeleteAsset(asset *contentful.Asset) error {
-	if cc.Client == nil {
-		return errors.New("DeleteAsset: No client available")
-	}
-	if cc.clientMode != ClientModeCMA {
-		return errors.New("DeleteAsset: Only available in ClientModeCMA")
-	}
-	errUnpublish := cc.Client.Assets.Unpublish(cc.SpaceID, asset)
-	if errUnpublish != nil && !strings.Contains(errUnpublish.Error(), "Not published") {
-		return errUnpublish
-	}
-	errDelete := cc.Client.Assets.Delete(cc.SpaceID, asset)
-	if errDelete != nil {
-		return errDelete
-	}
-	return nil
-}
-
-// RichText utils
-
-func HtmlToRichText(htmlSrc string) *RichTextNode {
-	htmlClean := strings.TrimSpace(htmlSrc)
-	htmlClean = strings.ReplaceAll(htmlClean, `&nbsp;`, ` `)
-	htmlClean = strings.ReplaceAll(htmlClean, "\t", "")
-	htmlClean = regexp.MustCompile(`[\s]{2,}`).ReplaceAllString(htmlClean, " ")
-	re := regexp.MustCompile(`>([^\n])`)
-	htmlClean = re.ReplaceAllString(htmlClean, fmt.Sprintf(">\n"+`$1`))
-	re = regexp.MustCompile(`(.{1})<`)
-	htmlClean = re.ReplaceAllString(htmlClean, `$1`+fmt.Sprintf("\n<"))
-	htmlLines := strings.Split(htmlClean, "\n")
-	rtnd := &RichTextNode{
-		NodeType: RichTextNodeDocument,
-	}
-	var isBasic bool
-	rtnd.Content, _, isBasic = htmlLinesToRichTextNode(htmlLines, 0, "", nil, true)
-	if isBasic {
-		basicRich := &RichTextNode{
-			NodeType: RichTextNodeDocument,
-		}
-		par := RichTextNode{
-			NodeType: RichTextNodeParagraph,
-		}
-		par.Content = rtnd.Content
-		basicRich.Content = append(basicRich.Content, par)
-		return basicRich
-	}
-	return rtnd
-}
-
-func getMark(mark string) string {
+func richTextGetMark(mark string) string {
 	switch mark {
 	case HtmlItalic, HtmlEm:
 		return RichTextMarkItalic
@@ -539,31 +530,22 @@ func getMark(mark string) string {
 	return ""
 }
 
-func getAttribute(htmlLine string, attribute string) string {
-	re := regexp.MustCompile(` href=["']([^"']+)["']`)
-	matches := re.FindStringSubmatch(htmlLine)
-	if len(matches) == 2 {
-		return strings.ToLower(matches[1])
-	}
-	return ""
-}
-
-func htmlLinesToRichTextNode(htmlLines []string, start int, pendingTag string, marks []string, isBasic bool) ([]interface{}, int, bool) {
+func richTextHtmlLinesToNode(htmlLines []string, start int, pendingTag string, marks []string, isBasic bool) ([]interface{}, int, bool) {
 	nodeSlice := make([]interface{}, 0)
 	for i := start; i < len(htmlLines); i++ {
 		htmlLine := htmlLines[i]
-		if isClosingPending(htmlLine, pendingTag) {
+		if richTextIsHtmlClosingPending(htmlLine, pendingTag) {
 			return nodeSlice, i, isBasic
 		}
 		currentNode := RichTextNode{}
-		if isTag(htmlLine) {
-			tt := tagType(htmlLine)
+		if richTextIsHtmlTag(htmlLine) {
+			tt := richTextHtmlTagType(htmlLine)
 			switch tt {
 			case HtmlParagraph, HtmlHeading1, HtmlHeading2, HtmlHeading3, HtmlHeading4, HtmlHeading5, HtmlHeading6, HtmlUnorderedList, HtmlOrderedList:
 				isBasic = false
-				currentNode.NodeType = mapTagRichTextNodeType(tt)
+				currentNode.NodeType = richTextMapTagNodeType(tt)
 				var nextLine int
-				currentNode.Content, nextLine, isBasic = htmlLinesToRichTextNode(htmlLines, i+1, tt, marks, isBasic)
+				currentNode.Content, nextLine, isBasic = richTextHtmlLinesToNode(htmlLines, i+1, tt, marks, isBasic)
 				nodeSlice = append(nodeSlice, currentNode)
 				if nextLine == -1 {
 					return nodeSlice, -1, isBasic
@@ -571,9 +553,9 @@ func htmlLinesToRichTextNode(htmlLines []string, start int, pendingTag string, m
 				i = nextLine
 			case HtmlBlockquote, HtmlListItem:
 				isBasic = false
-				currentNode.NodeType = mapTagRichTextNodeType(tt)
+				currentNode.NodeType = richTextMapTagNodeType(tt)
 				currentNode.Content = make([]interface{}, 0)
-				innerContent, nextLine, isBasic := htmlLinesToRichTextNode(htmlLines, i+1, tt, marks, isBasic)
+				innerContent, nextLine, isBasic := richTextHtmlLinesToNode(htmlLines, i+1, tt, marks, isBasic)
 				currentNode.Content = append(currentNode.Content, RichTextNode{
 					NodeType: RichTextNodeParagraph,
 					Content:  innerContent,
@@ -587,7 +569,7 @@ func htmlLinesToRichTextNode(htmlLines []string, start int, pendingTag string, m
 				isBasic = false
 				currentNode.NodeType = RichTextNodeParagraph
 				var nextLine int
-				currentNode.Content, nextLine, isBasic = htmlLinesToRichTextNode(htmlLines, i+1, HtmlCode, []string{HtmlCode}, isBasic)
+				currentNode.Content, nextLine, isBasic = richTextHtmlLinesToNode(htmlLines, i+1, HtmlCode, []string{HtmlCode}, isBasic)
 				nodeSlice = append(nodeSlice, currentNode)
 				if nextLine == -1 {
 					return nodeSlice, -1, isBasic
@@ -597,12 +579,12 @@ func htmlLinesToRichTextNode(htmlLines []string, start int, pendingTag string, m
 				isBasic = false
 				currentNode.NodeType = RichTextNodeHyperlink
 				var nextLine int
-				anchorURI := getAttribute(htmlLine, HtmlAttributeHref)
+				anchorURI := richTextGetAttribute(htmlLine, HtmlAttributeHref)
 				if anchorURI == "" {
 					anchorURI = "/"
 				}
 				currentNode.Data = RichTextData{URI: anchorURI}
-				currentNode.Content, nextLine, isBasic = htmlLinesToRichTextNode(htmlLines, i+1, tt, marks, isBasic)
+				currentNode.Content, nextLine, isBasic = richTextHtmlLinesToNode(htmlLines, i+1, tt, marks, isBasic)
 				nodeSlice = append(nodeSlice, currentNode)
 				if nextLine == -1 {
 					return nodeSlice, -1, isBasic
@@ -630,7 +612,7 @@ func htmlLinesToRichTextNode(htmlLines []string, start int, pendingTag string, m
 			}
 			continue //unsupported tags will be ignored but content is preserved
 		}
-		if isClosingTag(htmlLine) {
+		if richTextIsHtmlClosingTag(htmlLine) {
 			continue //closing tags that are not pending equal to unknown
 		}
 		if htmlLine == " " {
@@ -642,7 +624,7 @@ func htmlLinesToRichTextNode(htmlLines []string, start int, pendingTag string, m
 		currentNodeTextNode.Value = htmlLine
 		for _, mark := range marks {
 			currentNodeTextNode.Marks = append(currentNodeTextNode.Marks, RichTextMark{
-				Type: getMark(mark),
+				Type: richTextGetMark(mark),
 			})
 		}
 		marks = nil
@@ -651,19 +633,19 @@ func htmlLinesToRichTextNode(htmlLines []string, start int, pendingTag string, m
 	return nodeSlice, -1, isBasic
 }
 
-func isClosingPending(htmlLine, tag string) bool {
+func richTextIsHtmlClosingPending(htmlLine, tag string) bool {
 	return regexp.MustCompile(`</` + strings.ToLower(tag) + `.+$`).MatchString(strings.ToLower(htmlLine))
 }
 
-func isClosingTag(htmlLine string) bool {
+func richTextIsHtmlClosingTag(htmlLine string) bool {
 	return regexp.MustCompile(`</[a-zA-Z]+.+$`).MatchString(htmlLine)
 }
 
-func isTag(htmlLine string) bool {
+func richTextIsHtmlTag(htmlLine string) bool {
 	return regexp.MustCompile(`<[a-zA-Z]+.+$`).MatchString(htmlLine)
 }
 
-func mapTagRichTextNodeType(tag string) string {
+func richTextMapTagNodeType(tag string) string {
 	switch tag {
 	case HtmlParagraph:
 		return RichTextNodeParagraph
@@ -693,16 +675,7 @@ func mapTagRichTextNodeType(tag string) string {
 	return ""
 }
 
-func tagType(htmlLine string) string {
-	re := regexp.MustCompile(`^<([a-zA-Z0-9]+)[\s]*>*`)
-	matches := re.FindStringSubmatch(htmlLine)
-	if len(matches) == 2 {
-		return strings.ToLower(matches[1])
-	}
-	return ""
-}
-
-func (ts htmlTags) open(w io.Writer) {
+func (ts richTextHtmlTags) richTextHtmlTagsOpen(w io.Writer) {
 
 	for _, t := range ts {
 		tagString := "<" + t.name
@@ -715,52 +688,63 @@ func (ts htmlTags) open(w io.Writer) {
 	}
 }
 
-func (ts htmlTags) close(w io.Writer) {
-
+func (ts richTextHtmlTags) richTextHtmlTagsClose(w io.Writer) {
 	for _, t := range ts {
 		w.Write([]byte("</" + t.name + ">"))
 	}
 }
 
-type LinkResolverFunc func(url string) (resolvedURL string, resolveError error)
-type ImageResolverFunc func(assetID string) (attrs map[string]string, resolveError error)
+func richTextHtmlTagType(htmlLine string) string {
+	re := regexp.MustCompile(`^<([a-zA-Z0-9]+)[\s]*>*`)
+	matches := re.FindStringSubmatch(htmlLine)
+	if len(matches) == 2 {
+		return strings.ToLower(matches[1])
+	}
+	return ""
+}
 
-func (n *RichTextGenericNode) renderHTML(w io.Writer, linkResolver LinkResolverFunc, imageResolver ImageResolverFunc) (err error) {
+func (n *RichTextGenericNode) richTextRenderHTML(w io.Writer, linkResolver LinkResolverFunc, entryLinkResolver EntryLinkResolverFunc, imageResolver ImageResolverFunc, locale Locale) (err error) {
 	if linkResolver == nil {
-		linkResolver = func(url string) (transformedURL string, err error) {
-			return url, nil
+		linkResolver = func(url string) (transformedAttrs map[string]string, err error) {
+			return map[string]string{
+				"href": url,
+			}, nil
 		}
 	}
-
-	tags := htmlTags{}
+	if entryLinkResolver == nil {
+		entryLinkResolver = func(entryID string, locale Locale) (transformedAttrs map[string]string, err error) {
+			return map[string]string{}, nil
+		}
+	}
+	tags := richTextHtmlTags{}
 
 	switch n.NodeType {
 	case RichTextNodeParagraph:
-		tags = []htmlTag{ {name: HtmlParagraph} }
+		tags = []richTextHtmlTag{ {name: HtmlParagraph} }
 	case RichTextNodeHeading1:
-		tags = []htmlTag{ {name: HtmlHeading1} }
+		tags = []richTextHtmlTag{ {name: HtmlHeading1} }
 	case RichTextNodeHeading2:
-		tags = []htmlTag{ {name: HtmlHeading2} }
+		tags = []richTextHtmlTag{ {name: HtmlHeading2} }
 	case RichTextNodeHeading3:
-		tags = []htmlTag{ {name: HtmlHeading3} }
+		tags = []richTextHtmlTag{ {name: HtmlHeading3} }
 	case RichTextNodeHeading4:
-		tags = []htmlTag{ {name: HtmlHeading4} }
+		tags = []richTextHtmlTag{ {name: HtmlHeading4} }
 	case RichTextNodeHeading5:
-		tags = []htmlTag{ {name: HtmlHeading5} }
+		tags = []richTextHtmlTag{ {name: HtmlHeading5} }
 	case RichTextNodeHeading6:
-		tags = []htmlTag{ {name: HtmlHeading6} }
+		tags = []richTextHtmlTag{ {name: HtmlHeading6} }
 	case RichTextNodeOrderedList:
-		tags = []htmlTag{ {name: HtmlOrderedList} }
+		tags = []richTextHtmlTag{ {name: HtmlOrderedList} }
 	case RichTextNodeUnorderedList:
-		tags = []htmlTag{ {name: HtmlUnorderedList} }
+		tags = []richTextHtmlTag{ {name: HtmlUnorderedList} }
 	case RichTextNodeListItem:
-		tags = []htmlTag{ {name: HtmlListItem} }
+		tags = []richTextHtmlTag{ {name: HtmlListItem} }
 	case RichTextNodeHR:
-		tags = []htmlTag{ {name: HtmlHorizontalRule} }
+		tags = []richTextHtmlTag{ {name: HtmlHorizontalRule} }
 	case RichTextNodeBlockquote:
-		tags = []htmlTag{ {name: HtmlBlockquote} }
+		tags = []richTextHtmlTag{ {name: HtmlBlockquote} }
 	case RichTextNodeText:
-		tags = []htmlTag{}
+		tags = []richTextHtmlTag{}
 	case RichTextNodeHyperlink:
 		uri, _ := n.Data["uri"]
 		attrs := map[string]string{}
@@ -768,17 +752,32 @@ func (n *RichTextGenericNode) renderHTML(w io.Writer, linkResolver LinkResolverF
 		case string:
 			uriString := uri.(string)
 			if uriString != "" {
-				resolvedURL, errResolveURL := linkResolver(uriString)
-				if errResolveURL != nil {
-					err = errResolveURL
+				resolvedAttrs, errResolveAttrs := linkResolver(uriString)
+				if errResolveAttrs != nil {
+					err = errResolveAttrs
 					return
 				}
-
-				attrs["href"] = resolvedURL
+				attrs = resolvedAttrs
 			}
-
 		}
-		tags = []htmlTag{htmlTag{name: HtmlAnchor, attrs: attrs}}
+		tags = []richTextHtmlTag{richTextHtmlTag{name: HtmlAnchor, attrs: attrs}}
+	case RichTextNodeEntryHyperlink:
+		target, _ := n.Data["target"]
+		attrs := map[string]string{}
+		switch target.(type) {
+		case map[string]interface{}:
+			targetSys, ok := target.(map[string]interface{})["sys"]
+			if ok {
+				entryID := targetSys.(map[string]interface{})["id"].(string)
+				resolvedAttrs, errResolveAttrs := entryLinkResolver(entryID, locale)
+				if errResolveAttrs != nil {
+					err = errResolveAttrs
+					return
+				}
+				attrs = resolvedAttrs
+			}
+		}
+		tags = []richTextHtmlTag{richTextHtmlTag{name: HtmlAnchor, attrs: attrs}}
 	case RichTextNodeEmbeddedAsset:
 		if imageResolver == nil {
 			return errors.New("Can't resolve image asset URL")
@@ -796,7 +795,7 @@ func (n *RichTextGenericNode) renderHTML(w io.Writer, linkResolver LinkResolverF
 		if err != nil {
 			return err
 		}
-		tags = []htmlTag{htmlTag{name: HtmlImage, attrs: attrs}}
+		tags = []richTextHtmlTag{richTextHtmlTag{name: HtmlImage, attrs: attrs}}
 	default:
 	}
 	for _, m := range n.Marks {
@@ -814,49 +813,21 @@ func (n *RichTextGenericNode) renderHTML(w io.Writer, linkResolver LinkResolverF
 			markTag = HtmlBlockquote
 		}
 		if markTag != "" {
-			tags = append(tags, htmlTag{name: markTag})
+			tags = append(tags, richTextHtmlTag{name: markTag})
 		}
 	}
 
-	tags.open(w)
+	tags.richTextHtmlTagsOpen(w)
 	w.Write([]byte(strings.Replace(html.EscapeString(n.Value), "\n", "<br/>", -1)))
 	for _, subNode := range n.Content {
-		errSubNode := subNode.renderHTML(w, linkResolver, imageResolver)
+		errSubNode := subNode.richTextRenderHTML(w, linkResolver, entryLinkResolver, imageResolver, locale)
 		if errSubNode != nil {
 			err = errSubNode
 			return
 		}
 	}
-	tags.close(w)
+	tags.richTextHtmlTagsClose(w)
 	return
-}
-
-func RichTextToHtml(rt interface{}, linkResolver LinkResolverFunc, imageResolver ImageResolverFunc) (string, error) {
-	w := bytes.NewBuffer([]byte{})
-	node := &RichTextGenericNode{}
-	byt, err := json.Marshal(rt)
-	if err != nil {
-		return "", err
-	}
-	err = json.Unmarshal(byt, node)
-	if err != nil {
-		return "", err
-	}
-	err = node.renderHTML(w, linkResolver, imageResolver)
-	if err != nil {
-		return "", err
-	}
-	out := string(w.Bytes())
-	if out == "<p></p>" {
-		return "", nil
-	}
-	return out, nil
-}
-
-// Other utils
-
-func (ref ContentfulReferencedEntry) ContentType() (contentType string) {
-	return ref.Entry.Sys.ContentType.Sys.ID
 }
 
 func stringSliceContains(s []string, e string) bool {
@@ -867,3 +838,52 @@ func stringSliceContains(s []string, e string) bool {
 	}
 	return false
 }
+
+func updateCacheForContentType(ctx context.Context, results chan ContentTypeResult, cc *ContentfulClient, tempCache *ContentfulCache, contentType string) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	switch contentType {
+	{{ range $index , $contentType := $contentTypes }}
+	case ContentType{{ firstCap $contentType.Sys.ID }}:
+		all{{ firstCap $contentType.Sys.ID }}, err := cc.cacheAll{{ firstCap $contentType.Sys.ID }}(ctx, results)
+		if err != nil {
+			return err
+		}
+		tempCache.EntryMaps.{{ firstCap $contentType.Sys.ID }} = all{{ firstCap $contentType.Sys.ID }}
+		if cc.logFn != nil && cc.logLevel <= LogInfo {
+			cc.logFn(map[string]interface{}{"contentType":"{{ $contentType.Sys.ID }}", "method": "updateCacheForContentType", "size":len(all{{ firstCap $contentType.Sys.ID }})}, LogInfo, InfoCachedAllEntries)
+		}
+	{{ end }}
+	case assetWorkerType:
+		allAssets, err := cc.getAllAssets(false)
+		if err != nil {
+			return err
+		}
+		tempCache.Assets = allAssets
+		if cc.logFn != nil && cc.logLevel <= LogInfo {
+			cc.logFn(map[string]interface{}{"contentType": "asset", "method": "updateCacheForContentType", "size": len(allAssets)}, LogInfo, InfoCachedAllAssets)
+		}
+	}
+	return nil
+}
+
+func updateCacheForContentTypeAndEntity(ctx context.Context, cc *ContentfulClient, sysType string, contentType string, entityID string) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	switch contentType {
+	{{ range $index , $contentType := $contentTypes }}
+	case ContentType{{ firstCap $contentType.Sys.ID }}:
+		err := cc.cache{{ firstCap $contentType.Sys.ID }}ByID(ctx, entityID)
+		if err != nil {
+			return err
+		}
+		if cc.logFn != nil && cc.logLevel <= LogInfo {
+			cc.logFn(map[string]interface{}{"contentType": "{{ $contentType.Sys.ID }}", "method": "updateCacheForContentType", "entityID": entityID}, LogInfo, InfoUpdatedEntityCache)
+		}
+	{{ end }}
+	}
+	return nil
+}
+

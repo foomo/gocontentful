@@ -13,163 +13,6 @@ import (
 const ContentType{{ firstCap $contentType.Sys.ID }} = "{{ $contentType.Sys.ID }}"
 // ---{{ firstCap $contentType.Sys.ID }} private methods---
 
-func (cc *ContentfulClient) cacheAll{{ firstCap $contentType.Sys.ID }}(ctx context.Context, resultChan chan<- ContentTypeResult) (vos map[string]*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
-	if cc.Client == nil {
-		return nil, errors.New("cacheAll{{ firstCap $contentType.Sys.ID }}: No CDA client available")
-	}
-	col, err := cc.optimisticPageSizeGetAll("{{ $contentType.Sys.ID }}", cc.optimisticPageSize)
-	if err != nil {
-		return nil, err
-	}
-	all{{ firstCap $contentType.Sys.ID }}, err := colToCf{{ firstCap $contentType.Sys.ID }}(col,cc)
-	if err != nil {
-		return nil, err
-	}
-	{{ $contentType.Sys.ID }}Map := map[string]*Cf{{ firstCap $contentType.Sys.ID }}{}
-	for _, {{ $contentType.Sys.ID }} := range all{{ firstCap $contentType.Sys.ID }} {
-		{{ $contentType.Sys.ID }}Map[{{ $contentType.Sys.ID }}.Sys.ID] = {{ $contentType.Sys.ID }}
-			result := ContentTypeResult{
-				EntryID: {{ $contentType.Sys.ID }}.Sys.ID,
-				ContentType: ContentType{{ firstCap $contentType.Sys.ID }},
-				References:  map[string][]EntryReference{},
-			}
-			addEntry := func(id string, refs EntryReference){
-				if result.References[id] == nil {
-					result.References[id] = []EntryReference{}
-				}
-				result.References[id] = append(result.References[id], refs)
-			}
-			_ = addEntry
-			{{ range $fieldIndex, $field := $contentType.Fields }}
-			{{ if fieldIsMultipleReference $field }}
-				for _, loc := range cc.locales {
-					children, okChildren := {{ $contentType.Sys.ID }}.Fields.{{ firstCap $field.ID }}[string(loc)]
-					if okChildren {
-						for _, child := range children {
-							addEntry(child.Sys.ID, EntryReference{ContentType: {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID, ID: {{ $contentType.Sys.ID }}.Sys.ID, VO: {{ $contentType.Sys.ID }}})
-						}
-					}
-				}
-			{{ end }}
-			{{ if fieldIsReference $field }}
-			for _, loc := range cc.locales {
-				child, okChild := {{ $contentType.Sys.ID }}.Fields.{{ firstCap $field.ID }}[string(loc)]
-				if okChild {
-					addEntry(child.Sys.ID, EntryReference{ContentType: {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID, ID: {{ $contentType.Sys.ID }}.Sys.ID, VO: {{ $contentType.Sys.ID }}})
-				}
-				}
-			{{ end }}
-			{{ end }}
-		if ctx.Err() != nil {
-			return nil, ctx.Err()
-		}
-		resultChan <- result
-	}
-	return {{ $contentType.Sys.ID }}Map, nil
-}
-
-func (cc *ContentfulClient) cache{{ firstCap $contentType.Sys.ID }}ByID(ctx context.Context, id string) error {
-	if cc.Client == nil {
-		return errors.New("cache{{ firstCap $contentType.Sys.ID }}ByID: No client available")
-	}
-	col := cc.Client.Entries.List(cc.SpaceID)
-	col.Query.ContentType("{{ $contentType.Sys.ID }}").Locale("*").Include(0).Equal("sys.id", id)
-	_, err := col.GetAll()
-	if err != nil {
-		return err
-	}
-	{{ $contentType.Sys.ID }}EntryMap := cc.Cache.EntryMaps.{{ firstCap $contentType.Sys.ID }}
-	idContentTypeMap := cc.Cache.IdContentTypeMap
-	parentMap := cc.Cache.ParentMap
-	// It was deleted
-	if len(col.Items) == 0 {
-		delete({{ $contentType.Sys.ID }}EntryMap, id)
-		delete(idContentTypeMap, id)
-		// delete as child
-		delete(parentMap, id)
-		// delete as parent
-		for childID, child := range parentMap {
-			newParents := []EntryReference{}
-			for _, parent := range child {
-				if parent.ID != id {
-					newParents = append(newParents, parent)
-				}
-			}
-			parentMap[childID] = newParents
-		}
-		cc.Cache.EntryMaps.{{ firstCap $contentType.Sys.ID }} = {{ $contentType.Sys.ID }}EntryMap
-		cc.Cache.IdContentTypeMap = idContentTypeMap
-		cc.Cache.ParentMap = parentMap
-		return nil
-	}
-	vos, err := colToCf{{ firstCap $contentType.Sys.ID }}(col, cc)
-	if err != nil {
-		return fmt.Errorf("cache{{ firstCap $contentType.Sys.ID }}ByID: Error converting %s to VO: "+err.Error(), id)
-	}
-	{{ $contentType.Sys.ID }} := vos[0]
-	{{ $contentType.Sys.ID }}EntryMap[id] = {{ $contentType.Sys.ID }}
-	idContentTypeMap[id] = {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID
-	{{ range $fieldIndex, $field := $contentType.Fields }}
-	{{ if fieldIsMultipleReference $field }}
-		for _, loc := range cc.locales {
-			children, okChildren := {{ $contentType.Sys.ID }}.Fields.{{ firstCap $field.ID }}[string(loc)]
-			if okChildren {
-				for _, child := range children {
-					if parentMap[child.Sys.ID] == nil {
-						parentMap[child.Sys.ID] = []EntryReference{}
-					}
-					found := false
-					for _, parent := range parentMap[child.Sys.ID] {
-						if parent.ID == id {
-							found = true
-						}
-					}
-					if !found {
-						parentMap[child.Sys.ID] = append(parentMap[child.Sys.ID], EntryReference{ContentType: {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID, ID: {{ $contentType.Sys.ID }}.Sys.ID, VO: {{ $contentType.Sys.ID }}})
-					}
-				}
-			}
-		}
-	{{ end }}
-	{{ if fieldIsReference $field }}
-		for _, loc := range cc.locales {
-			child, okChild := {{ $contentType.Sys.ID }}.Fields.{{ firstCap $field.ID }}[string(loc)]
-			if okChild {
-				if parentMap[child.Sys.ID] == nil {
-					parentMap[child.Sys.ID] = []EntryReference{}
-				}
-				found := false
-				for _, parent := range parentMap[child.Sys.ID] {
-					if parent.ID == id {
-						found = true
-					}
-				}
-				if !found {
-					parentMap[child.Sys.ID] = append(parentMap[child.Sys.ID], EntryReference{ContentType: {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID, ID: {{ $contentType.Sys.ID }}.Sys.ID, VO: {{ $contentType.Sys.ID }}})
-				}
-			}
-		}
-	{{ end }}
-	{{ end }}
-	cc.Cache.EntryMaps.{{ firstCap $contentType.Sys.ID }} = {{ $contentType.Sys.ID }}EntryMap
-	cc.Cache.IdContentTypeMap = idContentTypeMap
-	cc.Cache.ParentMap = parentMap
-	return nil
-}
-
-func colToCf{{ firstCap $contentType.Sys.ID }}(col *contentful.Collection, cc *ContentfulClient) (vos []*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
-	for _, item := range col.Items {
-		var vo Cf{{ firstCap $contentType.Sys.ID }}
-		byteArray, _ := json.Marshal(item)
-		err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&vo)
-		if err != nil {
-			break
-		}
-		vo.CC = cc
-		vos = append(vos, &vo)
-	}
-	return vos, err
-}
 
 // ---{{ firstCap $contentType.Sys.ID }} public methods---
 
@@ -312,7 +155,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 			}
 			return {{ mapFieldTypeLiteral $contentType.Sys.ID $field }}
 		}
-	} 
+	}
 	if _, ok := vo.Fields.{{ firstCap $field.ID }}[string(loc)]; !ok {
 		if _, ok := localeFallback[loc]; !ok {
 			if vo.CC.logFn != nil && vo.CC.logLevel == LogDebug {
@@ -345,7 +188,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 			}
 			return {{ mapFieldTypeLiteral $contentType.Sys.ID $field }}
 		}
-	} 
+	}
 	if _, ok := vo.Fields.{{ firstCap $field.ID }}[string(loc)]; !ok {
 		if _, ok := localeFallback[loc]; !ok {
 			if vo.CC.logFn != nil && vo.CC.logLevel == LogDebug {
@@ -589,7 +432,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) Set{{ firstCap $field.ID }}({{ $
 	}
 	if vo.Fields.{{ firstCap $field.ID }} == nil {
 		vo.Fields.{{ firstCap $field.ID }} = make(map[string]{{ mapFieldType $contentType.Sys.ID $field }})
-	} 
+	}
 	vo.Fields.{{ firstCap $field.ID }}[string(loc)] = {{ $field.ID }}
 	return
 }
@@ -729,4 +572,162 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) ToReference() (refSys ContentTyp
 	refSys.Sys.Type = FieldTypeLink
 	refSys.Sys.LinkType = FieldLinkTypeEntry
 	return
+}
+
+func (cc *ContentfulClient) cacheAll{{ firstCap $contentType.Sys.ID }}(ctx context.Context, resultChan chan<- ContentTypeResult) (vos map[string]*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
+	if cc.Client == nil {
+		return nil, errors.New("cacheAll{{ firstCap $contentType.Sys.ID }}: No CDA client available")
+	}
+	col, err := cc.optimisticPageSizeGetAll("{{ $contentType.Sys.ID }}", cc.optimisticPageSize)
+	if err != nil {
+		return nil, err
+	}
+	all{{ firstCap $contentType.Sys.ID }}, err := colToCf{{ firstCap $contentType.Sys.ID }}(col,cc)
+	if err != nil {
+		return nil, err
+	}
+	{{ $contentType.Sys.ID }}Map := map[string]*Cf{{ firstCap $contentType.Sys.ID }}{}
+	for _, {{ $contentType.Sys.ID }} := range all{{ firstCap $contentType.Sys.ID }} {
+		{{ $contentType.Sys.ID }}Map[{{ $contentType.Sys.ID }}.Sys.ID] = {{ $contentType.Sys.ID }}
+	result := ContentTypeResult{
+	EntryID: {{ $contentType.Sys.ID }}.Sys.ID,
+	ContentType: ContentType{{ firstCap $contentType.Sys.ID }},
+	References:  map[string][]EntryReference{},
+	}
+	addEntry := func(id string, refs EntryReference){
+		if result.References[id] == nil {
+			result.References[id] = []EntryReference{}
+		}
+		result.References[id] = append(result.References[id], refs)
+	}
+	_ = addEntry
+	{{ range $fieldIndex, $field := $contentType.Fields }}
+	{{ if fieldIsMultipleReference $field }}
+		for _, loc := range cc.locales {
+		children, okChildren := {{ $contentType.Sys.ID }}.Fields.{{ firstCap $field.ID }}[string(loc)]
+		if okChildren {
+			for _, child := range children {
+				addEntry(child.Sys.ID, EntryReference{ContentType: {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID, ID: {{ $contentType.Sys.ID }}.Sys.ID, VO: {{ $contentType.Sys.ID }}})
+			}
+		}
+	}
+	{{ end }}
+	{{ if fieldIsReference $field }}
+	for _, loc := range cc.locales {
+		child, okChild := {{ $contentType.Sys.ID }}.Fields.{{ firstCap $field.ID }}[string(loc)]
+		if okChild {
+			addEntry(child.Sys.ID, EntryReference{ContentType: {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID, ID: {{ $contentType.Sys.ID }}.Sys.ID, VO: {{ $contentType.Sys.ID }}})
+		}
+	}
+	{{ end }}
+	{{ end }}
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		resultChan <- result
+	}
+	return {{ $contentType.Sys.ID }}Map, nil
+}
+
+func (cc *ContentfulClient) cache{{ firstCap $contentType.Sys.ID }}ByID(ctx context.Context, id string) error {
+	if cc.Client == nil {
+		return errors.New("cache{{ firstCap $contentType.Sys.ID }}ByID: No client available")
+	}
+		col := cc.Client.Entries.List(cc.SpaceID)
+		col.Query.ContentType("{{ $contentType.Sys.ID }}").Locale("*").Include(0).Equal("sys.id", id)
+		_, err := col.GetAll()
+	if err != nil {
+		return err
+	}
+		{{ $contentType.Sys.ID }}EntryMap := cc.Cache.EntryMaps.{{ firstCap $contentType.Sys.ID }}
+			idContentTypeMap := cc.Cache.IdContentTypeMap
+		parentMap := cc.Cache.ParentMap
+	// It was deleted
+	if len(col.Items) == 0 {
+		delete({{ $contentType.Sys.ID }}EntryMap, id)
+		delete(idContentTypeMap, id)
+		// delete as child
+		delete(parentMap, id)
+		// delete as parent
+		for childID, child := range parentMap {
+			newParents := []EntryReference{}
+			for _, parent := range child {
+				if parent.ID != id {
+					newParents = append(newParents, parent)
+				}
+			}
+			parentMap[childID] = newParents
+		}
+		cc.Cache.EntryMaps.{{ firstCap $contentType.Sys.ID }} = {{ $contentType.Sys.ID }}EntryMap
+		cc.Cache.IdContentTypeMap = idContentTypeMap
+		cc.Cache.ParentMap = parentMap
+		return nil
+	}
+		vos, err := colToCf{{ firstCap $contentType.Sys.ID }}(col, cc)
+	if err != nil {
+		return fmt.Errorf("cache{{ firstCap $contentType.Sys.ID }}ByID: Error converting %s to VO: "+err.Error(), id)
+	}
+	{{ $contentType.Sys.ID }} := vos[0]
+	{{ $contentType.Sys.ID }}EntryMap[id] = {{ $contentType.Sys.ID }}
+			idContentTypeMap[id] = {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID
+	{{ range $fieldIndex, $field := $contentType.Fields }}
+	{{ if fieldIsMultipleReference $field }}
+	for _, loc := range cc.locales {
+		children, okChildren := {{ $contentType.Sys.ID }}.Fields.{{ firstCap $field.ID }}[string(loc)]
+		if okChildren {
+			for _, child := range children {
+				if parentMap[child.Sys.ID] == nil {
+					parentMap[child.Sys.ID] = []EntryReference{}
+				}
+				found := false
+				for _, parent := range parentMap[child.Sys.ID] {
+					if parent.ID == id {
+						found = true
+					}
+				}
+				if !found {
+					parentMap[child.Sys.ID] = append(parentMap[child.Sys.ID], EntryReference{ContentType: {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID, ID: {{ $contentType.Sys.ID }}.Sys.ID, VO: {{ $contentType.Sys.ID }}})
+				}
+			}
+		}
+	}
+	{{ end }}
+	{{ if fieldIsReference $field }}
+		for _, loc := range cc.locales {
+			child, okChild := {{ $contentType.Sys.ID }}.Fields.{{ firstCap $field.ID }}[string(loc)]
+			if okChild {
+				if parentMap[child.Sys.ID] == nil {
+					parentMap[child.Sys.ID] = []EntryReference{}
+				}
+				found := false
+				for _, parent := range parentMap[child.Sys.ID] {
+					if parent.ID == id {
+						found = true
+					}
+				}
+				if !found {
+					parentMap[child.Sys.ID] = append(parentMap[child.Sys.ID], EntryReference{ContentType: {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID, ID: {{ $contentType.Sys.ID }}.Sys.ID, VO: {{ $contentType.Sys.ID }}})
+				}
+			}
+		}
+	{{ end }}
+	{{ end }}
+	cc.Cache.EntryMaps.{{ firstCap $contentType.Sys.ID }} = {{ $contentType.Sys.ID }}EntryMap
+	cc.Cache.IdContentTypeMap = idContentTypeMap
+	cc.Cache.ParentMap = parentMap
+	return nil
+}
+
+func colToCf{{ firstCap $contentType.Sys.ID }}(col *contentful.Collection, cc *ContentfulClient) (vos []*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
+	for _, item := range col.Items {
+		var vo Cf{{ firstCap $contentType.Sys.ID }}
+		byteArray, _ := json.Marshal(item)
+		err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&vo)
+		if err != nil {
+			break
+		}
+		vo.CC = cc
+		vos = append(vos, &vo)
+	}
+	return vos, err
 }

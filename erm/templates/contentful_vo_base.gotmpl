@@ -3,10 +3,110 @@
 
 import "github.com/foomo/contentful"
 
+type ContentTypeSysAttributes struct {
+	ID       string `json:"id,omitempty"`
+	Type     string `json:"type,omitempty"`
+	LinkType string `json:"linkType,omitempty"`
+}
+
+type ContentTypeSys struct {
+	Sys ContentTypeSysAttributes `json:"sys,omitempty"`
+}
+
+type ContentfulSys struct {
+	ID          		string         `json:"id,omitempty"`
+	Type        		string         `json:"type,omitempty"`
+	LinkType    		string         `json:"linkType,omitempty"`
+	ContentType 		ContentTypeSys `json:"contentType,omitempty"`
+	Environment 		ContentTypeSys `json:"environment,omitempty"`
+	Space       		ContentTypeSys `json:"space,omitempty"`
+	CreatedAt   		string         `json:"createdAt,omitempty"`
+	UpdatedAt   		string         `json:"updatedAt,omitempty"`
+	Revision    		float64        `json:"revision,omitempty"`
+	Version     		float64        `json:"version,omitempty"`
+	PublishedCounter    float64        `json:"publishedCounter,omitempty"`
+}
+
+type ContentfulReferencedEntry struct {
+	Entry 	*contentful.Entry
+	Col 	*contentful.Collection
+	LogFn   func(
+			contentType string,
+			entryID string,
+			method string,
+			err error,
+	)
+}
+
+type ContentTypeFieldLocation struct {
+	Lat float64 `json:"lat,omitempty"`
+	Lon float64 `json:"lon,omitempty"`
+}
+
+type RichTextNode struct {
+	NodeType string         `json:"nodeType"`
+	Content  []interface{} `json:"content"`
+	Data     RichTextData   `json:"data"`
+}
+
+type RichTextNodeTextNode struct {
+	NodeType string         `json:"nodeType"`
+	Data     RichTextData   `json:"data"`
+	Value    string         `json:"value"`
+	Marks    []RichTextMark `json:"marks"`
+}
+
+type RichTextData struct {
+	URI    string         `json:"uri,omitempty"`
+	Target *ContentTypeSys `json:"target,omitempty"`
+}
+
+type RichTextGenericNode struct {
+	NodeType string                 `json:"nodeType"`
+	Content  []*RichTextGenericNode `json:"content"`
+	Data     map[string]interface{} `json:"data"`
+	Value    string                 `json:"value"`
+	Marks    []RichTextMark         `json:"marks"`
+}
+
+type richTextHtmlTag struct {
+	attrs map[string]string
+	name  string
+}
+
+type richTextHtmlTags []richTextHtmlTag
+
+type RichTextMark struct {
+	Type string `json:"type,omitempty"`
+}
+
 const (
 	FieldTypeLink      string = "Link"
 	FieldLinkTypeEntry string = "Entry"
 	FieldLinkTypeAsset string = "Asset"
+
+	HtmlHeading1       string = "h1"
+	HtmlHeading2       string = "h2"
+	HtmlHeading3       string = "h3"
+	HtmlHeading4       string = "h4"
+	HtmlHeading5       string = "h5"
+	HtmlHeading6       string = "h6"
+	HtmlParagraph      string = "p"
+	HtmlItalic         string = "i"
+	HtmlEm             string = "em"
+	HtmlBold           string = "b"
+	HtmlStrong         string = "strong"
+	HtmlUnderline      string = "u"
+	HtmlAnchor         string = "a"
+	HtmlImage          string = "img"
+	HtmlBlockquote     string = "blockquote"
+	HtmlCode           string = "code"
+	HtmlUnorderedList  string = "ul"
+	HtmlOrderedList    string = "ol"
+	HtmlListItem       string = "li"
+	HtmlBreak          string = "br"
+	HtmlHorizontalRule string = "hr"
+	HtmlAttributeHref  string = "href"
 
 	RichTextNodeDocument       string = "document"
 	RichTextNodeParagraph      string = "paragraph"
@@ -31,113 +131,4 @@ const (
 	RichTextMarkItalic    string = "italic"
 	RichTextMarkUnderline string = "underline"
 	RichTextMarkCode      string = "code"
-
-	HtmlHeading1       string = "h1"
-	HtmlHeading2       string = "h2"
-	HtmlHeading3       string = "h3"
-	HtmlHeading4       string = "h4"
-	HtmlHeading5       string = "h5"
-	HtmlHeading6       string = "h6"
-	HtmlParagraph      string = "p"
-	HtmlItalic         string = "i"
-	HtmlEm             string = "em"
-	HtmlBold           string = "b"
-	HtmlStrong         string = "strong"
-	HtmlUnderline      string = "u"
-	HtmlAnchor         string = "a"
-	HtmlImage          string = "img"
-	HtmlBlockquote     string = "blockquote"
-	HtmlCode           string = "code"
-	HtmlUnorderedList  string = "ul"
-	HtmlOrderedList    string = "ol"
-	HtmlListItem       string = "li"
-	HtmlBreak          string = "br"
-	HtmlHorizontalRule string = "hr"
-
-	HtmlAttributeHref string = "href"
 )
-
-// --- Contentful common types
-
-// ContentTypeSysAttributes VO
-type ContentTypeSysAttributes struct {
-	ID       string `json:"id,omitempty"`
-	Type     string `json:"type,omitempty"`
-	LinkType string `json:"linkType,omitempty"`
-}
-
-// ContentTypeSys VO
-type ContentTypeSys struct {
-	Sys ContentTypeSysAttributes `json:"sys,omitempty"`
-}
-
-// ContentfulSys VO
-type ContentfulSys struct {
-	ID          		string         `json:"id,omitempty"`
-	Type        		string         `json:"type,omitempty"`
-	LinkType    		string         `json:"linkType,omitempty"`
-	ContentType 		ContentTypeSys `json:"contentType,omitempty"`
-	Environment 		ContentTypeSys `json:"environment,omitempty"`
-	Space       		ContentTypeSys `json:"space,omitempty"`
-	CreatedAt   		string         `json:"createdAt,omitempty"`
-	UpdatedAt   		string         `json:"updatedAt,omitempty"`
-	Revision    		float64        `json:"revision,omitempty"`
-	Version     		float64        `json:"version,omitempty"`
-	PublishedCounter    float64        `json:"publishedCounter,omitempty"`
-}
-
-// ContentTypeFieldLocation for location fields
-type ContentTypeFieldLocation struct {
-	Lat float64 `json:"lat,omitempty"`
-	Lon float64 `json:"lon,omitempty"`
-}
-
-// ContentfulReferencedEntry VO
-type ContentfulReferencedEntry struct {
-	Entry 	*contentful.Entry
-	Col 	*contentful.Collection
-	LogFn   func(
-		contentType string,
-		entryID string,
-		method string,
-		err error,
-	)
-}
-
-// RichText
-type RichTextNode struct {
-	NodeType string         `json:"nodeType"`
-	Content  []interface{} `json:"content"`
-	Data     RichTextData   `json:"data"`
-}
-
-type RichTextNodeTextNode struct {
-	NodeType string         `json:"nodeType"`
-	Data     RichTextData   `json:"data"`
-	Value    string         `json:"value"`
-	Marks    []RichTextMark `json:"marks"`
-}
-
-type RichTextGenericNode struct {
-	NodeType string                 `json:"nodeType"`
-	Content  []*RichTextGenericNode `json:"content"`
-	Data     map[string]interface{} `json:"data"`
-	Value    string                 `json:"value"`
-	Marks    []RichTextMark         `json:"marks"`
-}
-
-type RichTextData struct {
-	URI    string         `json:"uri,omitempty"`
-	Target *ContentTypeSys `json:"target,omitempty"`
-}
-
-type RichTextMark struct {
-	Type string `json:"type,omitempty"`
-}
-
-type htmlTag struct {
-	attrs map[string]string
-	name  string
-}
-
-type htmlTags []htmlTag

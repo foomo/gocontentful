@@ -3,11 +3,7 @@
 
 import "github.com/foomo/contentful"
 
-type genericEntryNoFields struct {
-	Sys ContentfulSys `json:"sys,omitempty"`
-}
-	{{ range $index , $contentType := $contentTypes }}
-// Cf{{ firstCap $contentType.Sys.ID }} is the main VO for this content type
+{{ range $index , $contentType := $contentTypes }}
 type Cf{{ firstCap $contentType.Sys.ID }} struct {
 	Sys    ContentfulSys          `json:"sys,omitempty"`
 	Fields Cf{{ firstCap $contentType.Sys.ID }}Fields `json:"fields,omitempty"`
@@ -19,12 +15,16 @@ type Cf{{ firstCap $contentType.Sys.ID }}Fields struct {
 	{{ range $fieldIndex, $field := $contentType.Fields }}
 	{{ firstCap $field.ID }}				map[string]{{ mapFieldType $contentType.Sys.ID $field }}			`json:"{{ $field.ID }},omitempty"`{{ end }}
 }
-{{ range $fieldIndex, $field := $contentType.Fields }}
-{{ if fieldIsAsset $field }}
-// Cf{{ firstCap $contentType.Sys.ID }}Fields{{ firstCap $field.ID }} is a CfNameFieldsReferenceName Asset VO
+	{{ range $fieldIndex, $field := $contentType.Fields }}
+		{{ if fieldIsAsset $field }}
 type Cf{{ firstCap $contentType.Sys.ID }}Fields{{ firstCap $field.ID }} struct {
 	Entry *contentful.Asset
 	Col   *contentful.Collection
 }
-{{ end }}{{ end }}
+		{{ end }}
+	{{ end }}
 {{ end }}
+
+type genericEntryNoFields struct {
+	Sys ContentfulSys `json:"sys,omitempty"`
+}
