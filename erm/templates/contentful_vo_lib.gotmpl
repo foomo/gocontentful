@@ -58,8 +58,7 @@ type EntryReference struct {
 	VO interface{}
 }
 
-type ImageResolverFunc func(assetID string) (attrs map[string]string, resolveError error)
-
+type ImageResolverFunc func(assetID string, locale Locale) (attrs map[string]string, resolveError error)
 type EntryLinkResolverFunc func(entryID string, locale Locale) (resolvedAttrs map[string]string, resolveError error)
 type LinkResolverFunc func(url string) (resolvedAttrs map[string]string, resolveError error)
 
@@ -791,7 +790,7 @@ func (n *RichTextGenericNode) richTextRenderHTML(w io.Writer, linkResolver LinkR
 		if dataObj.Target == nil {
 			return errors.New("Data target is empty")
 		}
-		attrs, err := imageResolver(dataObj.Target.Sys.ID)
+		attrs, err := imageResolver(dataObj.Target.Sys.ID, locale)
 		if err != nil {
 			return err
 		}
