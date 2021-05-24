@@ -409,6 +409,18 @@ func (cc *ContentfulClient) UpdateCacheForEntity(ctx context.Context, sysType st
 	return nil
 }
 
+func FieldToObject(jsonField interface{}, targetObject interface{}) error {
+	byteArray, err := json.Marshal(jsonField)
+	if err != nil {
+		return err
+	}
+	err = json.Unmarshal(byteArray, &targetObject)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (cc *ContentfulClient) entryMapForContentTypeIsNil(contentType string) bool {
 	switch contentType {
 	{{ range $index , $contentType := $contentTypes }}

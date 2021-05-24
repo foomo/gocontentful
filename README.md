@@ -148,9 +148,9 @@ Note that constants are available for all locales supported by the space. If a s
 
 Contentful supports Rich Text editing and sooner or later you'll want to convert that to HTML:
 
-`htmlText := people.RichTextToHtml(person.Resume(), linkResolver, imageResolver)`
+`htmlText := people.RichTextToHtml(person.Resume(), linkResolver, entryLinkResolver, imageResolver, locale)`
 
-_Note: linkResolver and imageResolver are two functions that resolve URLs for links and attributes for embedded image assets. See API documentation below._
+_Note: linkResolver, entryLinkResolver and imageResolver are functions that resolve URLs for links and attributes for embedded image assets. See API documentation below._
 
 ...or the other way around (often used when digesting data from external sources):
 
@@ -348,20 +348,27 @@ Converts the asset to a reference. You need to do this before you add the asset 
 Deletes an asset from a space by its ID (only available for _ClientModeCMA_)
 
 ---
-**UTILITY FUNCTIONS**
+**HELPER FUNCTIONS**
 
 >**HtmlToRichText**(htmlSrc string) *RichTextNode
 
-Converts an HTML fragment to a RichTextNode. This is far from complete but useful to migrate data from third-party systems to Contentful. It currently supports headings, paragraphs, hyperlinks, italic and bold tags, horizontal rules, blockquote, ordered and unordered lists, code. Unknown tags are stripped. This function doesn't return any error as it converts the input text into something as good as possible, without  validation.
+Converts an HTML fragment to a RichTextNode. This is useful to migrate data from third-party systems to Contentful or support HTML paste operations in Web applications. It currently supports headings, paragraphs, hyperlinks, italic and bold tags, horizontal rules, blockquote, ordered and unordered lists, code. Unknown tags are stripped. This function doesn't return any error as it converts the input text into something as good as possible, without  validation.
 
->**RichTextToHtml**(rt interface{}, linkResolver LinkResolverFunc, imageResolver ImageResolverFunc) (string, error)
+>**RichTextToHtml**(rt interface{}, linkResolver LinkResolverFunc, entryLinkResolver EntryLinkResolverFunc, imageResolver ImageResolverFunc, locale Locale) (string, error) {
 
-Converts an interface representing a Contentful RichText value (usually from a field getter) into HTML. It currently supports all tags except for embedded and inline entries and assets. It takes in two functions to resolve hyperlink URLs (if passed as null this will return the href unchanged) and to derive IMG tag attributes for embedded image assets (you usually want this customized in your application code). The two functions have this signature:
+Converts an interface representing a Contentful RichText value (usually from a field getter) into HTML. It currently supports all tags except for embedded and inline entries and assets. It takes in three (optional) functions to resolve hyperlink URLs, permalinks to entries and to derive IMG tag attributes for embedded image assets. The three functions return a map of attributes for the HTML tag the RichTextToHtml function will emit (either an A or an IMG) and have the following signature:
 
->type LinkResolverFunc func(url string) (resolvedURL string, resolveError error)
+>type LinkResolverFunc func(url string) (resolvedAttrs map[string]string, resolveError error)
 
->type ImageResolverFunc func(assetID string) (attrs map[string]string, resolveError error)
+>type EntryLinkResolverFunc func(entryID string, locale Locale) (resolvedAttrs map[string]string, resolveError error)
 
+>type ImageResolverFunc func(assetID string, locale Locale) (attrs map[string]string, resolveError error)
+
+All the three functions above can be passed as nil with different levels of graceful degrading. 
+
+>**FieldToObject**(jsonField interface{}, targetObject interface{}) error
+
+Converts a JSON field into an object. Make sure you pass a pointer to an object which type has JSON definition for all fields you want to retrieve.
 
 ---
 
