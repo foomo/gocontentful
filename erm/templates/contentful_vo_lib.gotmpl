@@ -16,20 +16,22 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-type CacheEntryMaps struct {
-	{{ range $index , $contentType := $contentTypes }}	{{ firstCap $contentType.Sys.ID }} map[string]*Cf{{ firstCap $contentType.Sys.ID }}
+type cacheEntryMaps struct {
+	{{ range $index , $contentType := $contentTypes }}	{{ $contentType.Sys.ID }} map[string]*Cf{{ firstCap $contentType.Sys.ID }}
 	{{ end }}
 }
 
 type ClientMode string
 
 type ContentfulCache struct {
-	Assets map[string]*contentful.Asset
-	ContentTypes []string
-	EntryMaps CacheEntryMaps
-	IdContentTypeMap map[string]string
-	ParentMap map[string][]EntryReference // Maps each entry ID to its parents' IDs
+	assets           assetCacheMap
+	contentTypes     []string
+	entryMaps        cacheEntryMaps
+	idContentTypeMap map[string]string
+	parentMap        map[string][]EntryReference // Maps each entry ID to its parents' IDs
 }
+
+type assetCacheMap map[string]*contentful.Asset
 
 type ContentfulClient struct {
 	Cache  *ContentfulCache
@@ -109,6 +111,15 @@ var (
 
 var spaceContentTypes = []string{ {{ range $index , $contentType := $contentTypes }}ContentType{{ firstCap $contentType.Sys.ID }}, {{ end }} }
 
+func (cc *ContentfulClient) CacheHasContentType(contentTypeID string) bool {
+	for _, cachedContentType := range cc.Cache.contentTypes {
+		if cachedContentType == contentTypeID {
+			return true
+		}
+	}
+	return false
+}
+
 func (ref ContentfulReferencedEntry) ContentType() (contentType string) {
 	return ref.Entry.Sys.ContentType.Sys.ID
 }
@@ -131,6 +142,10 @@ func (cc *ContentfulClient) DeleteAsset(asset *contentful.Asset) error {
 	return nil
 }
 
+func (cc *ContentfulClient) DeleteAssetFromCache(key string) error {
+	return cc.deleteAssetFromCache(key)
+}
+
 func (cc *ContentfulClient) GetAllAssets() (map[string]*contentful.Asset, error) {
 	return cc.getAllAssets(true)
 }
@@ -139,8 +154,8 @@ func (cc *ContentfulClient) GetAssetByID(id string) (*contentful.Asset, error) {
 	if cc.Client == nil {
 		return nil, errors.New("GetAssetByID: No client available")
 	}
-	if cc.Cache != nil && cc.Cache.Assets != nil {
-		asset, okAsset := cc.Cache.Assets[id]
+	if cc.Cache != nil && cc.Cache.assets != nil {
+		asset, okAsset := cc.Cache.assets[id]
 		if okAsset {
 			return asset, nil
 		}
@@ -179,7 +194,7 @@ func (cc *ContentfulClient) GetContentTypeOfID(id string) (string, error) {
 	if cc.Cache != nil {
 		okVo := false
 		{{ range $index , $contentType := $contentTypes }}
-		_, okVo = cc.Cache.EntryMaps.{{ firstCap $contentType.Sys.ID }}[id]
+		_, okVo = cc.Cache.entryMaps.{{ $contentType.Sys.ID }}[id]
 		if okVo {
 			return ContentType{{ firstCap $contentType.Sys.ID }}, nil
 		}
@@ -326,9 +341,9 @@ func RichTextToHtml(rt interface{}, linkResolver LinkResolverFunc, entryLinkReso
 func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []string, cacheAssets bool) error {
 	start := time.Now()
 	tempCache := &ContentfulCache{
-		ContentTypes:     contentTypes,
-		IdContentTypeMap: map[string]string{},
-		ParentMap:        map[string][]EntryReference{},
+		contentTypes:     contentTypes,
+		idContentTypeMap: map[string]string{},
+		parentMap:        map[string][]EntryReference{},
 	}
 	for _, contentType := range contentTypes {
 		if !stringSliceContains(spaceContentTypes, contentType) {
@@ -361,9 +376,9 @@ func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []stri
 	}()
 	go func() {
 		for res := range results {
-			tempCache.IdContentTypeMap[res.EntryID] = res.ContentType
+			tempCache.idContentTypeMap[res.EntryID] = res.ContentType
 			for childID, references := range res.References {
-				tempCache.ParentMap[childID] = append(tempCache.ParentMap[childID], references...)
+				tempCache.parentMap[childID] = append(tempCache.parentMap[childID], references...)
 			}
 		}
 		resultsDone <- struct{}{}
@@ -421,11 +436,19 @@ func FieldToObject(jsonField interface{}, targetObject interface{}) error {
 	return nil
 }
 
+func (cc *ContentfulClient) deleteAssetFromCache(key string) error {
+	if _, ok := cc.Cache.assets[key]; ok {
+		delete(cc.Cache.assets, key)
+		return nil
+	}
+	return errors.New("asset not found in cache, could not delete")
+}
+
 func (cc *ContentfulClient) entryMapForContentTypeIsNil(contentType string) bool {
 	switch contentType {
 	{{ range $index , $contentType := $contentTypes }}
 	case ContentType{{ firstCap $contentType.Sys.ID }}:
-		if cc.Cache.EntryMaps.{{ firstCap $contentType.Sys.ID }} == nil {
+		if cc.Cache.entryMaps.{{ $contentType.Sys.ID }} == nil {
 		return true
 	}
 	{{ end }}
@@ -450,8 +473,8 @@ func (cc *ContentfulClient) getAllAssets(tryCacheFirst bool) (map[string]*conten
 	if cc.Client == nil {
 		return nil, errors.New("getAllAssets: No client available")
 	}
-	if cc.Cache != nil && cc.Cache.Assets != nil && tryCacheFirst {
-		return cc.Cache.Assets, nil
+	if cc.Cache != nil && cc.Cache.assets != nil && tryCacheFirst {
+		return cc.Cache.assets, nil
 	}
 	col := cc.Client.Assets.List(cc.SpaceID)
 	col.Query.Locale("*").Limit(assetPageSize)
@@ -861,7 +884,7 @@ func updateCacheForContentType(ctx context.Context, results chan ContentTypeResu
 		if err != nil {
 			return err
 		}
-		tempCache.EntryMaps.{{ firstCap $contentType.Sys.ID }} = all{{ firstCap $contentType.Sys.ID }}
+		tempCache.entryMaps.{{ $contentType.Sys.ID }} = all{{ firstCap $contentType.Sys.ID }}
 		if cc.logFn != nil && cc.logLevel <= LogInfo {
 			cc.logFn(map[string]interface{}{"contentType":"{{ $contentType.Sys.ID }}", "method": "updateCacheForContentType", "size":len(all{{ firstCap $contentType.Sys.ID }})}, LogInfo, InfoCachedAllEntries)
 		}
@@ -871,7 +894,7 @@ func updateCacheForContentType(ctx context.Context, results chan ContentTypeResu
 		if err != nil {
 			return err
 		}
-		tempCache.Assets = allAssets
+		tempCache.assets = allAssets
 		if cc.logFn != nil && cc.logLevel <= LogInfo {
 			cc.logFn(map[string]interface{}{"contentType": "asset", "method": "updateCacheForContentType", "size": len(allAssets)}, LogInfo, InfoCachedAllAssets)
 		}

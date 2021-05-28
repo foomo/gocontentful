@@ -18,7 +18,7 @@ const ContentType{{ firstCap $contentType.Sys.ID }} = "{{ $contentType.Sys.ID }}
 
 func (cc *ContentfulClient) GetAll{{ firstCap $contentType.Sys.ID }}() (voMap map[string]*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
 	if cc.Cache != nil {
-		return cc.Cache.EntryMaps.{{ firstCap $contentType.Sys.ID }}, nil
+		return cc.Cache.entryMaps.{{ $contentType.Sys.ID }}, nil
 	}
 	col, err := cc.optimisticPageSizeGetAll("{{ $contentType.Sys.ID }}", cc.optimisticPageSize)
 	if err != nil {
@@ -64,7 +64,7 @@ func (cc *ContentfulClient) Get{{ firstCap $contentType.Sys.ID }}ByID(id string)
 		return nil, errors.New("Get{{ firstCap $contentType.Sys.ID }}ByID: No client available")
 	}
 	if cc.Cache != nil {
-		return cc.Cache.EntryMaps.{{ firstCap $contentType.Sys.ID }}[id], nil
+		return cc.Cache.entryMaps.{{ $contentType.Sys.ID }}[id], nil
 	}
 	col := cc.Client.Entries.List(cc.SpaceID)
 	col.Query.ContentType("{{ $contentType.Sys.ID }}").Locale("*").Include(0).Equal("sys.id",id)
@@ -100,14 +100,14 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) GetParents(contentType ...string
 	parents = []EntryReference{}
 	if vo.CC.Cache != nil {
 		if len(contentType) != 0 {
-			for _, parent := range vo.CC.Cache.ParentMap[vo.Sys.ID] {
+			for _, parent := range vo.CC.Cache.parentMap[vo.Sys.ID] {
 				if parent.ContentType == contentType[0] {
 					parents = append(parents, parent)
 				}
 			}
 			return parents, nil
 		}
-		return vo.CC.Cache.ParentMap[vo.Sys.ID], nil
+		return vo.CC.Cache.parentMap[vo.Sys.ID], nil
 	}
 	if len(contentType) != 1 {
 		return nil, errors.New("GetParents: uncached parentMap queries need a contentType")
@@ -639,9 +639,9 @@ func (cc *ContentfulClient) cache{{ firstCap $contentType.Sys.ID }}ByID(ctx cont
 	if err != nil {
 		return err
 	}
-		{{ $contentType.Sys.ID }}EntryMap := cc.Cache.EntryMaps.{{ firstCap $contentType.Sys.ID }}
-			idContentTypeMap := cc.Cache.IdContentTypeMap
-		parentMap := cc.Cache.ParentMap
+		{{ $contentType.Sys.ID }}EntryMap := cc.Cache.entryMaps.{{ $contentType.Sys.ID }}
+			idContentTypeMap := cc.Cache.idContentTypeMap
+		parentMap := cc.Cache.parentMap
 	// It was deleted
 	if len(col.Items) == 0 {
 		delete({{ $contentType.Sys.ID }}EntryMap, id)
@@ -658,9 +658,9 @@ func (cc *ContentfulClient) cache{{ firstCap $contentType.Sys.ID }}ByID(ctx cont
 			}
 			parentMap[childID] = newParents
 		}
-		cc.Cache.EntryMaps.{{ firstCap $contentType.Sys.ID }} = {{ $contentType.Sys.ID }}EntryMap
-		cc.Cache.IdContentTypeMap = idContentTypeMap
-		cc.Cache.ParentMap = parentMap
+		cc.Cache.entryMaps.{{ $contentType.Sys.ID }} = {{ $contentType.Sys.ID }}EntryMap
+		cc.Cache.idContentTypeMap = idContentTypeMap
+		cc.Cache.parentMap = parentMap
 		return nil
 	}
 		vos, err := colToCf{{ firstCap $contentType.Sys.ID }}(col, cc)
@@ -712,9 +712,9 @@ func (cc *ContentfulClient) cache{{ firstCap $contentType.Sys.ID }}ByID(ctx cont
 		}
 	{{ end }}
 	{{ end }}
-	cc.Cache.EntryMaps.{{ firstCap $contentType.Sys.ID }} = {{ $contentType.Sys.ID }}EntryMap
-	cc.Cache.IdContentTypeMap = idContentTypeMap
-	cc.Cache.ParentMap = parentMap
+	cc.Cache.entryMaps.{{ $contentType.Sys.ID }} = {{ $contentType.Sys.ID }}EntryMap
+	cc.Cache.idContentTypeMap = idContentTypeMap
+	cc.Cache.parentMap = parentMap
 	return nil
 }
 

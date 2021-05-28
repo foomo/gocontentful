@@ -231,9 +231,13 @@ Public function set
 
 **BASE FUNCTIONS COMMON TO ALL CONTENT TYPES**
 
+>**(cc *ContentfulClient) CacheHasContentType**(contentTypeID string) bool
+
+Returns true if the specified contentTypeID is cached by the client, false otherwise.
+
 >**NewContentfulClient**(spaceID string, clientMode string, clientKey string, optimisticPageSize uint16, logFn func(fields map[string]interface{}, level int, args ...interface{}), logLevel int, debug bool) (*ContentfulClient, error)
 
-Creates a Contentful client, this is the first function you need to call. For usage details please refer to the Quickstart above
+Creates a Contentful client, this is the first function you need to call. For usage details please refer to the Quickstart above.
 
 ---
 
@@ -326,6 +330,10 @@ Unpublishes and deletes the entry
 
 ---
 **ASSET FUNCTIONS**
+
+>(cc *ContentfulClient) **DeleteAssetFromCache(key string)** error {
+
+Deletes an asset from the client's cache
 
 >(cc *ContentfulClient) **GetAllAssets()** (map[string]*contentful.Asset, error)
 
