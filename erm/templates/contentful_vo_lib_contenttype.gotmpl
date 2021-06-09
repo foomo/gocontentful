@@ -64,7 +64,11 @@ func (cc *ContentfulClient) Get{{ firstCap $contentType.Sys.ID }}ByID(id string)
 		return nil, errors.New("Get{{ firstCap $contentType.Sys.ID }}ByID: No client available")
 	}
 	if cc.Cache != nil {
-		return cc.Cache.entryMaps.{{ $contentType.Sys.ID }}[id], nil
+		vo, ok := cc.Cache.entryMaps.{{ $contentType.Sys.ID }}[id]
+		if ok {
+			return vo, nil
+		}
+		return nil, fmt.Errorf("Get{{ firstCap $contentType.Sys.ID }}ByID: entry '%s' not found in cache", id)
 	}
 	col := cc.Client.Entries.List(cc.SpaceID)
 	col.Query.ContentType("{{ $contentType.Sys.ID }}").Locale("*").Include(0).Equal("sys.id",id)
