@@ -199,6 +199,7 @@ func (cc *ContentfulClient) GetContentTypeOfID(id string) (string, error) {
 			return ContentType{{ firstCap $contentType.Sys.ID }}, nil
 		}
 		{{ end }}
+		return "", fmt.Errorf("GetContentTypeOfID: %s Not found in cache", id)
 	}
 	col := cc.Client.Entries.List(cc.SpaceID)
 	col.Query.Include(0).Equal("sys.id",id)
@@ -207,7 +208,7 @@ func (cc *ContentfulClient) GetContentTypeOfID(id string) (string, error) {
 		return "", errors.New("GetContentTypeOfID: "+err.Error())
 	}
 	if len(col.Items) == 0 {
-		return "", fmt.Errorf("GetContentTypeOfID: %s Not found", id)
+		return "", fmt.Errorf("GetContentTypeOfID: %s Not found online", id)
 	}
 	var vo genericEntryNoFields
 	byteArray, _ := json.Marshal(col.Items[0])
