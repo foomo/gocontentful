@@ -11,6 +11,7 @@ import (
 	"io"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 	"github.com/foomo/contentful"
 	"golang.org/x/sync/errgroup"
@@ -18,17 +19,21 @@ import (
 
 type cacheEntryMaps struct {
 	{{ range $index , $contentType := $contentTypes }}	{{ $contentType.Sys.ID }} map[string]*Cf{{ firstCap $contentType.Sys.ID }}
+	{{ $contentType.Sys.ID }}GcLock sync.RWMutex
 	{{ end }}
 }
 
 type ClientMode string
 
 type ContentfulCache struct {
-	assets           assetCacheMap
-	contentTypes     []string
-	entryMaps        cacheEntryMaps
-	idContentTypeMap map[string]string
-	parentMap        map[string][]EntryReference // Maps each entry ID to its parents' IDs
+	assets                 assetCacheMap
+	assetsGcLock           sync.RWMutex
+	contentTypes           []string
+	entryMaps              cacheEntryMaps
+	idContentTypeMap       map[string]string
+	idContentTypeMapGcLock sync.RWMutex
+	parentMap              map[string][]EntryReference
+	parentMapGcLock        sync.RWMutex
 }
 
 type assetCacheMap map[string]*contentful.Asset
@@ -112,6 +117,9 @@ var (
 var spaceContentTypes = []string{ {{ range $index , $contentType := $contentTypes }}ContentType{{ firstCap $contentType.Sys.ID }}, {{ end }} }
 
 func (cc *ContentfulClient) CacheHasContentType(contentTypeID string) bool {
+	if cc.Cache == nil {
+		return false
+	}
 	for _, cachedContentType := range cc.Cache.contentTypes {
 		if cachedContentType == contentTypeID {
 			return true
@@ -155,7 +163,9 @@ func (cc *ContentfulClient) GetAssetByID(id string) (*contentful.Asset, error) {
 		return nil, errors.New("GetAssetByID: No client available")
 	}
 	if cc.Cache != nil && cc.Cache.assets != nil {
+		cc.Cache.assetsGcLock.RLock()
 		asset, okAsset := cc.Cache.assets[id]
+		cc.Cache.assetsGcLock.RUnlock()
 		if okAsset {
 			return asset, nil
 		}
@@ -194,7 +204,9 @@ func (cc *ContentfulClient) GetContentTypeOfID(id string) (string, error) {
 	if cc.Cache != nil {
 		okVo := false
 		{{ range $index , $contentType := $contentTypes }}
+		cc.Cache.entryMaps.{{ $contentType.Sys.ID }}GcLock.RLock()
 		_, okVo = cc.Cache.entryMaps.{{ $contentType.Sys.ID }}[id]
+		cc.Cache.entryMaps.{{ $contentType.Sys.ID }}GcLock.RUnlock()
 		if okVo {
 			return ContentType{{ firstCap $contentType.Sys.ID }}, nil
 		}
@@ -288,6 +300,15 @@ func NewAssetFromURL(id string, uploadUrl string, imageFileType string, title st
 func NewContentfulClient(spaceID string, clientMode ClientMode, clientKey string, optimisticPageSize uint16, logFn func(fields map[string]interface{}, level int, args ...interface{}), logLevel int, debug bool) (*ContentfulClient, error) {
 	if spaceID == "" {
 		return nil, errors.New("NewContentfulClient: SpaceID cannot be empty")
+	}
+	if clientMode != ClientModeCMA && clientMode != ClientModeCPA && clientMode != ClientModeCDA {
+		return nil, errors.New("NewContentfulClient: clientMode not supported")
+	}
+	if optimisticPageSize < 10 {
+		return nil, errors.New("NewContentfulClient: optimisticPageSize must be 10 or bigger")
+	}
+	if logLevel < 0 || logLevel > 3 {
+		return nil, errors.New("NewContentfulClient: logLevel must be between 0 and 3")
 	}
 	if clientKey == "" {
 		return nil, errors.New("NewContentfulClient: Please provide an API key")
@@ -415,7 +436,7 @@ func (cc *ContentfulClient) UpdateCacheForEntity(ctx context.Context, sysType st
 	if sysType == sysTypeAsset {
 		contentType = assetWorkerType
 	}
-	if !stringSliceContains(spaceContentTypes, contentType) {
+	if contentType != assetWorkerType && !stringSliceContains(spaceContentTypes, contentType) {
 		return fmt.Errorf("UpdateCache: Content Type %q not available in this space", contentType)
 	}
 	err := updateCacheForContentTypeAndEntity(ctx, cc, sysType, contentType, entityID)
@@ -437,11 +458,48 @@ func FieldToObject(jsonField interface{}, targetObject interface{}) error {
 	return nil
 }
 
+func (cc *ContentfulClient) cacheGcAssetByID(ctx context.Context, id string) error {
+	if cc.Client == nil {
+		return errors.New("cacheGcAssetByID: No client available")
+	}
+	col := cc.Client.Assets.List(cc.SpaceID)
+	col.Query.Locale("*").Equal("sys.id", id)
+	_, err := col.Next()
+	if err != nil {
+		return err
+	}
+	if len(col.Items) == 0 {
+		return errors.New("cacheGcAssetByID: Not found " + id)
+	}
+	item := col.Items[0]
+	asset := contentful.Asset{}
+	byt, err := json.Marshal(item)
+	if err != nil {
+		return err
+	}
+	err = json.Unmarshal(byt, &asset)
+	if err != nil {
+		return err
+	}
+	for _, loc := range []Locale{SpaceLocaleGerman, SpaceLocaleFrench} {
+		if _, ok := asset.Fields.File[string(loc)]; ok {
+			asset.Fields.File[string(loc)].URL = "https:" + asset.Fields.File[string(loc)].URL
+		}
+	}
+	cc.Cache.assetsGcLock.Lock()
+	cc.Cache.assets[id] = &asset
+	cc.Cache.assetsGcLock.Unlock()
+	return nil
+}
+
 func (cc *ContentfulClient) deleteAssetFromCache(key string) error {
+	cc.Cache.assetsGcLock.Lock()
 	if _, ok := cc.Cache.assets[key]; ok {
 		delete(cc.Cache.assets, key)
+		cc.Cache.assetsGcLock.Unlock()
 		return nil
 	}
+	cc.Cache.assetsGcLock.Unlock()
 	return errors.New("asset not found in cache, could not delete")
 }
 
@@ -908,6 +966,14 @@ func updateCacheForContentTypeAndEntity(ctx context.Context, cc *ContentfulClien
 		return ctx.Err()
 	}
 	switch contentType {
+	case assetWorkerType:
+		err := cc.cacheGcAssetByID(ctx, entityID)
+		if err != nil {
+			return err
+		}
+		if cc.logFn != nil && cc.logLevel <= LogInfo {
+			cc.logFn(map[string]interface{}{"contentType": "Asset", "method": "updateCacheForContentTypeAndEntity", "entityID": entityID}, LogInfo, InfoUpdatedEntityCache)
+		}
 	{{ range $index , $contentType := $contentTypes }}
 	case ContentType{{ firstCap $contentType.Sys.ID }}:
 		err := cc.cache{{ firstCap $contentType.Sys.ID }}ByID(ctx, entityID)
@@ -915,7 +981,7 @@ func updateCacheForContentTypeAndEntity(ctx context.Context, cc *ContentfulClien
 			return err
 		}
 		if cc.logFn != nil && cc.logLevel <= LogInfo {
-			cc.logFn(map[string]interface{}{"contentType": "{{ $contentType.Sys.ID }}", "method": "updateCacheForContentType", "entityID": entityID}, LogInfo, InfoUpdatedEntityCache)
+			cc.logFn(map[string]interface{}{"contentType": "{{ $contentType.Sys.ID }}", "method": "updateCacheForContentTypeAndEntity", "entityID": entityID}, LogInfo, InfoUpdatedEntityCache)
 		}
 	{{ end }}
 	}

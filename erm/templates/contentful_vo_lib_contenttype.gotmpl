@@ -64,7 +64,9 @@ func (cc *ContentfulClient) Get{{ firstCap $contentType.Sys.ID }}ByID(id string)
 		return nil, errors.New("Get{{ firstCap $contentType.Sys.ID }}ByID: No client available")
 	}
 	if cc.Cache != nil {
+		cc.Cache.entryMaps.{{ $contentType.Sys.ID }}GcLock.RLock()
 		vo, ok := cc.Cache.entryMaps.{{ $contentType.Sys.ID }}[id]
+		cc.Cache.entryMaps.{{ $contentType.Sys.ID }}GcLock.RUnlock()
 		if ok {
 			return vo, nil
 		}
@@ -643,28 +645,25 @@ func (cc *ContentfulClient) cache{{ firstCap $contentType.Sys.ID }}ByID(ctx cont
 	if err != nil {
 		return err
 	}
-		{{ $contentType.Sys.ID }}EntryMap := cc.Cache.entryMaps.{{ $contentType.Sys.ID }}
-			idContentTypeMap := cc.Cache.idContentTypeMap
-		parentMap := cc.Cache.parentMap
+	cc.Cache.entryMaps.{{ $contentType.Sys.ID }}GcLock.Lock()
+	cc.Cache.idContentTypeMapGcLock.Lock()
+	cc.Cache.parentMapGcLock.Lock()
 	// It was deleted
 	if len(col.Items) == 0 {
-		delete({{ $contentType.Sys.ID }}EntryMap, id)
-		delete(idContentTypeMap, id)
+		delete(cc.Cache.entryMaps.{{ $contentType.Sys.ID }}, id)
+		delete(cc.Cache.idContentTypeMap, id)
 		// delete as child
-		delete(parentMap, id)
+		delete(cc.Cache.parentMap, id)
 		// delete as parent
-		for childID, child := range parentMap {
+		for childID, child := range cc.Cache.parentMap {
 			newParents := []EntryReference{}
 			for _, parent := range child {
 				if parent.ID != id {
 					newParents = append(newParents, parent)
 				}
 			}
-			parentMap[childID] = newParents
+			cc.Cache.parentMap[childID] = newParents
 		}
-		cc.Cache.entryMaps.{{ $contentType.Sys.ID }} = {{ $contentType.Sys.ID }}EntryMap
-		cc.Cache.idContentTypeMap = idContentTypeMap
-		cc.Cache.parentMap = parentMap
 		return nil
 	}
 		vos, err := colToCf{{ firstCap $contentType.Sys.ID }}(col, cc)
@@ -672,25 +671,25 @@ func (cc *ContentfulClient) cache{{ firstCap $contentType.Sys.ID }}ByID(ctx cont
 		return fmt.Errorf("cache{{ firstCap $contentType.Sys.ID }}ByID: Error converting %s to VO: "+err.Error(), id)
 	}
 	{{ $contentType.Sys.ID }} := vos[0]
-	{{ $contentType.Sys.ID }}EntryMap[id] = {{ $contentType.Sys.ID }}
-			idContentTypeMap[id] = {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID
+	cc.Cache.entryMaps.{{ $contentType.Sys.ID }}[id] = {{ $contentType.Sys.ID }}
+			cc.Cache.idContentTypeMap[id] = {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID
 	{{ range $fieldIndex, $field := $contentType.Fields }}
 	{{ if fieldIsMultipleReference $field }}
 	for _, loc := range cc.locales {
 		children, okChildren := {{ $contentType.Sys.ID }}.Fields.{{ firstCap $field.ID }}[string(loc)]
 		if okChildren {
 			for _, child := range children {
-				if parentMap[child.Sys.ID] == nil {
-					parentMap[child.Sys.ID] = []EntryReference{}
+				if cc.Cache.parentMap[child.Sys.ID] == nil {
+					cc.Cache.parentMap[child.Sys.ID] = []EntryReference{}
 				}
 				found := false
-				for _, parent := range parentMap[child.Sys.ID] {
+				for _, parent := range cc.Cache.parentMap[child.Sys.ID] {
 					if parent.ID == id {
 						found = true
 					}
 				}
 				if !found {
-					parentMap[child.Sys.ID] = append(parentMap[child.Sys.ID], EntryReference{ContentType: {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID, ID: {{ $contentType.Sys.ID }}.Sys.ID, VO: {{ $contentType.Sys.ID }}})
+					cc.Cache.parentMap[child.Sys.ID] = append(cc.Cache.parentMap[child.Sys.ID], EntryReference{ContentType: {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID, ID: {{ $contentType.Sys.ID }}.Sys.ID, VO: {{ $contentType.Sys.ID }}})
 				}
 			}
 		}
@@ -700,25 +699,25 @@ func (cc *ContentfulClient) cache{{ firstCap $contentType.Sys.ID }}ByID(ctx cont
 		for _, loc := range cc.locales {
 			child, okChild := {{ $contentType.Sys.ID }}.Fields.{{ firstCap $field.ID }}[string(loc)]
 			if okChild {
-				if parentMap[child.Sys.ID] == nil {
-					parentMap[child.Sys.ID] = []EntryReference{}
+				if cc.Cache.parentMap[child.Sys.ID] == nil {
+					cc.Cache.parentMap[child.Sys.ID] = []EntryReference{}
 				}
 				found := false
-				for _, parent := range parentMap[child.Sys.ID] {
+				for _, parent := range cc.Cache.parentMap[child.Sys.ID] {
 					if parent.ID == id {
 						found = true
 					}
 				}
 				if !found {
-					parentMap[child.Sys.ID] = append(parentMap[child.Sys.ID], EntryReference{ContentType: {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID, ID: {{ $contentType.Sys.ID }}.Sys.ID, VO: {{ $contentType.Sys.ID }}})
+					cc.Cache.parentMap[child.Sys.ID] = append(cc.Cache.parentMap[child.Sys.ID], EntryReference{ContentType: {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID, ID: {{ $contentType.Sys.ID }}.Sys.ID, VO: {{ $contentType.Sys.ID }}})
 				}
 			}
 		}
 	{{ end }}
 	{{ end }}
-	cc.Cache.entryMaps.{{ $contentType.Sys.ID }} = {{ $contentType.Sys.ID }}EntryMap
-	cc.Cache.idContentTypeMap = idContentTypeMap
-	cc.Cache.parentMap = parentMap
+	cc.Cache.entryMaps.{{ $contentType.Sys.ID }}GcLock.Unlock()
+	cc.Cache.idContentTypeMapGcLock.Unlock()
+	cc.Cache.parentMapGcLock.Unlock()
 	return nil
 }
 
