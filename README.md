@@ -120,9 +120,13 @@ The cache update uses 4 workers to speed up the process. This is safe since Cont
 
 All functions that query the space through ERM are cache-transparent: if a cache is available data will be loaded from there, otherwise it will be sourced from Contentful.
 
-Note that when something changes in the space at Contentful you need to regenerate the cache. This can be done setting up a webhook at Contentful and handling it in your service.
+gocontentful also supports selective entry and asset cache updates through the following method:
 
-_@TODO: implement support for Contentful's sync API for selective updates of the cache_ 
+<pre><code>err = cc.UpdateCacheForEntity(context, sysType, contentType, entityID string)
+</code></pre>
+
+Note that when something changes in the space at Contentful you need to regenerate the cache. This can be done setting up a webhook at Contentful and handling its call in your service through one of the cache update methods. It's highly recommended that you regenerate the entire CDA cache when something is published (because you want production data to be 100% up to date in your application) and that you only update a single entry in the cache for the CPA cache (because it's a whole lot faster for preview features).
+ 
 
 ### Have fun with persons and pets
 
@@ -226,18 +230,29 @@ You'll write your own unit tests using the generated code, but the generator its
 
 _@TODO: add sample space data and unit tests_ 
 
-Public function set
+Public functions and methods
 ---------------------
 
-**BASE FUNCTIONS COMMON TO ALL CONTENT TYPES**
-
->**(cc *ContentfulClient) CacheHasContentType**(contentTypeID string) bool
-
-Returns true if the specified contentTypeID is cached by the client, false otherwise.
+**BASE FUNCTIONS**
 
 >**NewContentfulClient**(spaceID string, clientMode string, clientKey string, optimisticPageSize uint16, logFn func(fields map[string]interface{}, level int, args ...interface{}), logLevel int, debug bool) (*ContentfulClient, error)
 
 Creates a Contentful client, this is the first function you need to call. For usage details please refer to the Quickstart above.
+
+**SPACE CACHING** 
+
+>(cc *ContentfulClient) **CacheHasContentType**(contentTypeID string) bool
+
+Returns true if the specified contentTypeID is cached by the client, false otherwise.
+
+>(cc *ContentfulClient) **UpdateCache**(ctx context.Context, contentTypes []string, cacheAssets bool) error
+
+Builds or re-builds the entire client cache.
+
+>(cc *ContentfulClient) **UpdateCacheForEntity**(ctx context.Context, sysType string, contentType string, entityID string) error
+
+Updates a single entry or asset (the sysType can take const sysTypeEntry or sysTypeAsset values) in the cache. 
+
 
 ---
 
@@ -265,13 +280,17 @@ Retrieves the Person entry with the specified ID.
 
 **REFERENCE CONVERSION AND CONTENT TYPE FUNCTIONS**
 
->(vo *CfPerson) **ToReference**() (refSys ContentTypeSys) 
+>**(ref ContentfulReferencedEntry) ContentType() (contentType string)**
 
-Converts a value object into a reference that can be added to a reference field of an entry. Note that functions that retrieve referenced entries return a more flexible and useful _[]*EntryReference_ (see Quickstart above) but to store a reference you need a ContentTypeSys.
+Returns the Sys.ID of the content type of the referenced entry
 
 >(cc *ContentfulClient) **GetContentTypeOfID**(ID string) (contentType string)
 
 Returns the Contentful content type of an entry ID.
+
+>(vo *CfPerson) **ToReference**() (refSys ContentTypeSys) 
+
+Converts a value object into a reference that can be added to a reference field of an entry. Note that functions that retrieve referenced entries return a more flexible and useful _[]*EntryReference_ (see Quickstart above) but to store a reference you need a ContentTypeSys.
 
 ---
 
@@ -331,6 +350,10 @@ Unpublishes and deletes the entry
 ---
 **ASSET FUNCTIONS**
 
+>(cc *ContentfulClient) **DeleteAsset(asset *contentful.Asset)** error
+
+Deletes an asset from the space (only available in CMA)
+
 >(cc *ContentfulClient) **DeleteAssetFromCache(key string)** error {
 
 Deletes an asset from the client's cache
@@ -356,7 +379,11 @@ Converts the asset to a reference. You need to do this before you add the asset 
 Deletes an asset from a space by its ID (only available for _ClientModeCMA_)
 
 ---
-**HELPER FUNCTIONS**
+**HELPER FUNCTIONS AND METHODS**
+
+>**FieldToObject**(jsonField interface{}, targetObject interface{}) error
+
+Converts a JSON field into an object. Make sure you pass a pointer to an object which type has JSON definition for all fields you want to retrieve.
 
 >**HtmlToRichText**(htmlSrc string) *RichTextNode
 
@@ -373,10 +400,6 @@ Converts an interface representing a Contentful RichText value (usually from a f
 >type ImageResolverFunc func(assetID string, locale Locale) (attrs map[string]string, resolveError error)
 
 All the three functions above can be passed as nil with different levels of graceful degrading. 
-
->**FieldToObject**(jsonField interface{}, targetObject interface{}) error
-
-Converts a JSON field into an object. Make sure you pass a pointer to an object which type has JSON definition for all fields you want to retrieve.
 
 ---
 
