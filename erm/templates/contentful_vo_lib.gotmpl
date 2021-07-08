@@ -481,7 +481,7 @@ func (cc *ContentfulClient) cacheGcAssetByID(ctx context.Context, id string) err
 	if err != nil {
 		return err
 	}
-	for _, loc := range []Locale{SpaceLocaleGerman, SpaceLocaleFrench} {
+	for _, loc := range []Locale{ {{ range $index , $locale := $locales }}SpaceLocale{{ onlyLetters $locale.Name }},{{end}} } {
 		if _, ok := asset.Fields.File[string(loc)]; ok {
 			asset.Fields.File[string(loc)].URL = "https:" + asset.Fields.File[string(loc)].URL
 		}
