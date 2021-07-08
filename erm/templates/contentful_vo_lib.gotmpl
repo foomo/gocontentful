@@ -362,15 +362,19 @@ func RichTextToHtml(rt interface{}, linkResolver LinkResolverFunc, entryLinkReso
 
 func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []string, cacheAssets bool) error {
 	start := time.Now()
+	if contentTypes == nil {
+		contentTypes = spaceContentTypes
+	} else {
+		for _, contentType := range contentTypes {
+			if !stringSliceContains(spaceContentTypes, contentType) {
+				return fmt.Errorf("UpdateCache: Content Type %q not available in this space", contentType)
+			}
+		}
+	}
 	tempCache := &ContentfulCache{
 		contentTypes:     contentTypes,
 		idContentTypeMap: map[string]string{},
 		parentMap:        map[string][]EntryReference{},
-	}
-	for _, contentType := range contentTypes {
-		if !stringSliceContains(spaceContentTypes, contentType) {
-			return fmt.Errorf("UpdateCache: Content Type %q not available in this space", contentType)
-		}
 	}
 	if cacheAssets {
 		contentTypes = append([]string{assetWorkerType}, contentTypes...)

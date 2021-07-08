@@ -11,12 +11,18 @@ import (
 	"github.com/foomo/gocontentful/erm"
 )
 
-func usageError(comment string) {
-	fmt.Println("ERROR:", comment)
+const VERSION = "v0.9.5"
+
+var Usage = func() {
 	fmt.Printf("\nSYNOPSIS\n")
 	fmt.Printf("     gocontentful -spaceid SpaceID -cmakey CMAKey [-contenttypes firsttype,secondtype...lasttype] path/to/target/package\n\n")
-	flag.Usage()
+	flag.PrintDefaults()
 	fmt.Printf("\nNote: The last segment of the path/to/target/package will be used as package name\n\n")
+}
+
+func usageError(comment string) {
+	fmt.Println("ERROR:", comment)
+	Usage()
 	os.Exit(1)
 }
 
@@ -26,13 +32,23 @@ func fatal(infos ...interface{}) {
 }
 
 func main() {
-	fmt.Printf("Contentful API Generator starting...\n\n")
 	// Get parameters from cmd line flags
 	flagSpaceID := flag.String("spaceid", "", "Contentful space ID")
 	flagCMAKey := flag.String("cmakey", "", "Contentful CMA key")
 	flagContentTypes := flag.String("contenttypes", "", "[Optional] Content type IDs to parse, comma separated")
-
+	flagVersion := flag.Bool("version", false, "Print version and exit")
+	flagHelp := flag.Bool("help", false, "Print version and exit")
 	flag.Parse()
+
+	if *flagVersion {
+		fmt.Println(VERSION)
+		os.Exit(0)
+	}
+
+	if *flagHelp {
+		Usage()
+		os.Exit(0)
+	}
 
 	if *flagSpaceID == "" || *flagCMAKey == "" {
 		usageError("Please specify the Contentful space ID and access Key")
@@ -49,6 +65,8 @@ func main() {
 	if !matched {
 		usageError("Please specify the package name correctly (only small caps letters)")
 	}
+
+	fmt.Printf("Contentful API Generator starting...\n\n")
 
 	var flagContentTypesSlice []string
 	if *flagContentTypes != "" {
