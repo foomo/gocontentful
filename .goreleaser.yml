@@ -6,7 +6,7 @@ builds:
     env:
       - CGO_ENABLED=0
     ldflags:
-      - -s -w -X github.com/foomo/gocontentful/VERSION={{.Version}}
+      - -s -w -X github.com/foomo/gocontentful.VERSION={{.Version}}
     goos:
       - windows
       - darwin
