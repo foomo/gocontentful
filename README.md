@@ -27,11 +27,25 @@ Quickstart
 
 Prerequisite: you need Go 1.16+. Upgrade if you still haven't, then run:
 
-> go get github.com/foomo/gocontentful
+```bash
+go get github.com/foomo/gocontentful
+```
+
+If you trust us there are precompiled versions:
+
+[releases](https://github.com/foomo/gocontentful/releases)
+
+On the mac:
+
+```bash
+brew install foomo/gocontentful/gocontentful
+```
 
 Test the installation (make sure $GOPATH/bin is in your $PATH):
 
->gocontentful
+```bash
+gocontentful
+```
 
 <pre><code>Contentful API Generator starting...
 
@@ -51,13 +65,15 @@ Usage of gocontentful:
 Note: The last segment of the path/to/target/package will be used as package name
 </code></pre>
 
-###Use case
+### Use case
 
 - You want to generate a package named "people" and manipulate entries of content types with ID "person" and "pet".
 
 Run the following:
 
->gocontentful -spaceid YOUR_SPACE_ID -cmakey YOUR_CMA_API_TOKEN -contenttypes person,pet path/to/your/go/project/folder/people 
+```bash
+gocontentful -spaceid YOUR_SPACE_ID -cmakey YOUR_CMA_API_TOKEN -contenttypes person,pet path/to/your/go/project/folder/people 
+```
 
 The -contenttypes parameter is optional. If not specified, an API for all content types of the space will be generated.
 
