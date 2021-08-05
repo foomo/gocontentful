@@ -128,6 +128,28 @@ func (cc *ContentfulClient) CacheHasContentType(contentTypeID string) bool {
 	return false
 }
 
+func (cc *ContentfulClient) ClientStats() {
+	if cc.logFn != nil {
+		cached := false
+		if cc.Cache != nil {
+			cached = true
+		}
+		fieldsMap := map[string]interface{}{
+			"space ID":     cc.SpaceID,
+			"clientMode":   cc.clientMode,
+			"contentTypes": strings.Join(cc.Cache.contentTypes, ","),
+			"locales":      cc.locales,
+			"cached":       cached,
+		}
+		if cached {
+			fieldsMap["cache asset count"] = len(cc.Cache.assets)
+			fieldsMap["cache entry count"] = len(cc.Cache.idContentTypeMap)
+			fieldsMap["cache parentMap length"] = len(cc.Cache.parentMap)
+		}
+		cc.logFn(fieldsMap, LogInfo, "Contentful ClientStats")
+	}
+}
+
 func (ref ContentfulReferencedEntry) ContentType() (contentType string) {
 	return ref.Entry.Sys.ContentType.Sys.ID
 }
