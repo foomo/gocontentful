@@ -251,7 +251,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 			if vo.CC.logFn != nil && vo.CC.logLevel <= LogError {
 				vo.CC.logFn(map[string]interface{}{"content type":vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method":"{{ firstCap $field.ID }}()"}, LogError, ErrNoTypeOfRefEntry)
 			}
-			return nil
+			continue
 		}
 		switch contentType {
 		{{ range $index , $contentType := $contentTypes }}
@@ -361,7 +361,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 			if vo.CC.logFn != nil && vo.CC.logLevel == LogDebug {
 				vo.CC.logFn(map[string]interface{}{"content type":vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method":"{{ firstCap $field.ID }}()"}, LogError, ErrNoTypeOfRefAsset)
 			}
-			return nil
+			continue
 		}
 		tempAsset := &contentful.AssetNoLocale{}
 		tempAsset.Sys = asset.Sys

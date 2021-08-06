@@ -294,7 +294,7 @@ Retrieves the Person entry with the specified ID.
 
 ---
 
-**REFERENCE CONVERSION AND CONTENT TYPE FUNCTIONS**
+**REFERENCE AND CONTENT TYPE FUNCTIONS**
 
 >**(ref ContentfulReferencedEntry) ContentType() (contentType string)**
 
@@ -308,6 +308,15 @@ Returns the Contentful content type of an entry ID.
 
 Converts a value object into a reference that can be added to a reference field of an entry. Note that functions that retrieve referenced entries return a more flexible and useful _[]*EntryReference_ (see Quickstart above) but to store a reference you need a ContentTypeSys.
 
+>(vo *CfPerson) **GetParents**() (parents []EntryReference, err error) 
+
+>(ref *EntryReference) **GetParents**(cc *ContentfulClient) (parents []EntryReference, err error) 
+
+Return a slice of EntryReference objects that represent entries that reference the value object or the entry reference. 
+
+Note that in case of parents of an entry reference: 
+1. you need to pass a pointer to a ContentfulClient because EntryReference objects are generic and can't carry any.
+2. this method currently only works in cached mode 
 ---
 
 **ENTRY FIELD GETTERS**

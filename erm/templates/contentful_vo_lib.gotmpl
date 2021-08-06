@@ -253,6 +253,19 @@ func (cc *ContentfulClient) GetContentTypeOfID(id string) (string, error) {
 	return vo.Sys.ContentType.Sys.ID, nil
 }
 
+func (ref *EntryReference) GetParents(cc *ContentfulClient) (parents []EntryReference, err error) {
+	if ref == nil {
+		return nil, errors.New("GetParents: reference is nil!")
+	}
+	if cc == nil {
+		return nil, errors.New("GetParents: Contentful client is nil!")
+	}
+	if cc.Cache == nil {
+		return nil, errors.New("GetParents: only available in cached mode")
+	}
+	return cc.Cache.parentMap[ref.ID], nil
+}
+
 func HtmlToRichText(htmlSrc string) *RichTextNode {
 	htmlClean := strings.TrimSpace(htmlSrc)
 	htmlClean = strings.ReplaceAll(htmlClean, `&nbsp;`, ` `)
