@@ -3,7 +3,7 @@ module github.com/foomo/gocontentful
 go 1.16
 
 require (
-	github.com/foomo/contentful v0.3.5
+	github.com/foomo/contentful v0.3.6
 	github.com/smartystreets/goconvey v1.6.4 // indirect
 	github.com/stretchr/testify v1.7.0 // indirect
 	golang.org/x/mod v0.4.2 // indirect

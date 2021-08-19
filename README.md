@@ -255,6 +255,10 @@ Public functions and methods
 
 Creates a Contentful client, this is the first function you need to call. For usage details please refer to the Quickstart above.
 
+>**SetEnvironment**(environment string) 
+
+Sets the Contentful client's environment. All subsequent API calls will be directed to that environment in the selected space. Pass an empty string to reset to the _master_ environment. 
+
 **SPACE CACHING** 
 
 >(cc *ContentfulClient) **CacheHasContentType**(contentTypeID string) bool

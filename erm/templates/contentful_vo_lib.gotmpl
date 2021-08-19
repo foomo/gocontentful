@@ -395,6 +395,11 @@ func RichTextToHtml(rt interface{}, linkResolver LinkResolverFunc, entryLinkReso
 	return out, nil
 }
 
+func (cc *ContentfulClient) SetEnvironment(environment string) {
+	cc.Client.Environment = environment
+	return
+}
+
 func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []string, cacheAssets bool) error {
 	start := time.Now()
 	if contentTypes == nil {
