@@ -156,7 +156,7 @@ Load a specific person:
 
 `person, err := cc.GetPersonByID(THE_PERSON_ID)`
 
-ERM provides getters and setters for all fields in the entry. Get that person's name (assuming the entry has a "name" field):
+Gocontentful provides getters and setters for all fields in the entry. Get that person's name (assuming the entry has a "name" field):
 
 `name := person.Name() // returns Jane`
 
@@ -168,15 +168,15 @@ Note that constants are available for all locales supported by the space. If a s
 
 Contentful supports Rich Text editing and sooner or later you'll want to convert that to HTML:
 
-`htmlText := people.RichTextToHtml(person.Resume(), linkResolver, entryLinkResolver, imageResolver, locale)`
+`htmlText := people.RichTextToHtml(person.Resume(), linkResolver, entryLinkResolver, imageResolver, embeddedEntryResolver locale)`
 
-_Note: linkResolver, entryLinkResolver and imageResolver are functions that resolve URLs for links and attributes for embedded image assets. See API documentation below._
+_Note: linkResolver, entryLinkResolver, embeddedEntryResolver and imageResolver are functions that resolve URLs for links and attributes for embedded image assets or return the HTML snippet for an embedded entry in RichText. See API documentation below._
 
 ...or the other way around (often used when digesting data from external sources):
 
 `myRichText := HtmlToRichText(htmlSrc)`
 
-ERM supports references out of the box, the internals of how those are managed at the API level are completely transparet. To get a list of Jane's pets (assuming _pets_ is a multiple reference field) just do:
+Gocontentful supports references out of the box, the internals of how those are managed at the API level are completely transparet. To get a list of Jane's pets (assuming _pets_ is a multiple reference field) just do:
 
 `pets := person.Pets()`
 
@@ -427,6 +427,8 @@ Converts an interface representing a Contentful RichText value (usually from a f
 >type EntryLinkResolverFunc func(entryID string, locale Locale) (resolvedAttrs map[string]string, resolveError error)
 
 >type ImageResolverFunc func(assetID string, locale Locale) (attrs map[string]string, resolveError error)
+
+>type EmbeddedEntryResolverFunc func(entryID string, locale Locale) (html string, resolveError error)
 
 All the three functions above can be passed as nil with different levels of graceful degrading. 
 

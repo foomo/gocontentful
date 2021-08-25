@@ -68,6 +68,7 @@ type EntryReference struct {
 type ImageResolverFunc func(assetID string, locale Locale) (attrs map[string]string, resolveError error)
 type EntryLinkResolverFunc func(entryID string, locale Locale) (resolvedAttrs map[string]string, resolveError error)
 type LinkResolverFunc func(url string) (resolvedAttrs map[string]string, resolveError error)
+type EmbeddedEntryResolverFunc func(entryID string, locale Locale) (htmlSnippet string, resolveError error)
 
 type Locale string
 
@@ -373,7 +374,7 @@ func NewContentfulClient(spaceID string, clientMode ClientMode, clientKey string
 	return cc, nil
 }
 
-func RichTextToHtml(rt interface{}, linkResolver LinkResolverFunc, entryLinkResolver EntryLinkResolverFunc, imageResolver ImageResolverFunc, locale Locale) (string, error) {
+func RichTextToHtml(rt interface{}, linkResolver LinkResolverFunc, entryLinkResolver EntryLinkResolverFunc, imageResolver ImageResolverFunc, embeddedEntryResolver EmbeddedEntryResolverFunc, locale Locale) (string, error) {
 	w := bytes.NewBuffer([]byte{})
 	node := &RichTextGenericNode{}
 	byt, err := json.Marshal(rt)
@@ -384,7 +385,7 @@ func RichTextToHtml(rt interface{}, linkResolver LinkResolverFunc, entryLinkReso
 	if err != nil {
 		return "", err
 	}
-	err = node.richTextRenderHTML(w, linkResolver, entryLinkResolver, imageResolver, locale)
+	err = node.richTextRenderHTML(w, linkResolver, entryLinkResolver, imageResolver, embeddedEntryResolver, locale)
 	if err != nil {
 		return "", err
 	}
@@ -840,7 +841,7 @@ func richTextHtmlTagType(htmlLine string) string {
 	return ""
 }
 
-func (n *RichTextGenericNode) richTextRenderHTML(w io.Writer, linkResolver LinkResolverFunc, entryLinkResolver EntryLinkResolverFunc, imageResolver ImageResolverFunc, locale Locale) (err error) {
+func (n *RichTextGenericNode) richTextRenderHTML(w io.Writer, linkResolver LinkResolverFunc, entryLinkResolver EntryLinkResolverFunc, imageResolver ImageResolverFunc, embeddedEntryResolver EmbeddedEntryResolverFunc, locale Locale) (err error) {
 	if linkResolver == nil {
 		linkResolver = func(url string) (transformedAttrs map[string]string, err error) {
 			return map[string]string{
@@ -853,8 +854,12 @@ func (n *RichTextGenericNode) richTextRenderHTML(w io.Writer, linkResolver LinkR
 			return map[string]string{}, nil
 		}
 	}
+	if embeddedEntryResolver == nil {
+		embeddedEntryResolver = func(entryID string, locale Locale) (htmlSnippet string, err error) {
+			return "", nil
+		}
+	}
 	tags := richTextHtmlTags{}
-
 	switch n.NodeType {
 	case RichTextNodeParagraph:
 		tags = []richTextHtmlTag{ {name: HtmlParagraph} }
@@ -933,6 +938,25 @@ func (n *RichTextGenericNode) richTextRenderHTML(w io.Writer, linkResolver LinkR
 			return err
 		}
 		tags = []richTextHtmlTag{richTextHtmlTag{name: HtmlImage, attrs: attrs}}
+	case RichTextNodeEmbeddedEntry:
+		dataObj := RichTextData{}
+		byt, errMarshal := json.Marshal(n.Data)
+		if errMarshal != nil {
+			return errMarshal
+		}
+		errUnmarshal := json.Unmarshal(byt, &dataObj)
+		if errUnmarshal != nil {
+			return errUnmarshal
+		}
+		if dataObj.Target == nil {
+			return errors.New("Data target is empty")
+		}
+		rawHTML, errResolve := embeddedEntryResolver(dataObj.Target.Sys.ID, locale)
+		if errResolve != nil {
+			return errResolve
+		}
+		w.Write([]byte(rawHTML))
+		return
 	default:
 	}
 	for _, m := range n.Marks {
@@ -957,7 +981,7 @@ func (n *RichTextGenericNode) richTextRenderHTML(w io.Writer, linkResolver LinkR
 	tags.richTextHtmlTagsOpen(w)
 	w.Write([]byte(strings.Replace(html.EscapeString(n.Value), "\n", "<br/>", -1)))
 	for _, subNode := range n.Content {
-		errSubNode := subNode.richTextRenderHTML(w, linkResolver, entryLinkResolver, imageResolver, locale)
+		errSubNode := subNode.richTextRenderHTML(w, linkResolver, entryLinkResolver, imageResolver, embeddedEntryResolver, locale)
 		if errSubNode != nil {
 			err = errSubNode
 			return
