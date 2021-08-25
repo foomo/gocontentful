@@ -331,8 +331,10 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 	}
 	{{ $field.ID }} := []*contentful.AssetNoLocale{}
 	loc := defaultLocale
+	reqLoc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
+		reqLoc = locale[0]
 		if _, ok := localeFallback[loc]; !ok {
 			if vo.CC.logFn != nil && vo.CC.logLevel <= LogError {
 				vo.CC.logFn(map[string]interface{}{"content type":vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method":"{{ firstCap $field.ID }}()"}, LogError, ErrLocaleUnsupported)
@@ -366,9 +368,21 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 		tempAsset := &contentful.AssetNoLocale{}
 		tempAsset.Sys = asset.Sys
 		tempAsset.Fields = &contentful.FileFieldsNoLocale{}
-		tempAsset.Fields.Title = asset.Fields.Title[string(loc)]
-		tempAsset.Fields.Description = asset.Fields.Description[string(loc)]
-		tempAsset.Fields.File = asset.Fields.File[string(loc)]
+		if _, ok := asset.Fields.Title[string(reqLoc)]; ok {
+			tempAsset.Fields.Title = asset.Fields.Title[string(reqLoc)]
+		} else {
+			tempAsset.Fields.Title = asset.Fields.Title[string(loc)]
+		}
+		if _, ok := asset.Fields.Description[string(reqLoc)]; ok {
+			tempAsset.Fields.Description = asset.Fields.Description[string(reqLoc)]
+		} else {
+			tempAsset.Fields.Description = asset.Fields.Description[string(loc)]
+		}
+		if _, ok := asset.Fields.File[string(reqLoc)]; ok {
+			tempAsset.Fields.File = asset.Fields.File[string(reqLoc)]
+		} else {
+			tempAsset.Fields.File = asset.Fields.File[string(loc)]
+		}
 		{{ $field.ID }} = append({{ $field.ID }}, tempAsset)
 	}
 	return {{ $field.ID }}
@@ -380,8 +394,10 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 		return nil
 	}
 	loc := defaultLocale
+	reqLoc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
+		reqLoc = locale[0]
 		if _, ok := localeFallback[loc]; !ok {
 			if vo.CC.logFn != nil && vo.CC.logLevel <= LogError {
 				vo.CC.logFn(map[string]interface{}{"content type":vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method":"{{ firstCap $field.ID }}()"}, LogError, ErrLocaleUnsupported)
@@ -415,9 +431,21 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 	tempAsset := &contentful.AssetNoLocale{}
 	tempAsset.Sys = asset.Sys
 	tempAsset.Fields = &contentful.FileFieldsNoLocale{}
-	tempAsset.Fields.Title = asset.Fields.Title[string(loc)]
-	tempAsset.Fields.Description = asset.Fields.Description[string(loc)]
-	tempAsset.Fields.File = asset.Fields.File[string(loc)]
+	if _, ok := asset.Fields.Title[string(reqLoc)]; ok {
+		tempAsset.Fields.Title = asset.Fields.Title[string(reqLoc)]
+	} else {
+		tempAsset.Fields.Title = asset.Fields.Title[string(loc)]
+	}
+	if _, ok := asset.Fields.Description[string(reqLoc)]; ok {
+		tempAsset.Fields.Description = asset.Fields.Description[string(reqLoc)]
+	} else {
+		tempAsset.Fields.Description = asset.Fields.Description[string(loc)]
+	}
+	if _, ok := asset.Fields.File[string(reqLoc)]; ok {
+		tempAsset.Fields.File = asset.Fields.File[string(reqLoc)]
+	} else {
+		tempAsset.Fields.File = asset.Fields.File[string(loc)]
+	}
 	return tempAsset
 }
 {{ end }}
