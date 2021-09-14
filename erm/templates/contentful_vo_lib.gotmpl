@@ -130,6 +130,10 @@ func (cc *ContentfulClient) CacheHasContentType(contentTypeID string) bool {
 }
 
 func (cc *ContentfulClient) ClientStats() {
+	if cc == nil {
+		cc.logFn(nil, LogWarn, "ClientStats: no client available")
+		return
+	}
 	if cc.logFn != nil {
 		cached := false
 		if cc.Cache != nil {
@@ -137,6 +141,7 @@ func (cc *ContentfulClient) ClientStats() {
 		}
 		fieldsMap := map[string]interface{}{
 			"space ID":     cc.SpaceID,
+			"environment":  cc.Client.Environment,
 			"clientMode":   cc.clientMode,
 			"contentTypes": strings.Join(cc.Cache.contentTypes, ","),
 			"locales":      cc.locales,
@@ -156,7 +161,7 @@ func (ref ContentfulReferencedEntry) ContentType() (contentType string) {
 }
 
 func (cc *ContentfulClient) DeleteAsset(asset *contentful.Asset) error {
-	if cc.Client == nil {
+	if cc == nil || cc.Client == nil {
 		return errors.New("DeleteAsset: No client available")
 	}
 	if cc.clientMode != ClientModeCMA {
@@ -182,7 +187,7 @@ func (cc *ContentfulClient) GetAllAssets() (map[string]*contentful.Asset, error)
 }
 
 func (cc *ContentfulClient) GetAssetByID(id string) (*contentful.Asset, error) {
-	if cc.Client == nil {
+	if cc == nil || cc.Client == nil {
 		return nil, errors.New("GetAssetByID: No client available")
 	}
 	if cc.Cache != nil && cc.Cache.assets != nil {
@@ -221,7 +226,7 @@ func (cc *ContentfulClient) GetAssetByID(id string) (*contentful.Asset, error) {
 }
 
 func (cc *ContentfulClient) GetContentTypeOfID(id string) (string, error) {
-	if cc.Client == nil {
+	if cc == nil || cc.Client == nil {
 		return "", errors.New("GetContentTypeOfID: No client available")
 	}
 	if cc.Cache != nil {
@@ -504,7 +509,7 @@ func FieldToObject(jsonField interface{}, targetObject interface{}) error {
 }
 
 func (cc *ContentfulClient) cacheGcAssetByID(ctx context.Context, id string) error {
-	if cc.Client == nil {
+	if cc == nil || cc.Client == nil {
 		return errors.New("cacheGcAssetByID: No client available")
 	}
 	col := cc.Client.Assets.List(cc.SpaceID)
@@ -574,7 +579,7 @@ func getContentfulAPIClient(clientMode ClientMode, clientKey string) (*contentfu
 }
 
 func (cc *ContentfulClient) getAllAssets(tryCacheFirst bool) (map[string]*contentful.Asset, error) {
-	if cc.Client == nil {
+	if cc == nil || cc.Client == nil {
 		return nil, errors.New("getAllAssets: No client available")
 	}
 	if cc.Cache != nil && cc.Cache.assets != nil && tryCacheFirst {

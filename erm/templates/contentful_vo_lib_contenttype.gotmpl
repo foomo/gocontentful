@@ -17,6 +17,9 @@ const ContentType{{ firstCap $contentType.Sys.ID }} = "{{ $contentType.Sys.ID }}
 // ---{{ firstCap $contentType.Sys.ID }} public methods---
 
 func (cc *ContentfulClient) GetAll{{ firstCap $contentType.Sys.ID }}() (voMap map[string]*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
+	if cc == nil {
+		return nil, errors.New("GetAll{{ firstCap $contentType.Sys.ID }}: No client available")
+	}
 	if cc.Cache != nil {
 		return cc.Cache.entryMaps.{{ $contentType.Sys.ID }}, nil
 	}
@@ -36,7 +39,7 @@ func (cc *ContentfulClient) GetAll{{ firstCap $contentType.Sys.ID }}() (voMap ma
 }
 
 func (cc *ContentfulClient) GetFiltered{{ firstCap $contentType.Sys.ID }}(query *contentful.Query) (voMap map[string]*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
-	if cc.Client == nil {
+	if cc == nil || cc.Client == nil {
 		return nil, errors.New("getFiltered{{ firstCap $contentType.Sys.ID }}: No client available")
 	}
 	col := cc.Client.Entries.List(cc.SpaceID)
@@ -60,7 +63,7 @@ func (cc *ContentfulClient) GetFiltered{{ firstCap $contentType.Sys.ID }}(query 
 }
 
 func (cc *ContentfulClient) Get{{ firstCap $contentType.Sys.ID }}ByID(id string) (vo *Cf{{ firstCap $contentType.Sys.ID }}, err error) {
-	if cc.Client == nil {
+	if cc == nil || cc.Client == nil {
 		return nil, errors.New("Get{{ firstCap $contentType.Sys.ID }}ByID: No client available")
 	}
 	if cc.Cache != nil {
@@ -609,7 +612,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) ToReference() (refSys ContentTyp
 }
 
 func (cc *ContentfulClient) cacheAll{{ firstCap $contentType.Sys.ID }}(ctx context.Context, resultChan chan<- ContentTypeResult) (vos map[string]*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
-	if cc.Client == nil {
+	if cc == nil || cc.Client == nil {
 		return nil, errors.New("cacheAll{{ firstCap $contentType.Sys.ID }}: No CDA client available")
 	}
 	col, err := cc.optimisticPageSizeGetAll("{{ $contentType.Sys.ID }}", cc.optimisticPageSize)
@@ -664,7 +667,7 @@ func (cc *ContentfulClient) cacheAll{{ firstCap $contentType.Sys.ID }}(ctx conte
 }
 
 func (cc *ContentfulClient) cache{{ firstCap $contentType.Sys.ID }}ByID(ctx context.Context, id string) error {
-	if cc.Client == nil {
+	if cc == nil || cc.Client == nil {
 		return errors.New("cache{{ firstCap $contentType.Sys.ID }}ByID: No client available")
 	}
 		col := cc.Client.Entries.List(cc.SpaceID)
