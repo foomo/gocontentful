@@ -984,7 +984,9 @@ func (n *RichTextGenericNode) richTextRenderHTML(w io.Writer, linkResolver LinkR
 	}
 
 	tags.richTextHtmlTagsOpen(w)
-	w.Write([]byte(strings.Replace(html.EscapeString(n.Value), "\n", "<br/>", -1)))
+	cleanString := strings.Replace(html.EscapeString(n.Value), "\n", "<br/>", -1)
+	cleanString = strings.ReplaceAll(cleanString, "\u00a0", " ")
+	w.Write([]byte(cleanString))
 	for _, subNode := range n.Content {
 		errSubNode := subNode.richTextRenderHTML(w, linkResolver, entryLinkResolver, imageResolver, embeddedEntryResolver, locale)
 		if errSubNode != nil {
