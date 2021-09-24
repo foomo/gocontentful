@@ -86,7 +86,7 @@ func (cc *ContentfulClient) Get{{ firstCap $contentType.Sys.ID }}ByID(id string)
 	}
 	vos, err := colToCf{{ firstCap $contentType.Sys.ID }}(col,cc)
 	if err != nil {
-		return nil, fmt.Errorf("Get{{ firstCap $contentType.Sys.ID }}ByID: Error converting %s to VO: " + err.Error(), id)
+		return nil, fmt.Errorf("Get{{ firstCap $contentType.Sys.ID }}ByID: Error converting %s to VO: %w", id, err)
 	}
 	vo = vos[0]
 	return
@@ -104,7 +104,7 @@ func NewCf{{ firstCap $contentType.Sys.ID }}() (cf{{ firstCap $contentType.Sys.I
 }
 func (vo *Cf{{ firstCap $contentType.Sys.ID }}) GetParents(contentType ...string) (parents []EntryReference, err error) {
 	if vo == nil {
-		return nil, errors.New("GetParents: Value Object is nil!")
+		return nil, errors.New("GetParents: Value Object is nil")
 	}
 	parents = []EntryReference{}
 	if vo.CC.Cache != nil {
@@ -458,7 +458,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 {{ range $fieldIndex, $field := $contentType.Fields }}
 func (vo *Cf{{ firstCap $contentType.Sys.ID }}) Set{{ firstCap $field.ID }}({{ $field.ID }} {{ mapFieldType $contentType.Sys.ID $field }}, locale ...Locale) (err error) {
 	if vo == nil {
-		return errors.New("Set{{ firstCap $field.ID }}({{ $field.ID }}: Value Object is nil!")
+		return errors.New("Set{{ firstCap $field.ID }}({{ $field.ID }}: Value Object is nil")
 	}
 	loc := defaultLocale
 	if len(locale) != 0 {
@@ -476,7 +476,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) Set{{ firstCap $field.ID }}({{ $
 {{ end }}
 func (vo *Cf{{ firstCap $contentType.Sys.ID }}) UpsertEntry() (err error) {
 	if vo == nil {
-		return errors.New("UpsertEntry: Value Object is nil!")
+		return errors.New("UpsertEntry: Value Object is nil")
 	}
 	if vo.CC.clientMode != ClientModeCMA {
 		return errors.New("UpsertEntry: Only available in ClientModeCMA")
@@ -493,13 +493,13 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) UpsertEntry() (err error) {
 
 	err = vo.CC.Client.Entries.Upsert(vo.CC.SpaceID, cfEntry)
 	if err != nil {
-		return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} UpsertEntry: Operation failed: %s", err)
+		return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} UpsertEntry: Operation failed: %w", err)
 	}
 	return
 }
 func (vo *Cf{{ firstCap $contentType.Sys.ID }}) PublishEntry() (err error) {
 	if vo == nil {
-		return errors.New("PublishEntry: Value Object is nil!")
+		return errors.New("PublishEntry: Value Object is nil")
 	}
 	if vo.CC.clientMode != ClientModeCMA {
 		return errors.New("PublishEntry: Only available in ClientModeCMA")
@@ -515,7 +515,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) PublishEntry() (err error) {
 	}
 	err = vo.CC.Client.Entries.Publish(vo.CC.SpaceID, cfEntry)
 	if err != nil {
-		return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} PublishEntry: publish operation failed: %s", err)
+		return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} PublishEntry: publish operation failed: %w", err)
 	}
 	return
 }
@@ -534,13 +534,13 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) UnpublishEntry() (err error) {
 	}
 	err = vo.CC.Client.Entries.Unpublish(vo.CC.SpaceID, cfEntry)
 	if err != nil {
-		return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} UnpublishEntry: unpublish operation failed: %s", err)
+		return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} UnpublishEntry: unpublish operation failed: %w", err)
 	}
 	return
 }
 func (vo *Cf{{ firstCap $contentType.Sys.ID }}) UpdateEntry() (err error) {
 	if vo == nil {
-		return errors.New("UpdateEntry: Value Object is nil!")
+		return errors.New("UpdateEntry: Value Object is nil")
 	}
 	if vo.CC.clientMode != ClientModeCMA {
 		return errors.New("UpdateEntry: Only available in ClientModeCMA")
@@ -557,7 +557,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) UpdateEntry() (err error) {
 
 	err = vo.CC.Client.Entries.Upsert(vo.CC.SpaceID, cfEntry)
 	if err != nil {
-		return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} UpdateEntry: upsert operation failed: %s", err)
+		return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} UpdateEntry: upsert operation failed: %w", err)
 	}
 	tmp, errMarshal = json.Marshal(cfEntry)
 	if errMarshal != nil {
@@ -569,13 +569,13 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) UpdateEntry() (err error) {
 	}
 	err = vo.CC.Client.Entries.Publish(vo.CC.SpaceID, cfEntry)
 	if err != nil {
-		return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} UpdateEntry: publish operation failed: %s", err)
+		return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} UpdateEntry: publish operation failed: %w", err)
 	}
 	return
 }
 func (vo *Cf{{ firstCap $contentType.Sys.ID }}) DeleteEntry() (err error) {
 	if vo == nil {
-		return errors.New("DeleteEntry: Value Object is nil!")
+		return errors.New("DeleteEntry: Value Object is nil")
 	}
 	if vo.CC.clientMode != ClientModeCMA {
 		return errors.New("DeleteEntry: Only available in ClientModeCMA")
@@ -677,8 +677,11 @@ func (cc *ContentfulClient) cache{{ firstCap $contentType.Sys.ID }}ByID(ctx cont
 		return err
 	}
 	cc.Cache.entryMaps.{{ $contentType.Sys.ID }}GcLock.Lock()
+	defer cc.Cache.entryMaps.{{ $contentType.Sys.ID }}GcLock.Unlock()
 	cc.Cache.idContentTypeMapGcLock.Lock()
+	defer cc.Cache.idContentTypeMapGcLock.Unlock()
 	cc.Cache.parentMapGcLock.Lock()
+	defer cc.Cache.parentMapGcLock.Unlock()
 	// It was deleted
 	if len(col.Items) == 0 {
 		delete(cc.Cache.entryMaps.{{ $contentType.Sys.ID }}, id)
@@ -699,7 +702,7 @@ func (cc *ContentfulClient) cache{{ firstCap $contentType.Sys.ID }}ByID(ctx cont
 	}
 		vos, err := colToCf{{ firstCap $contentType.Sys.ID }}(col, cc)
 	if err != nil {
-		return fmt.Errorf("cache{{ firstCap $contentType.Sys.ID }}ByID: Error converting %s to VO: "+err.Error(), id)
+		return fmt.Errorf("cache{{ firstCap $contentType.Sys.ID }}ByID: Error converting %s to VO: %w", id, err)
 	}
 	{{ $contentType.Sys.ID }} := vos[0]
 	cc.Cache.entryMaps.{{ $contentType.Sys.ID }}[id] = {{ $contentType.Sys.ID }}
@@ -746,9 +749,6 @@ func (cc *ContentfulClient) cache{{ firstCap $contentType.Sys.ID }}ByID(ctx cont
 		}
 	{{ end }}
 	{{ end }}
-	cc.Cache.entryMaps.{{ $contentType.Sys.ID }}GcLock.Unlock()
-	cc.Cache.idContentTypeMapGcLock.Unlock()
-	cc.Cache.parentMapGcLock.Unlock()
 	return nil
 }
 
