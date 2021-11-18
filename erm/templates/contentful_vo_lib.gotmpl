@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"html"
 	"io"
+	"io/ioutil"
 	"regexp"
 	"strings"
 	"sync"
@@ -51,6 +52,13 @@ type ContentfulClient struct {
 	logLevel           int
 	optimisticPageSize uint16 // Start downloading entries at this page size
 	SpaceID            string
+	offline            bool
+	offlineTemp        offlineTemp
+}
+
+type offlineTemp struct {
+	Entries []contentful.Entry `json:"entries"`
+	Assets  []contentful.Asset `json:"assets"`
 }
 
 type ContentTypeResult struct {
@@ -65,7 +73,7 @@ type EntryReference struct {
 	VO interface{}
 }
 
-type ImageResolverFunc func(assetID string, locale Locale) (attrs map[string]string, resolveError error)
+type ImageResolverFunc func(assetID string, locale Locale) (attrs map[string]string, customHTML string, resolveError error)
 type EntryLinkResolverFunc func(entryID string, locale Locale) (resolvedAttrs map[string]string, resolveError error)
 type LinkResolverFunc func(url string) (resolvedAttrs map[string]string, resolveError error)
 type EmbeddedEntryResolverFunc func(entryID string, locale Locale) (htmlSnippet string, resolveError error)
@@ -379,6 +387,36 @@ func NewContentfulClient(spaceID string, clientMode ClientMode, clientKey string
 	return cc, nil
 }
 
+func NewOfflineContentfulClient(filename string, logFn func(fields map[string]interface{}, level int, args ...interface{}), logLevel int, cacheAssets bool) (*ContentfulClient, error) {
+	fileBytes, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, fmt.Errorf("NewOfflineContentfulClient could not read space export file: %v", err)
+	}
+	offlineTemp := offlineTemp{}
+	err = json.Unmarshal(fileBytes, &offlineTemp)
+	if err != nil {
+		return nil, fmt.Errorf("NewOfflineContentfulClient could not parse space export file: %v", err)
+	}
+	cc := &ContentfulClient{
+		clientMode:  ClientModeCDA,
+		Client:      contentful.NewCDA(""),
+		locales:     []Locale{
+			{{ range $index , $locale := $locales }}SpaceLocale{{ onlyLetters $locale.Name }},
+{{ end}}},
+		logFn:       logFn,
+		logLevel:    logLevel,
+		SpaceID:     "OFFLINE",
+		offline:     true,
+		offlineTemp: offlineTemp,
+	}
+	fmt.Println(len(offlineTemp.Entries), len(offlineTemp.Assets))
+	err = cc.UpdateCache(context.TODO(), spaceContentTypes, cacheAssets)
+	if err != nil {
+		return nil, fmt.Errorf("NewOfflineContentfulClient could not cache offline space: %v", err)
+	}
+	return cc, nil
+}
+
 func RichTextToHtml(rt interface{}, linkResolver LinkResolverFunc, entryLinkResolver EntryLinkResolverFunc, imageResolver ImageResolverFunc, embeddedEntryResolver EmbeddedEntryResolverFunc, locale Locale) (string, error) {
 	w := bytes.NewBuffer([]byte{})
 	node := &RichTextGenericNode{}
@@ -585,18 +623,24 @@ func (cc *ContentfulClient) getAllAssets(tryCacheFirst bool) (map[string]*conten
 	if cc.Cache != nil && cc.Cache.assets != nil && tryCacheFirst {
 		return cc.Cache.assets, nil
 	}
-	col := cc.Client.Assets.List(cc.SpaceID)
-	col.Query.Locale("*").Limit(assetPageSize)
-	assets := map[string]*contentful.Asset{}
 	allItems := []interface{}{}
-	for {
-		_, err := col.Next()
-		if err != nil {
-			return nil, err
+	assets := map[string]*contentful.Asset{}
+	if cc.offline {
+		for _, asset := range cc.offlineTemp.Assets {
+			allItems = append(allItems,asset)
 		}
-		allItems = append(allItems, col.Items...)
-		if uint16(len(col.Items)) < assetPageSize {
-			break
+	} else {
+		col := cc.Client.Assets.List(cc.SpaceID)
+		col.Query.Locale("*").Limit(assetPageSize)
+		for {
+			_, err := col.Next()
+			if err != nil {
+				return nil, err
+			}
+			allItems = append(allItems, col.Items...)
+			if uint16(len(col.Items)) < assetPageSize {
+				break
+			}
 		}
 	}
 	for _, item := range allItems {
@@ -821,6 +865,10 @@ func richTextMapTagNodeType(tag string) string {
 func (ts richTextHtmlTags) richTextHtmlTagsOpen(w io.Writer) {
 
 	for _, t := range ts {
+		if t.customHTML != "" {
+			w.Write([]byte(t.customHTML))
+			continue
+		}
 		tagString := "<" + t.name
 		if len(t.attrs) > 0 {
 			for name, value := range t.attrs {
@@ -833,6 +881,9 @@ func (ts richTextHtmlTags) richTextHtmlTagsOpen(w io.Writer) {
 
 func (ts richTextHtmlTags) richTextHtmlTagsClose(w io.Writer) {
 	for _, t := range ts {
+		if t.customHTML != "" {
+			continue
+		}
 		w.Write([]byte("</" + t.name + ">"))
 	}
 }
@@ -938,11 +989,11 @@ func (n *RichTextGenericNode) richTextRenderHTML(w io.Writer, linkResolver LinkR
 		if dataObj.Target == nil {
 			return errors.New("Data target is empty")
 		}
-		attrs, err := imageResolver(dataObj.Target.Sys.ID, locale)
+		attrs, customHTML, err := imageResolver(dataObj.Target.Sys.ID, locale)
 		if err != nil {
 			return err
 		}
-		tags = []richTextHtmlTag{richTextHtmlTag{name: HtmlImage, attrs: attrs}}
+		tags = []richTextHtmlTag{richTextHtmlTag{name: HtmlImage, attrs: attrs, customHTML: customHTML}}
 	case RichTextNodeEmbeddedEntry:
 		dataObj := RichTextData{}
 		byt, errMarshal := json.Marshal(n.Data)

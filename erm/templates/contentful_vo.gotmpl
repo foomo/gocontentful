@@ -13,7 +13,8 @@ type Cf{{ firstCap $contentType.Sys.ID }} struct {
 // Cf{{ firstCap $contentType.Sys.ID }}Fields is a CfNameFields VO
 type Cf{{ firstCap $contentType.Sys.ID }}Fields struct {
 	{{ range $fieldIndex, $field := $contentType.Fields }}
-	{{ firstCap $field.ID }}				map[string]{{ mapFieldType $contentType.Sys.ID $field }}			`json:"{{ $field.ID }},omitempty"`{{ end }}
+	{{ firstCap $field.ID }}				map[string]{{ mapFieldType $contentType.Sys.ID $field }}			`json:"{{ $field.ID }},omitempty"`
+	RWLock{{ firstCap $field.ID }} sync.RWMutex         `json:"-"`{{ end }}
 }
 	{{ range $fieldIndex, $field := $contentType.Fields }}
 		{{ if fieldIsAsset $field }}

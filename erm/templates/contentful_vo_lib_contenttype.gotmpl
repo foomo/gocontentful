@@ -155,6 +155,8 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 	if vo == nil {
 		return {{ mapFieldTypeLiteral $contentType.Sys.ID $field }}
 	}
+	vo.Fields.RWLock{{ firstCap $field.ID }}.RLock()
+	defer vo.Fields.RWLock{{ firstCap $field.ID }}.RUnlock()
 	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
@@ -188,6 +190,8 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 	if vo == nil {
 		return {{ mapFieldTypeLiteral $contentType.Sys.ID $field }}
 	}
+	vo.Fields.RWLock{{ firstCap $field.ID }}.RLock()
+	defer vo.Fields.RWLock{{ firstCap $field.ID }}.RUnlock()
 	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
@@ -222,6 +226,8 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 	if vo == nil {
 		return nil
 	}
+	vo.Fields.RWLock{{ firstCap $field.ID }}.RLock()
+	defer vo.Fields.RWLock{{ firstCap $field.ID }}.RUnlock()
 	{{ $field.ID }} := []*EntryReference{}
 	loc := defaultLocale
 	if len(locale) != 0 {
@@ -278,6 +284,8 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 	if vo == nil {
 		return nil
 	}
+	vo.Fields.RWLock{{ firstCap $field.ID }}.RLock()
+	defer vo.Fields.RWLock{{ firstCap $field.ID }}.RUnlock()
 	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
@@ -332,6 +340,8 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 	if vo == nil {
 		return nil
 	}
+	vo.Fields.RWLock{{ firstCap $field.ID }}.RLock()
+	defer vo.Fields.RWLock{{ firstCap $field.ID }}.RUnlock()
 	{{ $field.ID }} := []*contentful.AssetNoLocale{}
 	loc := defaultLocale
 	reqLoc := defaultLocale
@@ -396,6 +406,8 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 	if vo == nil {
 		return nil
 	}
+	vo.Fields.RWLock{{ firstCap $field.ID }}.RLock()
+	defer vo.Fields.RWLock{{ firstCap $field.ID }}.RUnlock()
 	loc := defaultLocale
 	reqLoc := defaultLocale
 	if len(locale) != 0 {
@@ -467,6 +479,8 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) Set{{ firstCap $field.ID }}({{ $
 			return ErrLocaleUnsupported
 		}
 	}
+	vo.Fields.RWLock{{ firstCap $field.ID }}.Lock()
+	defer vo.Fields.RWLock{{ firstCap $field.ID }}.Unlock()
 	if vo.Fields.{{ firstCap $field.ID }} == nil {
 		vo.Fields.{{ firstCap $field.ID }} = make(map[string]{{ mapFieldType $contentType.Sys.ID $field }})
 	}
@@ -615,11 +629,23 @@ func (cc *ContentfulClient) cacheAll{{ firstCap $contentType.Sys.ID }}(ctx conte
 	if cc == nil || cc.Client == nil {
 		return nil, errors.New("cacheAll{{ firstCap $contentType.Sys.ID }}: No CDA client available")
 	}
-	col, err := cc.optimisticPageSizeGetAll("{{ $contentType.Sys.ID }}", cc.optimisticPageSize)
-	if err != nil {
-		return nil, err
+	var all{{ firstCap $contentType.Sys.ID }} []*Cf{{ firstCap $contentType.Sys.ID }}
+	col := &contentful.Collection{
+		Items: []interface{}{},
 	}
-	all{{ firstCap $contentType.Sys.ID }}, err := colToCf{{ firstCap $contentType.Sys.ID }}(col,cc)
+	if cc.offline {
+		for _, entry := range cc.offlineTemp.Entries {
+			if entry.Sys.ContentType.Sys.ID == ContentType{{ firstCap $contentType.Sys.ID }} {
+				col.Items = append(col.Items, entry)
+			}
+		}
+	} else {
+		col, err = cc.optimisticPageSizeGetAll("{{ $contentType.Sys.ID }}", cc.optimisticPageSize)
+		if err != nil {
+			return nil, err
+		}
+	}
+	all{{ firstCap $contentType.Sys.ID }}, err = colToCf{{ firstCap $contentType.Sys.ID }}(col,cc)
 	if err != nil {
 		return nil, err
 	}

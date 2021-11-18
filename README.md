@@ -120,6 +120,8 @@ The parameters to pass to NewContentfulClient are:
 - *logLevel* (int) is the debug level (see function above). Please note that LogDebug is very verbose and even logs when you request a field value but that is not set for the entry.
 - *debug* (bool) is the Contentful API client debug switch. If set to *true* it will log on stdout all the CURL calls to Contentful. This is extremely verbose and extremely valuable when something fails in a call to the API because it's the only way to see the REST API response.
 
+_NOTE:_ Gocontentful provides an offline version of the client that can load data from a JSON space export file (as exported by the _contentful_ CLI tool). This is the way you can write unit tests against your generated API that don't require to be online and the management of a safe API key storage. See function reference below
+
 ### Caching
 
 <pre><code>contentTypes := []string{"person", "pet"}
@@ -254,6 +256,10 @@ Public functions and methods
 >**NewContentfulClient**(spaceID string, clientMode string, clientKey string, optimisticPageSize uint16, logFn func(fields map[string]interface{}, level int, args ...interface{}), logLevel int, debug bool) (*ContentfulClient, error)
 
 Creates a Contentful client, this is the first function you need to call. For usage details please refer to the Quickstart above.
+
+>**NewOfflineContentfulClient**(filename string, logFn func(fields map[string]interface{}, level int, args ...interface{}), logLevel int, cacheAssets bool) (*ContentfulClient, error)
+
+Creates an offline Contentful client that loads space data from a JSON file containing a space export (use the contentful CLI tool to get one).
 
 >**SetEnvironment**(environment string) 
 
@@ -420,13 +426,13 @@ Converts an HTML fragment to a RichTextNode. This is useful to migrate data from
 
 >**RichTextToHtml**(rt interface{}, linkResolver LinkResolverFunc, entryLinkResolver EntryLinkResolverFunc, imageResolver ImageResolverFunc, locale Locale) (string, error) {
 
-Converts an interface representing a Contentful RichText value (usually from a field getter) into HTML. It currently supports all tags except for embedded and inline entries and assets. It takes in three (optional) functions to resolve hyperlink URLs, permalinks to entries and to derive IMG tag attributes for embedded image assets. The three functions return a map of attributes for the HTML tag the RichTextToHtml function will emit (either an A or an IMG) and have the following signature:
+Converts an interface representing a Contentful RichText value (usually from a field getter) into HTML. It currently supports all tags except for embedded and inline entries and assets. It takes in three (optional) functions to resolve hyperlink URLs, permalinks to entries and to derive IMG tag attributes for embedded image assets. The three functions return a map of attributes for the HTML tag the RichTextToHtml function will emit (either an A or an IMG) and have the following signature. Note that the ImageResolverFunc function must return a customHTML value that can be empty but if set it will substitute the IMG tag with the returned HTML snippet. This allows you to emit custom mark-up for your images, e.g. a PICTURE tag.
 
 >type LinkResolverFunc func(url string) (resolvedAttrs map[string]string, resolveError error)
 
 >type EntryLinkResolverFunc func(entryID string, locale Locale) (resolvedAttrs map[string]string, resolveError error)
 
->type ImageResolverFunc func(assetID string, locale Locale) (attrs map[string]string, resolveError error)
+>type ImageResolverFunc func(assetID string, locale Locale) (attrs map[string]string, customHTML string, resolveError error)
 
 >type EmbeddedEntryResolverFunc func(entryID string, locale Locale) (html string, resolveError error)
 
