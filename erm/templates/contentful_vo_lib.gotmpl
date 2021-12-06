@@ -71,7 +71,16 @@ type EntryReference struct {
 	ContentType string
 	ID string
 	VO interface{}
+	FromField   string
 }
+
+type BrokenReference struct {
+	ParentID   string `json:"parentId"`
+	ParentType string `json:"parentType"`
+	FromField  string `json:"fromField"`
+	ChildID    string `json:"childId"`
+}
+
 
 type ImageResolverFunc func(assetID string, locale Locale) (attrs map[string]string, customHTML string, resolveError error)
 type EntryLinkResolverFunc func(entryID string, locale Locale) (resolvedAttrs map[string]string, resolveError error)
@@ -124,6 +133,29 @@ var (
 )
 
 var spaceContentTypes = []string{ {{ range $index , $contentType := $contentTypes }}ContentType{{ firstCap $contentType.Sys.ID }}, {{ end }} }
+
+func (cc *ContentfulClient) BrokenReferences() (brokenReferences []BrokenReference) {
+	if cc.Cache == nil {
+		return
+	}
+	cc.Cache.parentMapGcLock.RLock()
+	defer cc.Cache.parentMapGcLock.RUnlock()
+	cc.Cache.idContentTypeMapGcLock.RLock()
+	defer cc.Cache.idContentTypeMapGcLock.RUnlock()
+	for childID, parents := range cc.Cache.parentMap {
+		if _, okGotEntry := cc.Cache.idContentTypeMap[childID]; !okGotEntry {
+			for _, parent := range parents {
+				brokenReferences = append(brokenReferences, BrokenReference{
+					ParentID:   parent.ID,
+					ParentType: parent.ContentType,
+					FromField:  parent.FromField,
+					ChildID:    childID,
+				})
+			}
+		}
+	}
+	return
+}
 
 func (cc *ContentfulClient) CacheHasContentType(contentTypeID string) bool {
 	if cc.Cache == nil {

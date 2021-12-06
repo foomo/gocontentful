@@ -416,6 +416,12 @@ Deletes an asset from a space by its ID (only available for _ClientModeCMA_)
 ---
 **HELPER FUNCTIONS AND METHODS**
 
+>(cc *ContentfulClient) **BrokenReferences()** (brokenReferences []BrokenReference)
+
+Returns a slice of BrokenReference objects with details of where entries have been
+referenced but they are not found in the cache. This might naturally return false
+positives for content types that are in the space but not included in the cache.
+
 >**FieldToObject**(jsonField interface{}, targetObject interface{}) error
 
 Converts a JSON field into an object. Make sure you pass a pointer to an object which type has JSON definition for all fields you want to retrieve.

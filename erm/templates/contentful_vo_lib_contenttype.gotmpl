@@ -670,7 +670,11 @@ func (cc *ContentfulClient) cacheAll{{ firstCap $contentType.Sys.ID }}(ctx conte
 		children, okChildren := {{ $contentType.Sys.ID }}.Fields.{{ firstCap $field.ID }}[string(loc)]
 		if okChildren {
 			for _, child := range children {
-				addEntry(child.Sys.ID, EntryReference{ContentType: {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID, ID: {{ $contentType.Sys.ID }}.Sys.ID, VO: {{ $contentType.Sys.ID }}})
+				addEntry(child.Sys.ID, EntryReference{ContentType: {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID,
+					ID: {{ $contentType.Sys.ID }}.Sys.ID,
+					VO: {{ $contentType.Sys.ID }},
+					FromField: "{{ $field.ID }}",
+				})
 			}
 		}
 	}
@@ -679,7 +683,11 @@ func (cc *ContentfulClient) cacheAll{{ firstCap $contentType.Sys.ID }}(ctx conte
 	for _, loc := range cc.locales {
 		child, okChild := {{ $contentType.Sys.ID }}.Fields.{{ firstCap $field.ID }}[string(loc)]
 		if okChild {
-			addEntry(child.Sys.ID, EntryReference{ContentType: {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID, ID: {{ $contentType.Sys.ID }}.Sys.ID, VO: {{ $contentType.Sys.ID }}})
+			addEntry(child.Sys.ID, EntryReference{ContentType: {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID,
+				ID: {{ $contentType.Sys.ID }}.Sys.ID,
+				VO: {{ $contentType.Sys.ID }},
+				FromField: "{{ $field.ID }}",
+})
 		}
 	}
 	{{ end }}
