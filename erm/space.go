@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/foomo/contentful"
@@ -59,10 +60,17 @@ func getContentTypes(CMA *contentful.Contentful, spaceID string) (contentTypes [
 		}
 		contentTypes = append(contentTypes, contentType)
 	}
+	sort.Slice(
+		contentTypes, func(i, j int) bool {
+			return contentTypes[i].Name < contentTypes[j].Name
+		},
+	)
 	return
 }
 
-func getData(spaceID, cmaKey string, flagContentTypes []string) (finalContentTypes []ContentType, locales []Locale, err error) {
+func getData(spaceID, cmaKey string, flagContentTypes []string) (
+	finalContentTypes []ContentType, locales []Locale, err error,
+) {
 	// Get client
 	CMA := contentful.NewCMA(cmaKey)
 	CMA.Debug = false

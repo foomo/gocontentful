@@ -106,47 +106,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) GetParents(contentType ...string
 	if vo == nil {
 		return nil, errors.New("GetParents: Value Object is nil")
 	}
-	parents = []EntryReference{}
-	if vo.CC.Cache != nil {
-		if len(contentType) != 0 {
-			for _, parent := range vo.CC.Cache.parentMap[vo.Sys.ID] {
-				if parent.ContentType == contentType[0] {
-					parents = append(parents, parent)
-				}
-			}
-			return parents, nil
-		}
-		return vo.CC.Cache.parentMap[vo.Sys.ID], nil
-	}
-	if len(contentType) != 1 {
-		return nil, errors.New("GetParents: uncached parentMap queries need a contentType")
-	}
-	col := vo.CC.Client.Entries.List(vo.CC.SpaceID)
-	col.Query.Equal("fields.nodes.sys.id", vo.Sys.ID).ContentType(contentType[0]).Locale("*")
-	_, err = col.GetAll()
-	if err != nil {
-		return nil, errors.New("GetParents: " + err.Error())
-	}
-	switch contentType[0] {
-	{{ range $index , $contentType := $contentTypes }}
-	case ContentType{{ firstCap $contentType.Sys.ID }}:
-		for _, item := range col.Items {
-			var parentVO Cf{{ firstCap $contentType.Sys.ID }}
-			byteArray, _ := json.Marshal(item)
-			err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&parentVO)
-			if err != nil {
-				return nil, errors.New("GetParents: "+err.Error())
-			}
-			parentVO.CC = vo.CC
-			parents = append(parents, EntryReference{
-				ContentType: contentType[0],
-				ID: parentVO.Sys.ID,
-				VO: &parentVO,
-			})
-		}
-	{{ end }}
-	}
-	return parents, nil
+	return commonGetParents(vo.CC, vo.Sys.ID, contentType)
 }
 // {{ firstCap $contentType.Sys.ID }} Field getters
 {{ range $fieldIndex, $field := $contentType.Fields }}
