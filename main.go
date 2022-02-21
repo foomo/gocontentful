@@ -35,6 +35,7 @@ func main() {
 	// Get parameters from cmd line flags
 	flagSpaceID := flag.String("spaceid", "", "Contentful space ID")
 	flagCMAKey := flag.String("cmakey", "", "Contentful CMA key")
+	flagEnvironment := flag.String("environment", "", "Contentful space environment")
 	flagContentTypes := flag.String("contenttypes", "", "[Optional] Content type IDs to parse, comma separated")
 	flagVersion := flag.Bool("version", false, "Print version and exit")
 	flagHelp := flag.Bool("help", false, "Print version and exit")
@@ -75,7 +76,7 @@ func main() {
 		}
 	}
 
-	err = erm.GenerateAPI(filepath.Dir(path), packageName, *flagSpaceID, *flagCMAKey, flagContentTypesSlice)
+	err = erm.GenerateAPI(filepath.Dir(path), packageName, *flagSpaceID, *flagCMAKey, *flagEnvironment, flagContentTypesSlice)
 	if err != nil {
 		fatal("Something went horribly wrong...", err)
 	}

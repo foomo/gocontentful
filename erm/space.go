@@ -68,12 +68,15 @@ func getContentTypes(CMA *contentful.Contentful, spaceID string) (contentTypes [
 	return
 }
 
-func getData(spaceID, cmaKey string, flagContentTypes []string) (
+func getData(spaceID, cmaKey, environment string, flagContentTypes []string) (
 	finalContentTypes []ContentType, locales []Locale, err error,
 ) {
 	// Get client
 	CMA := contentful.NewCMA(cmaKey)
 	CMA.Debug = false
+	if environment != "" {
+		CMA.Environment = environment
+	}
 
 	// Get space locales
 	locales, errGetLocales := getLocales(CMA, spaceID)
@@ -108,8 +111,8 @@ func getData(spaceID, cmaKey string, flagContentTypes []string) (
 }
 
 // GenerateAPI calls the generators
-func GenerateAPI(dir, packageName, spaceID, cmaKey string, flagContentTypes []string) (err error) {
-	contentTypes, locales, errGetData := getData(spaceID, cmaKey, flagContentTypes)
+func GenerateAPI(dir, packageName, spaceID, cmaKey, environment string, flagContentTypes []string) (err error) {
+	contentTypes, locales, errGetData := getData(spaceID, cmaKey, environment, flagContentTypes)
 	if errGetData != nil {
 		return errGetData
 	}
