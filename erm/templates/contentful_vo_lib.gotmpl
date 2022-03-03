@@ -120,16 +120,18 @@ const (
 )
 
 var (
-	ErrLocaleUnsupported   = errors.New("locale not supported by this space")
-	ErrNotSet              = errors.New("field value not set")
-	ErrNotSetNoFallback    = errors.New("field value not set and no fallback locale available")
-	ErrRefNotIncludes      = errors.New("referenced entry not found in includes")
-	ErrNoTypeOfRefEntry    = errors.New("couldn't get contentType of referenced entry")
-	ErrNoTypeOfRefAsset    = errors.New("couldn't get contentType of referenced asset")
-	InfoUpdatedEntityCache = "updated cache for entity"
-	InfoCachedAllEntries   = "cached all entries of content type"
-	InfoCachedAllAssets    = "cached all assets"
-	InfoUpdateCacheTime    = "space caching done, time recorded"
+	ErrLocaleUnsupported      = errors.New("locale not supported by this space")
+	ErrNotSet                 = errors.New("field value not set")
+	ErrNotSetNoFallback       = errors.New("field value not set and no fallback locale available")
+	ErrRefNotIncludes         = errors.New("referenced entry not found in includes")
+	ErrNoTypeOfRefEntry       = errors.New("couldn't get contentType of referenced entry")
+	ErrNoTypeOfRefAsset       = errors.New("couldn't get contentType of referenced asset")
+	InfoUpdatedEntityCache    = "updated cache for entity"
+	InfoCachedAllEntries      = "cached all entries of content type"
+	InfoCachedAllAssets       = "cached all assets"
+	InfoFallingBackToFile     = "could not download space data from Contentful, falling back to local file"
+	InfoOfflineEntitiesLoaded = "downloaded entries and assets from offline file"
+	InfoUpdateCacheTime       = "space caching done, time recorded"
 )
 
 var spaceContentTypes = []string{ {{ range $index , $contentType := $contentTypes }}ContentType{{ firstCap $contentType.Sys.ID }}, {{ end }} }
@@ -420,12 +422,7 @@ func NewContentfulClient(spaceID string, clientMode ClientMode, clientKey string
 }
 
 func NewOfflineContentfulClient(filename string, logFn func(fields map[string]interface{}, level int, args ...interface{}), logLevel int, cacheAssets bool) (*ContentfulClient, error) {
-	fileBytes, err := ioutil.ReadFile(filename)
-	if err != nil {
-		return nil, fmt.Errorf("NewOfflineContentfulClient could not read space export file: %v", err)
-	}
-	offlineTemp := offlineTemp{}
-	err = json.Unmarshal(fileBytes, &offlineTemp)
+	offlineTemp, err := getOfflineSpaceFromFile(filename)
 	if err != nil {
 		return nil, fmt.Errorf("NewOfflineContentfulClient could not parse space export file: %v", err)
 	}
@@ -439,9 +436,11 @@ func NewOfflineContentfulClient(filename string, logFn func(fields map[string]in
 		logLevel:    logLevel,
 		SpaceID:     "OFFLINE",
 		offline:     true,
-		offlineTemp: offlineTemp,
+		offlineTemp: *offlineTemp,
 	}
-	fmt.Println(len(offlineTemp.Entries), len(offlineTemp.Assets))
+	if cc.logFn != nil && cc.logLevel <= LogInfo {
+        cc.logFn(map[string]interface{}{"entries": len(offlineTemp.Entries),"assets": len(offlineTemp.Assets)}, LogInfo, InfoFallingBackToFile)
+    }
 	err = cc.UpdateCache(context.TODO(), spaceContentTypes, cacheAssets)
 	if err != nil {
 		return nil, fmt.Errorf("NewOfflineContentfulClient could not cache offline space: %v", err)
@@ -476,6 +475,15 @@ func (cc *ContentfulClient) SetEnvironment(environment string) {
 	return
 }
 
+func (cc *ContentfulClient) SetOfflineFallback(filename string) error {
+	offlineTemp, err := getOfflineSpaceFromFile(filename)
+	if err != nil {
+		return err
+	}
+	cc.offlineTemp = *offlineTemp
+	return nil
+}
+
 func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []string, cacheAssets bool) error {
 	start := time.Now()
 	if contentTypes == nil {
@@ -495,7 +503,17 @@ func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []stri
 	if cacheAssets {
 		contentTypes = append([]string{assetWorkerType}, contentTypes...)
 	}
-	results := make(chan ContentTypeResult, 16)
+	_, errCanWeEvenConnect := cc.Client.Spaces.Get(cc.SpaceID)
+    offlinePreviousState := cc.offline
+    if errCanWeEvenConnect != nil {
+        if len(cc.offlineTemp.Entries) > 0 {
+            if cc.logFn != nil && cc.logLevel <= LogInfo {
+                cc.logFn(map[string]interface{}{"method": "UpdateCache"}, LogInfo, InfoFallingBackToFile)
+            }
+            cc.offline = true
+        }
+    }
+    results := make(chan ContentTypeResult, 16)
 	resultsDone := make(chan struct{})
 	contentTypeChan := make(chan string)
 	group, gctx := errgroup.WithContext(ctx)
@@ -530,7 +548,8 @@ func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []stri
 	if err != nil {
 		// drain contentTypeChan
 		for _ = range contentTypeChan {	}
-		return err
+		cc.offline = offlinePreviousState
+        return err
 	}
 	// Signal that the cache build is done
 	<-resultsDone
@@ -539,6 +558,7 @@ func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []stri
 		cc.logFn(map[string]interface{}{"time elapsed":fmt.Sprint(time.Since(start)), "method": "UpdateCache"}, LogInfo, InfoUpdateCacheTime)
 	}
 	cc.Cache = tempCache
+	cc.offline = offlinePreviousState
 	return nil
 }
 
@@ -693,6 +713,19 @@ func (cc *ContentfulClient) getAllAssets(tryCacheFirst bool) (map[string]*conten
 		assets[asset.Sys.ID] = &asset
 	}
 	return assets, nil
+}
+
+func getOfflineSpaceFromFile(filename string) (*offlineTemp, error) {
+	fileBytes, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, fmt.Errorf("getOfflineSpaceFromFile could not read space export file: %v", err)
+	}
+	offlineTemp := &offlineTemp{}
+	err = json.Unmarshal(fileBytes, offlineTemp)
+	if err != nil {
+		return nil, fmt.Errorf("getOfflineSpaceFromFile could not parse space export file: %v", err)
+	}
+	return offlineTemp, nil
 }
 
 func (cc *ContentfulClient) optimisticPageSizeGetAll(contentType string, limit uint16) (*contentful.Collection, error) {

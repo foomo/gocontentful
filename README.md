@@ -59,8 +59,14 @@ Usage of gocontentful:
     	Contentful CMA key
   -contenttypes string
     	[Optional] Content type IDs to parse, comma separated
+  -environment string
+    	Contentful space environment
+  -help
+    	Print version and exit
   -spaceid string
     	Contentful space ID
+  -version
+    	Print version and exit
 
 Note: The last segment of the path/to/target/package will be used as package name
 </code></pre>
@@ -238,9 +244,13 @@ And finally delete it (but don't delete that lovely puppy please!):
 
 ### Environments support
 
-Not there yet, sorry.
+Gocontentful supports Contentful enviroments in two ways:
 
-_@TODO: add support for environments_ 
+- Code can be generated loading the content model from an 
+environment other than master. Use the -enviroment flag on the command
+line to specify the environment you want to load the model from.
+- The gocontentful client in your application can be switched to any 
+enviroment calling the SetEnviroment method. See documentation below.  
 
 ### Unit tests
 
@@ -257,11 +267,16 @@ Public functions and methods
 
 Creates a Contentful client, this is the first function you need to call. For usage details please refer to the Quickstart above.
 
+>**SetOfflineFallback**(filename string) error
+
+Sets a path to a space export JSON file to be used as a fallback in case
+Contentful is not reachable when you call UpdateCache() on the client
+
 >**NewOfflineContentfulClient**(filename string, logFn func(fields map[string]interface{}, level int, args ...interface{}), logLevel int, cacheAssets bool) (*ContentfulClient, error)
 
 Creates an offline Contentful client that loads space data from a JSON file containing a space export (use the contentful CLI tool to get one).
 
->**SetEnvironment**(environment string) 
+>(cc *ContentfulClient) **SetEnvironment**(environment string) 
 
 Sets the Contentful client's environment. All subsequent API calls will be directed to that environment in the selected space. Pass an empty string to reset to the _master_ environment. 
 
