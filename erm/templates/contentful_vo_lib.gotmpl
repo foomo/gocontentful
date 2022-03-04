@@ -120,18 +120,19 @@ const (
 )
 
 var (
-	ErrLocaleUnsupported      = errors.New("locale not supported by this space")
-	ErrNotSet                 = errors.New("field value not set")
-	ErrNotSetNoFallback       = errors.New("field value not set and no fallback locale available")
-	ErrRefNotIncludes         = errors.New("referenced entry not found in includes")
-	ErrNoTypeOfRefEntry       = errors.New("couldn't get contentType of referenced entry")
-	ErrNoTypeOfRefAsset       = errors.New("couldn't get contentType of referenced asset")
-	InfoUpdatedEntityCache    = "updated cache for entity"
-	InfoCachedAllEntries      = "cached all entries of content type"
-	InfoCachedAllAssets       = "cached all assets"
-	InfoFallingBackToFile     = "could not download space data from Contentful, falling back to local file"
-	InfoOfflineEntitiesLoaded = "downloaded entries and assets from offline file"
-	InfoUpdateCacheTime       = "space caching done, time recorded"
+	ErrLocaleUnsupported        = errors.New("locale not supported by this space")
+	ErrNotSet                   = errors.New("field value not set")
+	ErrNotSetNoFallback         = errors.New("field value not set and no fallback locale available")
+	ErrRefNotIncludes           = errors.New("referenced entry not found in includes")
+	ErrNoTypeOfRefEntry         = errors.New("couldn't get contentType of referenced entry")
+	ErrNoTypeOfRefAsset         = errors.New("couldn't get contentType of referenced asset")
+	InfoUpdatedEntityCache      = "updated cache for entity"
+	InfoCachedAllEntries        = "cached all entries of content type"
+	InfoCachedAllAssets         = "cached all assets"
+	InfoFallingBackToFile       = "could not download space data from Contentful, falling back to local file"
+	InfoOfflineEntitiesLoaded   = "downloaded entries and assets from offline file"
+	InfoPreservingExistingCache = "could not connect for cache update, preserving the existing cache"
+	InfoUpdateCacheTime         = "space caching done, time recorded"
 )
 
 var spaceContentTypes = []string{ {{ range $index , $contentType := $contentTypes }}ContentType{{ firstCap $contentType.Sys.ID }}, {{ end }} }
@@ -505,14 +506,18 @@ func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []stri
 	}
 	_, errCanWeEvenConnect := cc.Client.Spaces.Get(cc.SpaceID)
     offlinePreviousState := cc.offline
-    if errCanWeEvenConnect != nil {
-        if len(cc.offlineTemp.Entries) > 0 {
-            if cc.logFn != nil && cc.logLevel <= LogInfo {
-                cc.logFn(map[string]interface{}{"method": "UpdateCache"}, LogInfo, InfoFallingBackToFile)
-            }
-            cc.offline = true
-        }
-    }
+	if errCanWeEvenConnect != nil {
+		if len(cc.offlineTemp.Entries) > 0 && cc.Cache == nil {
+			if cc.logFn != nil && cc.logLevel <= LogInfo {
+				cc.logFn(map[string]interface{}{"method": "UpdateCache"}, LogInfo, InfoFallingBackToFile)
+			}
+			cc.offline = true
+		} else {
+			if cc.logFn != nil && cc.logLevel <= LogInfo {
+				cc.logFn(map[string]interface{}{"method": "UpdateCache"}, LogInfo, InfoPreservingExistingCache)
+			}
+		}
+	}
     results := make(chan ContentTypeResult, 16)
 	resultsDone := make(chan struct{})
 	contentTypeChan := make(chan string)
