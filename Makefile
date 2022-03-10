@@ -12,8 +12,10 @@ build:
 	go build -o bin/gocontenful main.go
 
 .PHONY: test
+
 ## Run tests
 test:
+	go run ./main.go -exportfile ./test/test-space-export.json ./test/testapi
 	go test ./...
 
 .PHONY: lint

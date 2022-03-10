@@ -60,3 +60,8 @@ type ContentType struct {
 	Name   string             `json:"name,omitempty"`
 	Fields []ContentTypeField `json:"fields,omitempty"`
 }
+
+type ExportFile struct {
+	ContentTypes []ContentType `json:"contentTypes"`
+	Locales      []Locale      `json:"locales"`
+}

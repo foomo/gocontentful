@@ -15,3 +15,4 @@ bin
 .history*
 *.idea
 /.vscode/*
+/untracked_*.go

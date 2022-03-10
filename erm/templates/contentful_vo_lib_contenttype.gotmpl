@@ -92,9 +92,12 @@ func (cc *ContentfulClient) Get{{ firstCap $contentType.Sys.ID }}ByID(id string)
 	return
 }
 
-func NewCf{{ firstCap $contentType.Sys.ID }}() (cf{{ firstCap $contentType.Sys.ID }} *Cf{{ firstCap $contentType.Sys.ID }}) {
+func NewCf{{ firstCap $contentType.Sys.ID }}(contentfulClient ...*ContentfulClient) (cf{{ firstCap $contentType.Sys.ID }} *Cf{{ firstCap $contentType.Sys.ID }}) {
 	cf{{ firstCap $contentType.Sys.ID }} = &Cf{{ firstCap $contentType.Sys.ID }}{}
-	{{ range $fieldIndex, $field := $contentType.Fields }}
+	if len(contentfulClient) != 0 && contentfulClient[0] != nil {
+    	cf{{ firstCap $contentType.Sys.ID }}.CC = contentfulClient[0]
+    }
+    {{ range $fieldIndex, $field := $contentType.Fields }}
 		cf{{ firstCap $contentType.Sys.ID }}.Fields.{{ firstCap $field.ID }} = map[string]{{ mapFieldType $contentType.Sys.ID $field }}{}
 	{{ end }}
 	cf{{ firstCap $contentType.Sys.ID }}.Sys.ContentType.Sys.ID = "{{ $contentType.Sys.ID }}"
@@ -608,7 +611,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) ToReference() (refSys ContentTyp
 
 func (cc *ContentfulClient) cacheAll{{ firstCap $contentType.Sys.ID }}(ctx context.Context, resultChan chan<- ContentTypeResult) (vos map[string]*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
 	if cc == nil || cc.Client == nil {
-		return nil, errors.New("cacheAll{{ firstCap $contentType.Sys.ID }}: No CDA client available")
+		return nil, errors.New("cacheAll{{ firstCap $contentType.Sys.ID }}: No CDA/CPA client available")
 	}
 	var all{{ firstCap $contentType.Sys.ID }} []*Cf{{ firstCap $contentType.Sys.ID }}
 	col := &contentful.Collection{
@@ -632,6 +635,15 @@ func (cc *ContentfulClient) cacheAll{{ firstCap $contentType.Sys.ID }}(ctx conte
 	}
 	{{ $contentType.Sys.ID }}Map := map[string]*Cf{{ firstCap $contentType.Sys.ID }}{}
 	for _, {{ $contentType.Sys.ID }} := range all{{ firstCap $contentType.Sys.ID }} {
+		if cc.Cache != nil {
+            existing{{ firstCap $contentType.Sys.ID }}, err := cc.Get{{ firstCap $contentType.Sys.ID }}ByID({{ $contentType.Sys.ID }}.Sys.ID)
+            if err != nil {
+                return nil, err
+            }
+            if existing{{ firstCap $contentType.Sys.ID }}.Sys.Version > {{ $contentType.Sys.ID }}.Sys.Version {
+                return nil, fmt.Errorf("cache update canceled because {{ firstCap $contentType.Sys.ID }} entry %s is newer in cache", {{ $contentType.Sys.ID }}.Sys.ID)
+            }
+        }
 		{{ $contentType.Sys.ID }}Map[{{ $contentType.Sys.ID }}.Sys.ID] = {{ $contentType.Sys.ID }}
 	result := ContentTypeResult{
 	EntryID: {{ $contentType.Sys.ID }}.Sys.ID,

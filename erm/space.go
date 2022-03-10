@@ -3,8 +3,8 @@ package erm
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -68,28 +68,44 @@ func getContentTypes(CMA *contentful.Contentful, spaceID string) (contentTypes [
 	return
 }
 
-func getData(spaceID, cmaKey, environment string, flagContentTypes []string) (
+func getData(spaceID, cmaKey, environment, exportFile string, flagContentTypes []string) (
 	finalContentTypes []ContentType, locales []Locale, err error,
 ) {
-	// Get client
-	CMA := contentful.NewCMA(cmaKey)
-	CMA.Debug = false
-	if environment != "" {
-		CMA.Environment = environment
+	var contentTypes []ContentType
+	if exportFile != "" {
+		fileBytes, err := ioutil.ReadFile(exportFile)
+		if err != nil {
+			return nil, nil, fmt.Errorf("error reading export file: %v", err)
+		}
+		var export ExportFile
+		err = json.Unmarshal(fileBytes, &export)
+		if err != nil {
+			return nil, nil, fmt.Errorf("error parsing export file: %v", err)
+		}
+		contentTypes = export.ContentTypes
+		locales = export.Locales
+	} else {
+		// Get client
+		CMA := contentful.NewCMA(cmaKey)
+		CMA.Debug = false
+		if environment != "" {
+			CMA.Environment = environment
+		}
+
+		// Get space locales
+		locales, err = getLocales(CMA, spaceID)
+		if err != nil {
+			return nil, nil, fmt.Errorf("could not get locales: %v", err)
+		}
+		fmt.Println("Locales found:", locales)
+
+		// Get content types
+		contentTypes, err = getContentTypes(CMA, spaceID)
+		if err != nil {
+			return nil, nil, fmt.Errorf("could not get content types: %v", err)
+		}
 	}
 
-	// Get space locales
-	locales, errGetLocales := getLocales(CMA, spaceID)
-	if errGetLocales != nil {
-		return nil, nil, errors.New("Could not get locales: " + errGetLocales.Error())
-	}
-	fmt.Println("Locales found:", locales)
-
-	// Get content types
-	contentTypes, err := getContentTypes(CMA, spaceID)
-	if err != nil {
-		return nil, nil, errors.New("Could not get content types")
-	}
 	fmt.Println("Content types found:", len(contentTypes))
 
 	finalContentTypes = []ContentType{}
@@ -111,8 +127,8 @@ func getData(spaceID, cmaKey, environment string, flagContentTypes []string) (
 }
 
 // GenerateAPI calls the generators
-func GenerateAPI(dir, packageName, spaceID, cmaKey, environment string, flagContentTypes []string) (err error) {
-	contentTypes, locales, errGetData := getData(spaceID, cmaKey, environment, flagContentTypes)
+func GenerateAPI(dir, packageName, spaceID, cmaKey, environment, exportFile string, flagContentTypes []string) (err error) {
+	contentTypes, locales, errGetData := getData(spaceID, cmaKey, environment, exportFile, flagContentTypes)
 	if errGetData != nil {
 		return errGetData
 	}

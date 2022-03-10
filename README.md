@@ -57,19 +57,25 @@ SYNOPSIS
 Usage of gocontentful:
   -cmakey string
     	Contentful CMA key
-  -contenttypes string
-    	[Optional] Content type IDs to parse, comma separated
-  -environment string
-    	Contentful space environment
-  -help
-    	Print version and exit
   -spaceid string
     	Contentful space ID
+  -environment string
+    	Contentful space environment
+  -exportfile string
+        Space export file to generate the API from
+  -contenttypes string
+    	[Optional] Content type IDs to parse, comma separated
+  -help
+    	Print usage info and exit
   -version
     	Print version and exit
 
-Note: The last segment of the path/to/target/package will be used as package name
 </code></pre>
+Notes: 
+- The last segment of the path/to/target/package will be used as package name
+- You need to pass gocontentful either cmakey/spaceid (and optional environment) to generate
+the API from a live space or exportfile to generate it from a local space export file 
+
 
 ### Use case
 
@@ -301,9 +307,10 @@ Updates a single entry or asset (the sysType can take const sysTypeEntry or sysT
 
 _For these we're assuming a content type named "Person"._
 
->**NewCfPerson**() (cfPerson *CfPerson)
+>**NewCfPerson**(contentfulClient ...*ContentfulClient) (cfPerson *CfPerson)
 
-Creates a new Person entry. You can manipulate and upsert this later.
+Creates a new Person entry. You can manipulate and upsert this later. The contentfulClient parameter is optional but you 
+might want to pass it most of the times or you won't be able to save the entry.
 
 >(cc *ContentfulClient) **GetAllPerson**() (voMap map[string]*CfPerson, err error)
 

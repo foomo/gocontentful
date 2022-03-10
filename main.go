@@ -11,7 +11,7 @@ import (
 	"github.com/foomo/gocontentful/erm"
 )
 
-var VERSION = "v1.0.4"
+var VERSION = "v1.0.6"
 
 var Usage = func() {
 	fmt.Printf("\nSYNOPSIS\n")
@@ -35,7 +35,8 @@ func main() {
 	// Get parameters from cmd line flags
 	flagSpaceID := flag.String("spaceid", "", "Contentful space ID")
 	flagCMAKey := flag.String("cmakey", "", "Contentful CMA key")
-	flagEnvironment := flag.String("environment", "", "Contentful space environment")
+	flagEnvironment := flag.String("environment", "", "[Optional] Contentful space environment")
+	flagGenerateFromExport := flag.String("exportfile", "", "Space export file to generate the API from")
 	flagContentTypes := flag.String("contenttypes", "", "[Optional] Content type IDs to parse, comma separated")
 	flagVersion := flag.Bool("version", false, "Print version and exit")
 	flagHelp := flag.Bool("help", false, "Print version and exit")
@@ -51,8 +52,9 @@ func main() {
 		os.Exit(0)
 	}
 
-	if *flagSpaceID == "" || *flagCMAKey == "" {
-		usageError("Please specify the Contentful space ID and access Key")
+	if *flagGenerateFromExport == "" && (*flagSpaceID == "" || *flagCMAKey == "") ||
+		*flagGenerateFromExport != "" && (*flagSpaceID != "" || *flagCMAKey != "") {
+		usageError("Please specify either a Contentful Space ID and CMA access token or an export file name")
 	}
 
 	if len(flag.Args()) != 1 {
@@ -76,7 +78,7 @@ func main() {
 		}
 	}
 
-	err = erm.GenerateAPI(filepath.Dir(path), packageName, *flagSpaceID, *flagCMAKey, *flagEnvironment, flagContentTypesSlice)
+	err = erm.GenerateAPI(filepath.Dir(path), packageName, *flagSpaceID, *flagCMAKey, *flagEnvironment, *flagGenerateFromExport, flagContentTypesSlice)
 	if err != nil {
 		fatal("Something went horribly wrong...", err)
 	}
