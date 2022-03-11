@@ -260,9 +260,15 @@ enviroment calling the SetEnviroment method. See documentation below.
 
 ### Unit tests
 
-You'll write your own unit tests using the generated code, but the generator itself will need some good tests. These require a non-trivial set of data and a pass-through HTTP connection to load it from the filesystem instead of the network. It's all in the plan, hang on.
+As of v1.0.6 gocontenful can generate the API files also  from a local export
+JSON file (through the `-exportfile` command line option)
+and it includes both a sample export file (`./test/test-space-export.json`) and 
+a test suite you can run with
 
-_@TODO: add sample space data and unit tests_ 
+`make test`
+
+This generates the API in the test/testapi folder and runs a dozen unit tests to 
+make sure everything is working correctly. 
 
 Public functions and methods
 ---------------------
