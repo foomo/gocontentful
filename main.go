@@ -11,7 +11,7 @@ import (
 	"github.com/foomo/gocontentful/erm"
 )
 
-var VERSION = "v1.0.6"
+var VERSION = "v1.0.7"
 
 var Usage = func() {
 	fmt.Printf("\nSYNOPSIS\n")
