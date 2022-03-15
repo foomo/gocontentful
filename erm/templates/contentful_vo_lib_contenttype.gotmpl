@@ -62,11 +62,11 @@ func (cc *ContentfulClient) GetFiltered{{ firstCap $contentType.Sys.ID }}(query 
 	return {{ $contentType.Sys.ID }}Map, nil
 }
 
-func (cc *ContentfulClient) Get{{ firstCap $contentType.Sys.ID }}ByID(id string) (vo *Cf{{ firstCap $contentType.Sys.ID }}, err error) {
+func (cc *ContentfulClient) Get{{ firstCap $contentType.Sys.ID }}ByID(id string, forceNoCache ...bool) (vo *Cf{{ firstCap $contentType.Sys.ID }}, err error) {
 	if cc == nil || cc.Client == nil {
 		return nil, errors.New("Get{{ firstCap $contentType.Sys.ID }}ByID: No client available")
 	}
-	if cc.Cache != nil {
+	if cc.Cache != nil && (len(forceNoCache) == 0 || !forceNoCache[0]) {
 		cc.Cache.entryMaps.{{ $contentType.Sys.ID }}GcLock.RLock()
 		vo, ok := cc.Cache.entryMaps.{{ $contentType.Sys.ID }}[id]
 		cc.Cache.entryMaps.{{ $contentType.Sys.ID }}GcLock.RUnlock()

@@ -230,11 +230,11 @@ func (cc *ContentfulClient) GetAllAssets() (map[string]*contentful.Asset, error)
 	return cc.getAllAssets(true)
 }
 
-func (cc *ContentfulClient) GetAssetByID(id string) (*contentful.Asset, error) {
+func (cc *ContentfulClient) GetAssetByID(id string, forceNoCache ...bool) (*contentful.Asset, error) {
 	if cc == nil || cc.Client == nil {
 		return nil, errors.New("GetAssetByID: No client available")
 	}
-	if cc.Cache != nil && cc.Cache.assets != nil {
+	if cc.Cache != nil && cc.Cache.assets != nil && (len(forceNoCache) == 0 || !forceNoCache[0]) {
 		cc.Cache.assetsGcLock.RLock()
 		asset, okAsset := cc.Cache.assets[id]
 		cc.Cache.assetsGcLock.RUnlock()

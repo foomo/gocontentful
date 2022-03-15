@@ -326,9 +326,10 @@ Retrieves all Person entries from the client and returnes a map where the key is
 
 Retrieves Person entries matching the specified query.
 
->(cc *ContentfulClient) **GetPersonByID**(id string) (vo *CfPerson, err error)
+>(cc *ContentfulClient) **GetPersonByID**(id string, forceNoCache ...bool) (vo *CfPerson, err error)
 
-Retrieves the Person entry with the specified ID.
+Retrieves the Person entry with the specified ID. The optional _forceNoCache_ parameter, if true, 
+makes the function bypass the existing cache and load a fresh copy of the entry from Contentful.
 
 ---
 
@@ -425,9 +426,10 @@ Deletes an asset from the client's cache
 
 Retrieve all assets from a space
 
->(cc *ContentfulClient) **GetAssetByID**(id string) (*contentful.Asset, error)
+>(cc *ContentfulClient) **GetAssetByID**(id string, forceNoCache ...bool) (*contentful.Asset, error)
 
-Retrieve an asset from a space by its ID
+Retrieve an asset from a space by its ID. The optional _forceNoCache_ parameter, if true,
+makes the function bypass the existing cache and load a fresh copy of the asset from Contentful.
 
 >**NewAssetFromURL**(id string, uploadUrl string, imageFileType string, title string, locale ...string) *contentful.Asset
 
