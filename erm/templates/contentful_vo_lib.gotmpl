@@ -67,6 +67,14 @@ type ContentTypeResult struct {
 	References  map[string][]EntryReference
 }
 
+type ContentTypeInfo struct {
+	ContentType string
+	Title       string
+	Description string
+}
+
+type ContentTypeInfoMap map[string]ContentTypeInfo
+
 type EntryReference struct {
 	ContentType string
 	ID string
@@ -137,7 +145,13 @@ var (
 )
 
 var spaceContentTypes = []string{ {{ range $index , $contentType := $contentTypes }}ContentType{{ firstCap $contentType.Sys.ID }}, {{ end }} }
-
+var SpaceContentTypeInfoMap = ContentTypeInfoMap{ {{ range $index , $contentType := $contentTypes }}
+    "{{ $contentType.Sys.ID }}": ContentTypeInfo{
+            ContentType: "{{ $contentType.Sys.ID }}",
+            Title:       "{{ $contentType.Name }}",
+            Description: "{{ $contentType.Description }}",
+        },{{ end }}
+}
 func (cc *ContentfulClient) BrokenReferences() (brokenReferences []BrokenReference) {
 	if cc.Cache == nil {
 		return

@@ -56,9 +56,10 @@ type ContentTypeField struct {
 
 // ContentType VO
 type ContentType struct {
-	Sys    ContentfulSys      `json:"sys,omitempty"`
-	Name   string             `json:"name,omitempty"`
-	Fields []ContentTypeField `json:"fields,omitempty"`
+	Sys         ContentfulSys      `json:"sys,omitempty"`
+	Name        string             `json:"name,omitempty"`
+	Description string             `json:"description,omitempty"`
+	Fields      []ContentTypeField `json:"fields,omitempty"`
 }
 
 type ExportFile struct {
