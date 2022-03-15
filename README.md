@@ -476,7 +476,7 @@ All the three functions above can be passed as nil with different levels of grac
 
 ---
 
-**CONSTANTS**
+**CONSTANTS AND GLOBAL VARIABLES**
 
 Each generated content type library file exports a constant with the Contentful ID of the content type itself, for example in _contentful_vo_lib_person.go_:
 
@@ -497,6 +497,8 @@ Four levels of logging are supported (even if only partially used at this time):
     LogError = 3
 )</code></pre>
 
+A global variable named _SpaceContentTypeInfoMap_ contains an ID-indexed map of all content types 
+with their names and descriptions
 
 Dependencies and credits
 ------------------------
