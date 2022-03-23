@@ -64,11 +64,11 @@ func (cc *ContentfulClient) GetFilteredCategory(query *contentful.Query) (voMap 
 	return categoryMap, nil
 }
 
-func (cc *ContentfulClient) GetCategoryByID(id string) (vo *CfCategory, err error) {
+func (cc *ContentfulClient) GetCategoryByID(id string, forceNoCache ...bool) (vo *CfCategory, err error) {
 	if cc == nil || cc.Client == nil {
 		return nil, errors.New("GetCategoryByID: No client available")
 	}
-	if cc.Cache != nil {
+	if cc.Cache != nil && (len(forceNoCache) == 0 || !forceNoCache[0]) {
 		cc.Cache.entryMaps.categoryGcLock.RLock()
 		vo, ok := cc.Cache.entryMaps.category[id]
 		cc.Cache.entryMaps.categoryGcLock.RUnlock()
@@ -489,10 +489,7 @@ func (cc *ContentfulClient) cacheAllCategory(ctx context.Context, resultChan cha
 	for _, category := range allCategory {
 		if cc.Cache != nil {
 			existingCategory, err := cc.GetCategoryByID(category.Sys.ID)
-			if err != nil {
-				return nil, err
-			}
-			if existingCategory.Sys.Version > category.Sys.Version {
+			if err == nil && existingCategory != nil && existingCategory.Sys.Version > category.Sys.Version {
 				return nil, fmt.Errorf("cache update canceled because Category entry %s is newer in cache", category.Sys.ID)
 			}
 		}

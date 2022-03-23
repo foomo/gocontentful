@@ -64,11 +64,11 @@ func (cc *ContentfulClient) GetFilteredProduct(query *contentful.Query) (voMap m
 	return productMap, nil
 }
 
-func (cc *ContentfulClient) GetProductByID(id string) (vo *CfProduct, err error) {
+func (cc *ContentfulClient) GetProductByID(id string, forceNoCache ...bool) (vo *CfProduct, err error) {
 	if cc == nil || cc.Client == nil {
 		return nil, errors.New("GetProductByID: No client available")
 	}
-	if cc.Cache != nil {
+	if cc.Cache != nil && (len(forceNoCache) == 0 || !forceNoCache[0]) {
 		cc.Cache.entryMaps.productGcLock.RLock()
 		vo, ok := cc.Cache.entryMaps.product[id]
 		cc.Cache.entryMaps.productGcLock.RUnlock()
@@ -1107,10 +1107,7 @@ func (cc *ContentfulClient) cacheAllProduct(ctx context.Context, resultChan chan
 	for _, product := range allProduct {
 		if cc.Cache != nil {
 			existingProduct, err := cc.GetProductByID(product.Sys.ID)
-			if err != nil {
-				return nil, err
-			}
-			if existingProduct.Sys.Version > product.Sys.Version {
+			if err == nil && existingProduct != nil && existingProduct.Sys.Version > product.Sys.Version {
 				return nil, fmt.Errorf("cache update canceled because Product entry %s is newer in cache", product.Sys.ID)
 			}
 		}

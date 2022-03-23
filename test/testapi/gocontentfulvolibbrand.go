@@ -64,11 +64,11 @@ func (cc *ContentfulClient) GetFilteredBrand(query *contentful.Query) (voMap map
 	return brandMap, nil
 }
 
-func (cc *ContentfulClient) GetBrandByID(id string) (vo *CfBrand, err error) {
+func (cc *ContentfulClient) GetBrandByID(id string, forceNoCache ...bool) (vo *CfBrand, err error) {
 	if cc == nil || cc.Client == nil {
 		return nil, errors.New("GetBrandByID: No client available")
 	}
-	if cc.Cache != nil {
+	if cc.Cache != nil && (len(forceNoCache) == 0 || !forceNoCache[0]) {
 		cc.Cache.entryMaps.brandGcLock.RLock()
 		vo, ok := cc.Cache.entryMaps.brand[id]
 		cc.Cache.entryMaps.brandGcLock.RUnlock()
@@ -725,10 +725,7 @@ func (cc *ContentfulClient) cacheAllBrand(ctx context.Context, resultChan chan<-
 	for _, brand := range allBrand {
 		if cc.Cache != nil {
 			existingBrand, err := cc.GetBrandByID(brand.Sys.ID)
-			if err != nil {
-				return nil, err
-			}
-			if existingBrand.Sys.Version > brand.Sys.Version {
+			if err == nil && existingBrand != nil && existingBrand.Sys.Version > brand.Sys.Version {
 				return nil, fmt.Errorf("cache update canceled because Brand entry %s is newer in cache", brand.Sys.ID)
 			}
 		}

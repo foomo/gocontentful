@@ -71,6 +71,14 @@ type ContentTypeResult struct {
 	References  map[string][]EntryReference
 }
 
+type ContentTypeInfo struct {
+	ContentType string
+	Title       string
+	Description string
+}
+
+type ContentTypeInfoMap map[string]ContentTypeInfo
+
 type EntryReference struct {
 	ContentType string
 	ID          string
@@ -142,6 +150,23 @@ var (
 )
 
 var spaceContentTypes = []string{ContentTypeBrand, ContentTypeCategory, ContentTypeProduct}
+var SpaceContentTypeInfoMap = ContentTypeInfoMap{
+	"brand": ContentTypeInfo{
+		ContentType: "brand",
+		Title:       "Brand",
+		Description: "",
+	},
+	"category": ContentTypeInfo{
+		ContentType: "category",
+		Title:       "Category",
+		Description: "",
+	},
+	"product": ContentTypeInfo{
+		ContentType: "product",
+		Title:       "Product",
+		Description: "",
+	},
+}
 
 func (cc *ContentfulClient) BrokenReferences() (brokenReferences []BrokenReference) {
 	if cc.Cache == nil {
@@ -235,11 +260,11 @@ func (cc *ContentfulClient) GetAllAssets() (map[string]*contentful.Asset, error)
 	return cc.getAllAssets(true)
 }
 
-func (cc *ContentfulClient) GetAssetByID(id string) (*contentful.Asset, error) {
+func (cc *ContentfulClient) GetAssetByID(id string, forceNoCache ...bool) (*contentful.Asset, error) {
 	if cc == nil || cc.Client == nil {
 		return nil, errors.New("GetAssetByID: No client available")
 	}
-	if cc.Cache != nil && cc.Cache.assets != nil {
+	if cc.Cache != nil && cc.Cache.assets != nil && (len(forceNoCache) == 0 || !forceNoCache[0]) {
 		cc.Cache.assetsGcLock.RLock()
 		asset, okAsset := cc.Cache.assets[id]
 		cc.Cache.assetsGcLock.RUnlock()
