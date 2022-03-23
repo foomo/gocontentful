@@ -68,11 +68,28 @@ func TestGetParents(t *testing.T) {
 	require.Equal(t, 2, len(brandParents))
 }
 
+func TestCacheIfNewEntry(t *testing.T) {
+	contentfulClient, err := getTestClient()
+	require.NoError(t, err)
+	stats, err := contentfulClient.GetCacheStats()
+	require.NoError(t, err)
+	require.Equal(t, 9, stats.EntryCount)
+	err = contentfulClient.SetOfflineFallback("./test-space-export-newer.json")
+	require.NoError(t, err)
+	err = contentfulClient.UpdateCache(context.TODO(), nil, false)
+	require.NoError(t, err)
+	stats, err = contentfulClient.GetCacheStats()
+	require.NoError(t, err)
+	require.Equal(t, 10, stats.EntryCount)
+}
+
 func TestPreserveCacheIfNewer(t *testing.T) {
 	contentfulClient, err := getTestClient()
 	require.NoError(t, err)
-	contentfulClient.SetOfflineFallback("./test-space-export-older.json")
-	contentfulClient.UpdateCache(context.TODO(), nil, false)
+	err = contentfulClient.SetOfflineFallback("./test-space-export-older.json")
+	require.NoError(t, err)
+	err = contentfulClient.UpdateCache(context.TODO(), nil, false)
+	require.Error(t, err)
 	brand, err := contentfulClient.GetBrandByID("JrePkDVYomE8AwcuCUyMi")
 	require.NoError(t, err)
 	require.Equal(t, 2.0, brand.Sys.Version)
