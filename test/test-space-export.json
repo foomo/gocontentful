@@ -694,7 +694,6 @@
             "linkType": "Environment"
           }
         },
-        "publishedVersion": 1,
         "publishedAt": "2020-01-15T10:09:36.578Z",
         "firstPublishedAt": "2020-01-15T10:09:36.578Z",
         "createdBy": {
@@ -913,7 +912,7 @@
           }
         },
         "publishedCounter": 1,
-        "version": 2,
+        "version": 3,
         "publishedBy": {
           "sys": {
             "type": "Link",

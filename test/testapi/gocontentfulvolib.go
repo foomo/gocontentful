@@ -363,6 +363,7 @@ func (ref *EntryReference) GetParents(cc *ContentfulClient) (parents []EntryRefe
 func HtmlToRichText(htmlSrc string) *RichTextNode {
 	htmlClean := strings.TrimSpace(htmlSrc)
 	htmlClean = strings.ReplaceAll(htmlClean, `&nbsp;`, ` `)
+	htmlClean = strings.ReplaceAll(htmlClean, "&amp;", "&")
 	htmlClean = strings.ReplaceAll(htmlClean, "\t", "")
 	htmlClean = regexp.MustCompile(`[\s]{2,}`).ReplaceAllString(htmlClean, " ")
 	re := regexp.MustCompile(`>([^\n])`)
@@ -945,7 +946,14 @@ func richTextHtmlLinesToNode(htmlLines []string, start int, pendingTag string, m
 			})
 		}
 		marks = nil
-		nodeSlice = append(nodeSlice, currentNodeTextNode)
+		if pendingTag == "" {
+			nodeSlice = append(nodeSlice, RichTextNode{
+				NodeType: RichTextNodeParagraph,
+				Content:  []interface{}{currentNodeTextNode},
+			})
+		} else {
+			nodeSlice = append(nodeSlice, currentNodeTextNode)
+		}
 	}
 	return nodeSlice, -1, isBasic
 }
@@ -1295,19 +1303,27 @@ func commonGetParents(cc *ContentfulClient, id string, contentType []string) (pa
 		}
 		return cc.Cache.parentMap[id], nil
 	}
-	if len(contentType) != 1 {
-		return nil, errors.New("GetParents: uncached parentMap queries need a contentType")
-	}
 	col := cc.Client.Entries.List(cc.SpaceID)
-	col.Query.Equal("fields.nodes.sys.id", id).ContentType(contentType[0]).Locale("*")
+	col.Query.Equal("links_to_entry", id).Locale("*")
 	_, err = col.GetAll()
 	if err != nil {
 		return nil, errors.New("GetParents: " + err.Error())
 	}
-	switch contentType[0] {
-
-	case ContentTypeBrand:
-		for _, item := range col.Items {
+	for _, item := range col.Items {
+		var entry contentful.Entry
+		byteArray, err := json.Marshal(item)
+		if err != nil {
+			return nil, err
+		}
+		err = json.Unmarshal(byteArray, &entry)
+		if err != nil {
+			return nil, err
+		}
+		if len(contentType) == 1 && contentType[0] != entry.Sys.ContentType.Sys.ID {
+			continue
+		}
+		switch entry.Sys.ContentType.Sys.ID {
+		case ContentTypeBrand:
 			var parentVO CfBrand
 			byteArray, _ := json.Marshal(item)
 			err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&parentVO)
@@ -1317,14 +1333,12 @@ func commonGetParents(cc *ContentfulClient, id string, contentType []string) (pa
 			parentVO.CC = cc
 			parents = append(
 				parents, EntryReference{
-					ContentType: contentType[0],
-					ID:          parentVO.Sys.ID,
+					ContentType: entry.Sys.ContentType.Sys.ID,
+					ID:          entry.Sys.ID,
 					VO:          &parentVO,
 				})
-		}
 
-	case ContentTypeCategory:
-		for _, item := range col.Items {
+		case ContentTypeCategory:
 			var parentVO CfCategory
 			byteArray, _ := json.Marshal(item)
 			err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&parentVO)
@@ -1334,14 +1348,12 @@ func commonGetParents(cc *ContentfulClient, id string, contentType []string) (pa
 			parentVO.CC = cc
 			parents = append(
 				parents, EntryReference{
-					ContentType: contentType[0],
-					ID:          parentVO.Sys.ID,
+					ContentType: entry.Sys.ContentType.Sys.ID,
+					ID:          entry.Sys.ID,
 					VO:          &parentVO,
 				})
-		}
 
-	case ContentTypeProduct:
-		for _, item := range col.Items {
+		case ContentTypeProduct:
 			var parentVO CfProduct
 			byteArray, _ := json.Marshal(item)
 			err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&parentVO)
@@ -1351,12 +1363,11 @@ func commonGetParents(cc *ContentfulClient, id string, contentType []string) (pa
 			parentVO.CC = cc
 			parents = append(
 				parents, EntryReference{
-					ContentType: contentType[0],
-					ID:          parentVO.Sys.ID,
+					ContentType: entry.Sys.ContentType.Sys.ID,
+					ID:          entry.Sys.ID,
 					VO:          &parentVO,
 				})
 		}
-
 	}
 	return parents, nil
 }

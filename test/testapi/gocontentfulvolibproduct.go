@@ -139,6 +139,19 @@ func (vo *CfProduct) GetParents(contentType ...string) (parents []EntryReference
 	return commonGetParents(vo.CC, vo.Sys.ID, contentType)
 }
 
+func (vo *CfProduct) GetPublishingStatus() string {
+	if vo == nil {
+		return ""
+	}
+	if vo.Sys.PublishedVersion == 0 {
+		return StatusDraft
+	}
+	if vo.Sys.Version-vo.Sys.PublishedVersion == 1 {
+		return StatusPublished
+	}
+	return StatusChanged
+}
+
 // Product Field getters
 
 func (vo *CfProduct) ProductName(locale ...Locale) string {

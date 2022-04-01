@@ -25,6 +25,7 @@ type ContentfulSys struct {
 	Revision         float64        `json:"revision,omitempty"`
 	Version          float64        `json:"version,omitempty"`
 	PublishedCounter float64        `json:"publishedCounter,omitempty"`
+	PublishedVersion float64        `json:"publishedVersion,omitempty"`
 }
 
 type ContentfulReferencedEntry struct {
@@ -133,4 +134,10 @@ const (
 	RichTextMarkItalic    string = "italic"
 	RichTextMarkUnderline string = "underline"
 	RichTextMarkCode      string = "code"
+)
+
+const (
+	StatusDraft     = "draft"
+	StatusChanged   = "changed"
+	StatusPublished = "published"
 )

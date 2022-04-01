@@ -353,9 +353,19 @@ Converts a value object into a reference that can be added to a reference field 
 
 Return a slice of EntryReference objects that represent entries that reference the value object or the entry reference. 
 
-Note that in case of parents of an entry reference: 
-1. you need to pass a pointer to a ContentfulClient because EntryReference objects are generic and can't carry any.
-2. this method currently only works in cached mode 
+Note that in case of parents of an entry reference you need to pass a pointer to a ContentfulClient because EntryReference objects are generic and can't carry any.
+
+>(vo *CfPerson) **GetPublishingStatus**() string
+
+Returns the publishing status of the entry as per the Contentful editor UI. 
+Value returned is one of the following:
+
+<pre><code>const (
+  StatusDraft     = "draft"
+  StatusChanged   = "changed"
+  StatusPublished = "published"
+)</code></pre>
+
 ---
 
 **ENTRY FIELD GETTERS**

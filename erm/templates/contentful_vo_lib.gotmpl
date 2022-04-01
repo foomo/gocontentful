@@ -1244,7 +1244,7 @@ func commonGetParents(cc *ContentfulClient, id string, contentType []string) (pa
     		}
     		switch entry.Sys.ContentType.Sys.ID { {{ range $index , $contentType := $contentTypes }}
 	        case ContentType{{ firstCap $contentType.Sys.ID }}:
-		    	var parentVO CfShopCategory
+		    	var parentVO Cf{{ firstCap $contentType.Sys.ID }}
                 byteArray, _ := json.Marshal(item)
                 err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&parentVO)
                 if err != nil {

@@ -114,6 +114,20 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) GetParents(contentType ...string
     }
 	return commonGetParents(vo.CC, vo.Sys.ID, contentType)
 }
+
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) GetPublishingStatus() string {
+	if vo == nil {
+		return ""
+	}
+	if vo.Sys.PublishedVersion == 0 {
+		return StatusDraft
+	}
+	if vo.Sys.Version-vo.Sys.PublishedVersion == 1 {
+		return StatusPublished
+	}
+	return StatusChanged
+}
+
 // {{ firstCap $contentType.Sys.ID }} Field getters
 {{ range $fieldIndex, $field := $contentType.Fields }}
 {{ if fieldIsBasic $field }}

@@ -121,6 +121,19 @@ func (vo *CfCategory) GetParents(contentType ...string) (parents []EntryReferenc
 	return commonGetParents(vo.CC, vo.Sys.ID, contentType)
 }
 
+func (vo *CfCategory) GetPublishingStatus() string {
+	if vo == nil {
+		return ""
+	}
+	if vo.Sys.PublishedVersion == 0 {
+		return StatusDraft
+	}
+	if vo.Sys.Version-vo.Sys.PublishedVersion == 1 {
+		return StatusPublished
+	}
+	return StatusChanged
+}
+
 // Category Field getters
 
 func (vo *CfCategory) Title(locale ...Locale) string {
