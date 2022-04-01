@@ -1223,34 +1223,41 @@ func commonGetParents(cc *ContentfulClient, id string, contentType []string) (pa
 		}
 		return cc.Cache.parentMap[id], nil
 	}
-	if len(contentType) != 1 {
-		return nil, errors.New("GetParents: uncached parentMap queries need a contentType")
-	}
 	col := cc.Client.Entries.List(cc.SpaceID)
-	col.Query.Equal("fields.nodes.sys.id", id).ContentType(contentType[0]).Locale("*")
+	col.Query.Equal("links_to_entry", id).Locale("*")
 	_, err = col.GetAll()
 	if err != nil {
 		return nil, errors.New("GetParents: " + err.Error())
 	}
-	switch contentType[0] {
-	{{ range $index , $contentType := $contentTypes }}
-	case ContentType{{ firstCap $contentType.Sys.ID }}:
-		for _, item := range col.Items {
-			var parentVO Cf{{ firstCap $contentType.Sys.ID }}
-			byteArray, _ := json.Marshal(item)
-			err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&parentVO)
-			if err != nil {
-				return nil, errors.New("GetParents: " + err.Error())
-			}
-			parentVO.CC = cc
-			parents = append(
-				parents, EntryReference{
-					ContentType: contentType[0],
-					ID:          parentVO.Sys.ID,
-					VO:          &parentVO,
-				})
-		}
-		{{ end }}
+	for _, item := range col.Items {
+    		var entry contentful.Entry
+    		byteArray, err := json.Marshal(item)
+    		if err != nil {
+    			return nil, err
+    		}
+    		err = json.Unmarshal(byteArray, &entry)
+    		if err != nil {
+    			return nil, err
+    		}
+    		if len(contentType) == 1 && contentType[0] != entry.Sys.ContentType.Sys.ID {
+    			continue
+    		}
+    		switch entry.Sys.ContentType.Sys.ID { {{ range $index , $contentType := $contentTypes }}
+	        case ContentType{{ firstCap $contentType.Sys.ID }}:
+		    	var parentVO CfShopCategory
+                byteArray, _ := json.Marshal(item)
+                err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&parentVO)
+                if err != nil {
+                    return nil, errors.New("GetParents: " + err.Error())
+                }
+                parentVO.CC = cc
+                parents = append(
+                    parents, EntryReference{
+                        ContentType: entry.Sys.ContentType.Sys.ID,
+                        ID:          entry.Sys.ID,
+                        VO:          &parentVO,
+                    })
+            {{ end }} }
 	}
 	return parents, nil
 }
