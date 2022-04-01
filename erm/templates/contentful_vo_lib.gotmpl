@@ -333,7 +333,8 @@ func (ref *EntryReference) GetParents(cc *ContentfulClient) (parents []EntryRefe
 func HtmlToRichText(htmlSrc string) *RichTextNode {
 	htmlClean := strings.TrimSpace(htmlSrc)
 	htmlClean = strings.ReplaceAll(htmlClean, `&nbsp;`, ` `)
-	htmlClean = strings.ReplaceAll(htmlClean, "\t", "")
+	htmlClean = strings.ReplaceAll(htmlClean, "&amp;", "&")
+    htmlClean = strings.ReplaceAll(htmlClean, "\t", "")
 	htmlClean = regexp.MustCompile(`[\s]{2,}`).ReplaceAllString(htmlClean, " ")
 	re := regexp.MustCompile(`>([^\n])`)
 	htmlClean = re.ReplaceAllString(htmlClean, fmt.Sprintf(">\n"+`$1`))
@@ -903,7 +904,14 @@ func richTextHtmlLinesToNode(htmlLines []string, start int, pendingTag string, m
 			})
 		}
 		marks = nil
-		nodeSlice = append(nodeSlice, currentNodeTextNode)
+        if pendingTag == "" {
+            nodeSlice = append(nodeSlice, RichTextNode{
+                NodeType: RichTextNodeParagraph,
+                Content:  []interface{}{currentNodeTextNode},
+            })
+        } else {
+            nodeSlice = append(nodeSlice, currentNodeTextNode)
+        }
 	}
 	return nodeSlice, -1, isBasic
 }
