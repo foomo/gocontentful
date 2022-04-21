@@ -832,10 +832,27 @@ func richTextHtmlLinesToNode(htmlLines []string, start int, pendingTag string, m
 				currentNode.NodeType = richTextMapTagNodeType(tt)
 				currentNode.Content = make([]interface{}, 0)
 				innerContent, nextLine, isBasic := richTextHtmlLinesToNode(htmlLines, i+1, tt, marks, isBasic)
-				currentNode.Content = append(currentNode.Content, RichTextNode{
-					NodeType: RichTextNodeParagraph,
-					Content:  innerContent,
-				})
+				if len(innerContent) == 1 {
+                    switch innerContent[0].(type) {
+                    case RichTextNodeTextNode:
+                        currentNode.Content = append(currentNode.Content, RichTextNode{
+                            NodeType: RichTextNodeParagraph,
+                            Content:  innerContent,
+                        })
+                    }
+                } else {
+                    for _, ct := range innerContent {
+                        switch ct.(type) {
+                        case RichTextNode:
+                            currentNode.Content = append(currentNode.Content, ct)
+                        case RichTextNodeTextNode:
+                            currentNode.Content = append(currentNode.Content, RichTextNode{
+                                NodeType: RichTextNodeParagraph,
+                                Content:  []interface{}{ct},
+                            })
+                        }
+                    }
+                }
 				nodeSlice = append(nodeSlice, currentNode)
 				if nextLine == -1 {
 					return nodeSlice, -1, isBasic
