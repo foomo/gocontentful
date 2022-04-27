@@ -1,9 +1,12 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
+	"os/user"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -11,13 +14,20 @@ import (
 	"github.com/foomo/gocontentful/erm"
 )
 
-var VERSION = "v1.0.8"
+var VERSION = "v1.0.9"
+
+type contentfulRc struct {
+	ManagementToken string `json:"managementToken"`
+}
 
 var Usage = func() {
 	fmt.Printf("\nSYNOPSIS\n")
 	fmt.Printf("     gocontentful -spaceid SpaceID -cmakey CMAKey [-contenttypes firsttype,secondtype...lasttype] path/to/target/package\n\n")
 	flag.PrintDefaults()
-	fmt.Printf("\nNote: The last segment of the path/to/target/package will be used as package name\n\n")
+	fmt.Printf("\nNotes:\n")
+	fmt.Println("- The last segment of the path/to/target/package will be used as package name")
+	fmt.Println("- The -cmakey parameter can be omitted if you logged in with the Contentful CLI")
+	fmt.Println()
 }
 
 func usageError(comment string) {
@@ -31,10 +41,27 @@ func fatal(infos ...interface{}) {
 	os.Exit(1)
 }
 
+func getCmaKeyFromRcFile() string {
+	currentUser, errGetUser := user.Current()
+	if errGetUser != nil {
+		return ""
+	}
+	contentfulRcBytes, errReadFile := ioutil.ReadFile(currentUser.HomeDir + "/.contentfulrc.json")
+	if errReadFile != nil {
+		return ""
+	}
+	var contentfulConfig contentfulRc
+	errUnmarshal := json.Unmarshal(contentfulRcBytes, &contentfulConfig)
+	if errUnmarshal != nil {
+		return ""
+	}
+	return contentfulConfig.ManagementToken
+}
+
 func main() {
 	// Get parameters from cmd line flags
 	flagSpaceID := flag.String("spaceid", "", "Contentful space ID")
-	flagCMAKey := flag.String("cmakey", "", "Contentful CMA key")
+	flagCMAKey := flag.String("cmakey", "", "[Optional] Contentful CMA key")
 	flagEnvironment := flag.String("environment", "", "[Optional] Contentful space environment")
 	flagGenerateFromExport := flag.String("exportfile", "", "Space export file to generate the API from")
 	flagContentTypes := flag.String("contenttypes", "", "[Optional] Content type IDs to parse, comma separated")
@@ -51,9 +78,12 @@ func main() {
 		Usage()
 		os.Exit(0)
 	}
-
-	if *flagGenerateFromExport == "" && (*flagSpaceID == "" || *flagCMAKey == "") ||
-		*flagGenerateFromExport != "" && (*flagSpaceID != "" || *flagCMAKey != "") {
+	cmaKey := *flagCMAKey
+	if cmaKey == "" {
+		cmaKey = getCmaKeyFromRcFile()
+	}
+	if *flagGenerateFromExport == "" && (*flagSpaceID == "" || cmaKey == "") ||
+		*flagGenerateFromExport != "" && (*flagSpaceID != "" || cmaKey != "") {
 		usageError("Please specify either a Contentful Space ID and CMA access token or an export file name")
 	}
 
@@ -78,7 +108,7 @@ func main() {
 		}
 	}
 
-	err = erm.GenerateAPI(filepath.Dir(path), packageName, *flagSpaceID, *flagCMAKey, *flagEnvironment, *flagGenerateFromExport, flagContentTypesSlice)
+	err = erm.GenerateAPI(filepath.Dir(path), packageName, *flagSpaceID, cmaKey, *flagEnvironment, *flagGenerateFromExport, flagContentTypesSlice)
 	if err != nil {
 		fatal("Something went horribly wrong...", err)
 	}

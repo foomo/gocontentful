@@ -74,7 +74,8 @@ Usage of gocontentful:
 Notes: 
 - The last segment of the path/to/target/package will be used as package name
 - You need to pass gocontentful either cmakey/spaceid (and optional environment) to generate
-the API from a live space or exportfile to generate it from a local space export file 
+the API from a live space or exportfile to generate it from a local space export file. The cmakey
+can be omitted if you are logged in through the Contentful CLI. 
 
 
 ### Use case
