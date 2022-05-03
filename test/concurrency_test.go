@@ -1,6 +1,7 @@
 package test
 
 import (
+	"context"
 	"github.com/foomo/gocontentful/test/testapi"
 	"sync"
 	"testing"
@@ -46,7 +47,19 @@ func TestConcurrentReadWrites(t *testing.T) {
 		testLogger.Errorf("testConcurrentReadWrites: %v", err)
 	}
 	var wg sync.WaitGroup
-	for i := 1; i <= 50; i++ {
+	for i := 1; i <= 100; i++ {
+		wg.Add(1)
+		i := i
+		go func() {
+			defer wg.Done()
+			testLogger.Infof("testConcurrentReadWrites: caching run %d", i)
+			err = contentfulClient.UpdateCache(context.TODO(), nil, false)
+			if err != nil {
+				testLogger.Errorf("testConcurrentReadWrites: %v", err)
+			}
+		}()
+	}
+	for i := 1; i <= 10000; i++ {
 		wg.Add(1)
 		i := i
 		go func() {
@@ -57,7 +70,7 @@ func TestConcurrentReadWrites(t *testing.T) {
 			}
 		}()
 	}
-	for i := 1; i <= 50; i++ {
+	for i := 1; i <= 10000; i++ {
 		wg.Add(1)
 		i := i
 		go func() {

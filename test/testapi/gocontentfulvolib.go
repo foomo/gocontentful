@@ -21,24 +21,24 @@ import (
 
 type cacheEntryMaps struct {
 	brand          map[string]*CfBrand
-	brandGcLock    sync.RWMutex
+	brandGcLock    sync.Mutex
 	category       map[string]*CfCategory
-	categoryGcLock sync.RWMutex
+	categoryGcLock sync.Mutex
 	product        map[string]*CfProduct
-	productGcLock  sync.RWMutex
+	productGcLock  sync.Mutex
 }
 
 type ClientMode string
 
 type ContentfulCache struct {
 	assets                 assetCacheMap
-	assetsGcLock           sync.RWMutex
+	assetsGcLock           sync.Mutex
 	contentTypes           []string
 	entryMaps              cacheEntryMaps
 	idContentTypeMap       map[string]string
-	idContentTypeMapGcLock sync.RWMutex
+	idContentTypeMapGcLock sync.Mutex
 	parentMap              map[string][]EntryReference
-	parentMapGcLock        sync.RWMutex
+	parentMapGcLock        sync.Mutex
 }
 
 type assetCacheMap map[string]*contentful.Asset
@@ -172,10 +172,10 @@ func (cc *ContentfulClient) BrokenReferences() (brokenReferences []BrokenReferen
 	if cc.Cache == nil {
 		return
 	}
-	cc.Cache.parentMapGcLock.RLock()
-	defer cc.Cache.parentMapGcLock.RUnlock()
-	cc.Cache.idContentTypeMapGcLock.RLock()
-	defer cc.Cache.idContentTypeMapGcLock.RUnlock()
+	cc.Cache.parentMapGcLock.Lock()
+	defer cc.Cache.parentMapGcLock.Unlock()
+	cc.Cache.idContentTypeMapGcLock.Lock()
+	defer cc.Cache.idContentTypeMapGcLock.Unlock()
 	for childID, parents := range cc.Cache.parentMap {
 		if _, okGotEntry := cc.Cache.idContentTypeMap[childID]; !okGotEntry {
 			for _, parent := range parents {
@@ -265,9 +265,9 @@ func (cc *ContentfulClient) GetAssetByID(id string, forceNoCache ...bool) (*cont
 		return nil, errors.New("GetAssetByID: No client available")
 	}
 	if cc.Cache != nil && cc.Cache.assets != nil && (len(forceNoCache) == 0 || !forceNoCache[0]) {
-		cc.Cache.assetsGcLock.RLock()
+		cc.Cache.assetsGcLock.Lock()
 		asset, okAsset := cc.Cache.assets[id]
-		cc.Cache.assetsGcLock.RUnlock()
+		cc.Cache.assetsGcLock.Unlock()
 		if okAsset {
 			return asset, nil
 		}
@@ -306,23 +306,23 @@ func (cc *ContentfulClient) GetContentTypeOfID(id string) (string, error) {
 	if cc.Cache != nil {
 		okVo := false
 
-		cc.Cache.entryMaps.brandGcLock.RLock()
+		cc.Cache.entryMaps.brandGcLock.Lock()
 		_, okVo = cc.Cache.entryMaps.brand[id]
-		cc.Cache.entryMaps.brandGcLock.RUnlock()
+		cc.Cache.entryMaps.brandGcLock.Unlock()
 		if okVo {
 			return ContentTypeBrand, nil
 		}
 
-		cc.Cache.entryMaps.categoryGcLock.RLock()
+		cc.Cache.entryMaps.categoryGcLock.Lock()
 		_, okVo = cc.Cache.entryMaps.category[id]
-		cc.Cache.entryMaps.categoryGcLock.RUnlock()
+		cc.Cache.entryMaps.categoryGcLock.Unlock()
 		if okVo {
 			return ContentTypeCategory, nil
 		}
 
-		cc.Cache.entryMaps.productGcLock.RLock()
+		cc.Cache.entryMaps.productGcLock.Lock()
 		_, okVo = cc.Cache.entryMaps.product[id]
-		cc.Cache.entryMaps.productGcLock.RUnlock()
+		cc.Cache.entryMaps.productGcLock.Unlock()
 		if okVo {
 			return ContentTypeProduct, nil
 		}
@@ -874,10 +874,27 @@ func richTextHtmlLinesToNode(htmlLines []string, start int, pendingTag string, m
 				currentNode.NodeType = richTextMapTagNodeType(tt)
 				currentNode.Content = make([]interface{}, 0)
 				innerContent, nextLine, isBasic := richTextHtmlLinesToNode(htmlLines, i+1, tt, marks, isBasic)
-				currentNode.Content = append(currentNode.Content, RichTextNode{
-					NodeType: RichTextNodeParagraph,
-					Content:  innerContent,
-				})
+				if len(innerContent) == 1 {
+					switch innerContent[0].(type) {
+					case RichTextNodeTextNode:
+						currentNode.Content = append(currentNode.Content, RichTextNode{
+							NodeType: RichTextNodeParagraph,
+							Content:  innerContent,
+						})
+					}
+				} else {
+					for _, ct := range innerContent {
+						switch ct.(type) {
+						case RichTextNode:
+							currentNode.Content = append(currentNode.Content, ct)
+						case RichTextNodeTextNode:
+							currentNode.Content = append(currentNode.Content, RichTextNode{
+								NodeType: RichTextNodeParagraph,
+								Content:  []interface{}{ct},
+							})
+						}
+					}
+				}
 				nodeSlice = append(nodeSlice, currentNode)
 				if nextLine == -1 {
 					return nodeSlice, -1, isBasic

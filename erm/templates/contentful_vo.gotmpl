@@ -14,7 +14,7 @@ type Cf{{ firstCap $contentType.Sys.ID }} struct {
 type Cf{{ firstCap $contentType.Sys.ID }}Fields struct {
 	{{ range $fieldIndex, $field := $contentType.Fields }}
 	{{ firstCap $field.ID }}				map[string]{{ mapFieldType $contentType.Sys.ID $field }}			`json:"{{ $field.ID }},omitempty"`
-	RWLock{{ firstCap $field.ID }} sync.RWMutex         `json:"-"`{{ end }}
+	RWLock{{ firstCap $field.ID }} sync.Mutex         `json:"-"`{{ end }}
 }
 	{{ range $fieldIndex, $field := $contentType.Fields }}
 		{{ if fieldIsAsset $field }}

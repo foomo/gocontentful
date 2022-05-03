@@ -69,9 +69,9 @@ func (cc *ContentfulClient) GetCategoryByID(id string, forceNoCache ...bool) (vo
 		return nil, errors.New("GetCategoryByID: No client available")
 	}
 	if cc.Cache != nil && (len(forceNoCache) == 0 || !forceNoCache[0]) {
-		cc.Cache.entryMaps.categoryGcLock.RLock()
+		cc.Cache.entryMaps.categoryGcLock.Lock()
 		vo, ok := cc.Cache.entryMaps.category[id]
-		cc.Cache.entryMaps.categoryGcLock.RUnlock()
+		cc.Cache.entryMaps.categoryGcLock.Unlock()
 		if ok {
 			return vo, nil
 		}
@@ -143,8 +143,8 @@ func (vo *CfCategory) Title(locale ...Locale) string {
 	if vo.CC == nil {
 		return ""
 	}
-	vo.Fields.RWLockTitle.RLock()
-	defer vo.Fields.RWLockTitle.RUnlock()
+	vo.Fields.RWLockTitle.Lock()
+	defer vo.Fields.RWLockTitle.Unlock()
 	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
@@ -180,8 +180,8 @@ func (vo *CfCategory) Icon(locale ...Locale) *contentful.AssetNoLocale {
 	if vo.CC == nil {
 		return nil
 	}
-	vo.Fields.RWLockIcon.RLock()
-	defer vo.Fields.RWLockIcon.RUnlock()
+	vo.Fields.RWLockIcon.Lock()
+	defer vo.Fields.RWLockIcon.Unlock()
 	loc := defaultLocale
 	reqLoc := defaultLocale
 	if len(locale) != 0 {
@@ -245,8 +245,8 @@ func (vo *CfCategory) CategoryDescription(locale ...Locale) string {
 	if vo.CC == nil {
 		return ""
 	}
-	vo.Fields.RWLockCategoryDescription.RLock()
-	defer vo.Fields.RWLockCategoryDescription.RUnlock()
+	vo.Fields.RWLockCategoryDescription.Lock()
+	defer vo.Fields.RWLockCategoryDescription.Unlock()
 	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]

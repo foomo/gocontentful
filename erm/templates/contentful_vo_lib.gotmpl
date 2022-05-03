@@ -20,7 +20,7 @@ import (
 
 type cacheEntryMaps struct {
 	{{ range $index , $contentType := $contentTypes }}	{{ $contentType.Sys.ID }} map[string]*Cf{{ firstCap $contentType.Sys.ID }}
-	{{ $contentType.Sys.ID }}GcLock sync.RWMutex
+	{{ $contentType.Sys.ID }}GcLock sync.Mutex
 	{{ end }}
 }
 
@@ -28,13 +28,13 @@ type ClientMode string
 
 type ContentfulCache struct {
 	assets                 assetCacheMap
-	assetsGcLock           sync.RWMutex
+	assetsGcLock           sync.Mutex
 	contentTypes           []string
 	entryMaps              cacheEntryMaps
 	idContentTypeMap       map[string]string
-	idContentTypeMapGcLock sync.RWMutex
+	idContentTypeMapGcLock sync.Mutex
 	parentMap              map[string][]EntryReference
-	parentMapGcLock        sync.RWMutex
+	parentMapGcLock        sync.Mutex
 }
 
 type assetCacheMap map[string]*contentful.Asset
@@ -156,10 +156,10 @@ func (cc *ContentfulClient) BrokenReferences() (brokenReferences []BrokenReferen
 	if cc.Cache == nil {
 		return
 	}
-	cc.Cache.parentMapGcLock.RLock()
-	defer cc.Cache.parentMapGcLock.RUnlock()
-	cc.Cache.idContentTypeMapGcLock.RLock()
-	defer cc.Cache.idContentTypeMapGcLock.RUnlock()
+	cc.Cache.parentMapGcLock.Lock()
+	defer cc.Cache.parentMapGcLock.Unlock()
+	cc.Cache.idContentTypeMapGcLock.Lock()
+	defer cc.Cache.idContentTypeMapGcLock.Unlock()
 	for childID, parents := range cc.Cache.parentMap {
 		if _, okGotEntry := cc.Cache.idContentTypeMap[childID]; !okGotEntry {
 			for _, parent := range parents {
@@ -249,9 +249,9 @@ func (cc *ContentfulClient) GetAssetByID(id string, forceNoCache ...bool) (*cont
 		return nil, errors.New("GetAssetByID: No client available")
 	}
 	if cc.Cache != nil && cc.Cache.assets != nil && (len(forceNoCache) == 0 || !forceNoCache[0]) {
-		cc.Cache.assetsGcLock.RLock()
+		cc.Cache.assetsGcLock.Lock()
 		asset, okAsset := cc.Cache.assets[id]
-		cc.Cache.assetsGcLock.RUnlock()
+		cc.Cache.assetsGcLock.Unlock()
 		if okAsset {
 			return asset, nil
 		}
@@ -290,9 +290,9 @@ func (cc *ContentfulClient) GetContentTypeOfID(id string) (string, error) {
 	if cc.Cache != nil {
 		okVo := false
 		{{ range $index , $contentType := $contentTypes }}
-		cc.Cache.entryMaps.{{ $contentType.Sys.ID }}GcLock.RLock()
+		cc.Cache.entryMaps.{{ $contentType.Sys.ID }}GcLock.Lock()
 		_, okVo = cc.Cache.entryMaps.{{ $contentType.Sys.ID }}[id]
-		cc.Cache.entryMaps.{{ $contentType.Sys.ID }}GcLock.RUnlock()
+		cc.Cache.entryMaps.{{ $contentType.Sys.ID }}GcLock.Unlock()
 		if okVo {
 			return ContentType{{ firstCap $contentType.Sys.ID }}, nil
 		}

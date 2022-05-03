@@ -67,9 +67,9 @@ func (cc *ContentfulClient) Get{{ firstCap $contentType.Sys.ID }}ByID(id string,
 		return nil, errors.New("Get{{ firstCap $contentType.Sys.ID }}ByID: No client available")
 	}
 	if cc.Cache != nil && (len(forceNoCache) == 0 || !forceNoCache[0]) {
-		cc.Cache.entryMaps.{{ $contentType.Sys.ID }}GcLock.RLock()
+		cc.Cache.entryMaps.{{ $contentType.Sys.ID }}GcLock.Lock()
 		vo, ok := cc.Cache.entryMaps.{{ $contentType.Sys.ID }}[id]
-		cc.Cache.entryMaps.{{ $contentType.Sys.ID }}GcLock.RUnlock()
+		cc.Cache.entryMaps.{{ $contentType.Sys.ID }}GcLock.Unlock()
 		if ok {
 			return vo, nil
 		}
@@ -138,8 +138,8 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
     if vo.CC == nil {
         return {{ mapFieldTypeLiteral $contentType.Sys.ID $field }}
     }
-	vo.Fields.RWLock{{ firstCap $field.ID }}.RLock()
-	defer vo.Fields.RWLock{{ firstCap $field.ID }}.RUnlock()
+	vo.Fields.RWLock{{ firstCap $field.ID }}.Lock()
+	defer vo.Fields.RWLock{{ firstCap $field.ID }}.Unlock()
 	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
@@ -176,8 +176,8 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
     if vo.CC == nil {
         return {{ mapFieldTypeLiteral $contentType.Sys.ID $field }}
     }
-	vo.Fields.RWLock{{ firstCap $field.ID }}.RLock()
-	defer vo.Fields.RWLock{{ firstCap $field.ID }}.RUnlock()
+	vo.Fields.RWLock{{ firstCap $field.ID }}.Lock()
+	defer vo.Fields.RWLock{{ firstCap $field.ID }}.Unlock()
 	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
@@ -215,8 +215,8 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 	if vo.CC == nil {
 	    return nil
 	}
-	vo.Fields.RWLock{{ firstCap $field.ID }}.RLock()
-	defer vo.Fields.RWLock{{ firstCap $field.ID }}.RUnlock()
+	vo.Fields.RWLock{{ firstCap $field.ID }}.Lock()
+	defer vo.Fields.RWLock{{ firstCap $field.ID }}.Unlock()
 	{{ $field.ID }} := []*EntryReference{}
 	loc := defaultLocale
 	if len(locale) != 0 {
@@ -276,8 +276,8 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 	if vo.CC == nil {
         return nil
     }
-	vo.Fields.RWLock{{ firstCap $field.ID }}.RLock()
-	defer vo.Fields.RWLock{{ firstCap $field.ID }}.RUnlock()
+	vo.Fields.RWLock{{ firstCap $field.ID }}.Lock()
+	defer vo.Fields.RWLock{{ firstCap $field.ID }}.Unlock()
 	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
@@ -335,8 +335,8 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 	if vo.CC == nil {
         return nil
     }
-	vo.Fields.RWLock{{ firstCap $field.ID }}.RLock()
-	defer vo.Fields.RWLock{{ firstCap $field.ID }}.RUnlock()
+	vo.Fields.RWLock{{ firstCap $field.ID }}.Lock()
+	defer vo.Fields.RWLock{{ firstCap $field.ID }}.Unlock()
 	{{ $field.ID }} := []*contentful.AssetNoLocale{}
 	loc := defaultLocale
 	reqLoc := defaultLocale
@@ -404,8 +404,8 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 	if vo.CC == nil {
         return nil
     }
-	vo.Fields.RWLock{{ firstCap $field.ID }}.RLock()
-	defer vo.Fields.RWLock{{ firstCap $field.ID }}.RUnlock()
+	vo.Fields.RWLock{{ firstCap $field.ID }}.Lock()
+	defer vo.Fields.RWLock{{ firstCap $field.ID }}.Unlock()
 	loc := defaultLocale
 	reqLoc := defaultLocale
 	if len(locale) != 0 {

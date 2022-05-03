@@ -79,7 +79,7 @@ func main() {
 		os.Exit(0)
 	}
 	cmaKey := *flagCMAKey
-	if cmaKey == "" {
+	if cmaKey == "" && *flagGenerateFromExport == "" {
 		cmaKey = getCmaKeyFromRcFile()
 	}
 	if *flagGenerateFromExport == "" && (*flagSpaceID == "" || cmaKey == "") ||
@@ -99,7 +99,7 @@ func main() {
 		usageError("Please specify the package name correctly (only small caps letters)")
 	}
 
-	fmt.Printf("Contentful API Generator starting...\n\n")
+	fmt.Printf("Contentful API Generator %s starting...\n\n", VERSION)
 
 	var flagContentTypesSlice []string
 	if *flagContentTypes != "" {

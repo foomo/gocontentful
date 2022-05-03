@@ -16,19 +16,19 @@ type CfBrand struct {
 // CfBrandFields is a CfNameFields VO
 type CfBrandFields struct {
 	CompanyName              map[string]string         `json:"companyName,omitempty"`
-	RWLockCompanyName        sync.RWMutex              `json:"-"`
+	RWLockCompanyName        sync.Mutex                `json:"-"`
 	Logo                     map[string]ContentTypeSys `json:"logo,omitempty"`
-	RWLockLogo               sync.RWMutex              `json:"-"`
+	RWLockLogo               sync.Mutex                `json:"-"`
 	CompanyDescription       map[string]string         `json:"companyDescription,omitempty"`
-	RWLockCompanyDescription sync.RWMutex              `json:"-"`
+	RWLockCompanyDescription sync.Mutex                `json:"-"`
 	Website                  map[string]string         `json:"website,omitempty"`
-	RWLockWebsite            sync.RWMutex              `json:"-"`
+	RWLockWebsite            sync.Mutex                `json:"-"`
 	Twitter                  map[string]string         `json:"twitter,omitempty"`
-	RWLockTwitter            sync.RWMutex              `json:"-"`
+	RWLockTwitter            sync.Mutex                `json:"-"`
 	Email                    map[string]string         `json:"email,omitempty"`
-	RWLockEmail              sync.RWMutex              `json:"-"`
+	RWLockEmail              sync.Mutex                `json:"-"`
 	Phone                    map[string][]string       `json:"phone,omitempty"`
-	RWLockPhone              sync.RWMutex              `json:"-"`
+	RWLockPhone              sync.Mutex                `json:"-"`
 }
 
 type CfBrandFieldsLogo struct {
@@ -45,11 +45,11 @@ type CfCategory struct {
 // CfCategoryFields is a CfNameFields VO
 type CfCategoryFields struct {
 	Title                     map[string]string         `json:"title,omitempty"`
-	RWLockTitle               sync.RWMutex              `json:"-"`
+	RWLockTitle               sync.Mutex                `json:"-"`
 	Icon                      map[string]ContentTypeSys `json:"icon,omitempty"`
-	RWLockIcon                sync.RWMutex              `json:"-"`
+	RWLockIcon                sync.Mutex                `json:"-"`
 	CategoryDescription       map[string]string         `json:"categoryDescription,omitempty"`
-	RWLockCategoryDescription sync.RWMutex              `json:"-"`
+	RWLockCategoryDescription sync.Mutex                `json:"-"`
 }
 
 type CfCategoryFieldsIcon struct {
@@ -66,29 +66,29 @@ type CfProduct struct {
 // CfProductFields is a CfNameFields VO
 type CfProductFields struct {
 	ProductName              map[string]string           `json:"productName,omitempty"`
-	RWLockProductName        sync.RWMutex                `json:"-"`
+	RWLockProductName        sync.Mutex                  `json:"-"`
 	Slug                     map[string]string           `json:"slug,omitempty"`
-	RWLockSlug               sync.RWMutex                `json:"-"`
+	RWLockSlug               sync.Mutex                  `json:"-"`
 	ProductDescription       map[string]string           `json:"productDescription,omitempty"`
-	RWLockProductDescription sync.RWMutex                `json:"-"`
+	RWLockProductDescription sync.Mutex                  `json:"-"`
 	Sizetypecolor            map[string]string           `json:"sizetypecolor,omitempty"`
-	RWLockSizetypecolor      sync.RWMutex                `json:"-"`
+	RWLockSizetypecolor      sync.Mutex                  `json:"-"`
 	Image                    map[string][]ContentTypeSys `json:"image,omitempty"`
-	RWLockImage              sync.RWMutex                `json:"-"`
+	RWLockImage              sync.Mutex                  `json:"-"`
 	Tags                     map[string][]string         `json:"tags,omitempty"`
-	RWLockTags               sync.RWMutex                `json:"-"`
+	RWLockTags               sync.Mutex                  `json:"-"`
 	Categories               map[string][]ContentTypeSys `json:"categories,omitempty"`
-	RWLockCategories         sync.RWMutex                `json:"-"`
+	RWLockCategories         sync.Mutex                  `json:"-"`
 	Price                    map[string]float64          `json:"price,omitempty"`
-	RWLockPrice              sync.RWMutex                `json:"-"`
+	RWLockPrice              sync.Mutex                  `json:"-"`
 	Brand                    map[string]ContentTypeSys   `json:"brand,omitempty"`
-	RWLockBrand              sync.RWMutex                `json:"-"`
+	RWLockBrand              sync.Mutex                  `json:"-"`
 	Quantity                 map[string]float64          `json:"quantity,omitempty"`
-	RWLockQuantity           sync.RWMutex                `json:"-"`
+	RWLockQuantity           sync.Mutex                  `json:"-"`
 	Sku                      map[string]string           `json:"sku,omitempty"`
-	RWLockSku                sync.RWMutex                `json:"-"`
+	RWLockSku                sync.Mutex                  `json:"-"`
 	Website                  map[string]string           `json:"website,omitempty"`
-	RWLockWebsite            sync.RWMutex                `json:"-"`
+	RWLockWebsite            sync.Mutex                  `json:"-"`
 }
 
 type genericEntryNoFields struct {

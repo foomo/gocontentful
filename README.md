@@ -10,15 +10,26 @@ A Contentful API code generator for Go. Initial features:
 Rationale
 -----------------------------------------
 
-While an unofficial/experimental Go client by Contentful Labs has been available for a long time (see credits at the end of this document), working with the response of a JSON REST API is far from optimal. 
+While an unofficial/experimental Go client by Contentful Labs has been available for a long time (see credits at the end
+of this document), working with the response of a JSON REST API is far from optimal. 
 
-Loading and converting data into (and from) Go value objects can quickly become a nightmare and the amount of code to access each field of each content type of a complex space can literally explode and if you're not careful how and when you interact with an API over the Internet, performance can be impacted dramatically. Not to mention what happens to your code if you need to make a significant change the space data model. 
+Loading and converting data into (and from) Go value objects can quickly become a nightmare and the amount of code to 
+access each field of each content type of a complex space can literally explode and if you're not careful how and when 
+you interact with an API over the Internet, performance can be impacted dramatically. Not to mention the amount of 
+changes you need to make to your code when you change the space data model. 
 
-Also, the response of the REST API is very nicely modeled for a dynamic language where _any type_ can be returned in a slice of objects. The strict typing of Go makes this tricky to manage and you end up writing (and re-writing) a lot of similar code. 
+Also, the response of the REST API is very nicely modeled for a dynamic language where _any type_ can be returned in a 
+slice of objects. The strict typing of Go makes this tricky to manage and you end up writing (and re-writing) a lot 
+of similar code. 
 
-The scenario above suggested the need for a code generator that can scan a Contentful space and create a complete, native Go API to interact with the remote service and provide code that can be regenerated in some seconds when the data model change.
+The scenario above suggested the need for a code generator that can scan a Contentful space and create a complete, 
+native and idiomatic Go API to interact with the remote service and provide code that can be regenerated in some 
+seconds when the data model change.
 
-How much code is that? As an example of a real-world scenario, a space content model with 11 content types with ranging from 3 to over 40 fields each generated 14,500 lines of Go code. Do you need all those lines? Yes, you do, otherwise it means you never need to read/write some of the content types and fields you defined in the model. In other words, your model needs some spring cleaning.   
+How much code is that? As an example of a real-world production scenario where gocontentful is in use as of 2022, 
+a space content model with 11 content types ranging  from 3 to over 40 fields each generated around 50,000 lines of 
+Go code. Do you need all those lines? You might not need all setters if you don't manage content through the API 
+but you'll definitely need most of the getters otherwise those should not be in the model at all. 
 
 Quickstart
 -----------------------------------------
@@ -100,21 +111,33 @@ The script will scan the space, download locales and content types and generate 
 |-gocontentfulvo.go
 </code></pre>
 
-_Note: Do NOT modify these files! If you change the content model in Contentful you will need to run the generator again and overwrite the files._
+_Note: Do NOT modify these files! If you change the content model in Contentful you will need to run the generator 
+again and overwrite the files._
 
 ### Get a client
 
-The generated files will be in the "people" subdirectory of your project. Your go program can get a Contentful client from them:
+The generated files will be in the "people" subdirectory of your project. Your go program can get a Contentful 
+client from them:
 
 `cc, err := people.NewContentfulClient(YOUR_SPACE_ID, people.ClientModeCDA, YOUR_API_KEY, 1000, contentfulLogger, people.LogDebug,false)`
 
 The parameters to pass to NewContentfulClient are:
 
 - *spaceID* (string) 
-- *clientMode* (string) supports the constants ClientModeCDA, ClientModeCPA and ClientModeCMA. If you need to operate on multiple APIs (e.g. one for reading and CMA for writing) you need to get two clients
+- *clientMode* (string) supports the constants ClientModeCDA, ClientModeCPA and ClientModeCMA. If you need to operate 
+on multiple APIs (e.g. one for reading and CMA for writing) you need to get two clients
 - *clientKey* (string) is your API key (generate one for your API at Contentful)
-- *optimisticPageSize* (uint16) is the page size the client will use to download entries from the space for caching. Contentful's default is 100 but you can specify up to 1000: this might get you into an error because Contentful limits the payload response size to 70 KB but the client will handle the error and reduce the page size automatically until it finds a proper value. Hint: using a big page size that always fails is a waste of time and resources because a lot of initial calls will fail, whereas a too small one will not leverage the full download bandwidth. It's a trial-and-error and you need to find the best value for your case. For simple content types you can start with 1000, for very complex ones that include fat fields you might want to get down to 100 or even less.
-- *logFn* is a func(fields map[string]interface{}, level int, args ...interface{}) that the client will call whenever it needs to log something. It can be nil if you don't need logging and that will be handled gracefully but it's not recommended. A simple function you can pass that uses the https://github.com/Sirupsen/logrus package might look something like this:
+- *optimisticPageSize* (uint16) is the page size the client will use to download entries from the space for caching. 
+Contentful's default is 100 but you can specify up to 1000: this might get you into an error because Contentful 
+limits the payload response size to 70 KB but the client will handle the error and reduce the page size automatically 
+until it finds a proper value. Hint: using a big page size that always fails is a waste of time and resources because 
+a lot of initial calls will fail, whereas a too small one will not leverage the full download bandwidth. It's a 
+trial-and-error and you need to find the best value for your case. For simple content types you can start with 1000, 
+for very complex ones that include fat fields you might want to get down to 100 or even less.
+- *logFn* is a func(fields map[string]interface{}, level int, args ...interface{}) that the client will call whenever 
+it needs to log something. It can be nil if you don't need logging and that will be handled gracefully but it's not 
+recommended. A simple function you can pass that uses the https://github.com/Sirupsen/logrus package might look 
+something like this:
 <pre><code>contentfulLogger := func(fields map[string]interface{}, level int, args ...interface{}) {
     switch level {
     case people.LogDebug:
@@ -130,10 +153,15 @@ The parameters to pass to NewContentfulClient are:
     }
 }
 </code></pre>
-- *logLevel* (int) is the debug level (see function above). Please note that LogDebug is very verbose and even logs when you request a field value but that is not set for the entry.
-- *debug* (bool) is the Contentful API client debug switch. If set to *true* it will log on stdout all the CURL calls to Contentful. This is extremely verbose and extremely valuable when something fails in a call to the API because it's the only way to see the REST API response.
+- *logLevel* (int) is the debug level (see function above). Please note that LogDebug is very verbose and even logs 
+- when you request a field value but that is not set for the entry.
+- *debug* (bool) is the Contentful API client debug switch. If set to *true* it will log on stdout all the CURL calls 
+- to Contentful. This is extremely verbose and extremely valuable when something fails in a call to the API because 
+- it's the only way to see the REST API response.
 
-_NOTE:_ Gocontentful provides an offline version of the client that can load data from a JSON space export file (as exported by the _contentful_ CLI tool). This is the way you can write unit tests against your generated API that don't require to be online and the management of a safe API key storage. See function reference below
+_NOTE:_ Gocontentful provides an offline version of the client that can load data from a JSON space export file 
+(as exported by the _contentful_ CLI tool). This is the way you can write unit tests against your generated API that 
+don't require to be online and the management of a safe API key storage. See function reference below
 
 ### Caching
 
@@ -141,22 +169,33 @@ _NOTE:_ Gocontentful provides an offline version of the client that can load dat
 err = cc.UpdateCache(context, contentTypes, true)
 </code></pre>
 
-If your client mode is ClientModeCDA you can ask the client to cache the space (limited to the content types you pass to the UpdateCache function call). The client will download all the entries, convert and store them in the case as native Go value objects. This makes subsequent accesses to the space data an in-memory operation removing all the HTTP overhead you'd normally experience.
+If your client mode is ClientModeCDA you can ask the client to cache the space (limited to the content types you pass 
+to the UpdateCache function call). The client will download all the entries, convert and store them in the case as 
+native Go value objects. This makes subsequent accesses to the space data an in-memory operation removing all the HTTP 
+overhead you'd normally experience.
 
 The first parameter is the context. If you don't use a context in your application or service just pass _context.TODO()_
 
 The third parameter of UpdateCache toggles asset caching on or off. If you deal with assets you want this to be always on.
 
-The cache update uses 4 workers to speed up the process. This is safe since Contentful allows up to 5 concurrent connections. If you have content types that have a lot of entries, it might make sense to keep them close to each other in the content types slice passed to UpdateCache(), so that they will run in parallel and not one after the other (in case you have more than 4 content types, that is). 
+The cache update uses 4 workers to speed up the process. This is safe since Contentful allows up to 5 concurrent 
+connections. If you have content types that have a lot of entries, it might make sense to keep them close to each other 
+in the content types slice passed to UpdateCache(), so that they will run in parallel and not one after the other 
+(in case you have more than 4 content types, that is). 
 
-All functions that query the space through ERM are cache-transparent: if a cache is available data will be loaded from there, otherwise it will be sourced from Contentful.
+All functions that query the space through ERM are cache-transparent: if a cache is available data will be loaded from 
+there, otherwise it will be sourced from Contentful.
 
 gocontentful also supports selective entry and asset cache updates through the following method:
 
 <pre><code>err = cc.UpdateCacheForEntity(context, sysType, contentType, entityID string)
 </code></pre>
 
-Note that when something changes in the space at Contentful you need to regenerate the cache. This can be done setting up a webhook at Contentful and handling its call in your service through one of the cache update methods. It's highly recommended that you regenerate the entire CDA cache when something is published (because you want production data to be 100% up to date in your application) and that you only update a single entry in the cache for the CPA cache (because it's a whole lot faster for preview features).
+Note that when something changes in the space at Contentful you need to regenerate the cache. This can be done setting 
+up a webhook at Contentful and handling its call in your service through one of the cache update methods. It's highly 
+recommended that you regenerate the entire CDA cache when something is published (because you want production data to 
+be 100% up to date in your application) and that you only update a single entry in the cache for the CPA cache (because 
+it's a whole lot faster for preview features).
  
 
 ### Have fun with persons and pets
@@ -171,7 +210,8 @@ Load a specific person:
 
 `person, err := cc.GetPersonByID(THE_PERSON_ID)`
 
-Gocontentful provides getters and setters for all fields in the entry. Get that person's name (assuming the entry has a "name" field):
+Gocontentful provides getters and setters for all fields in the entry. Get that person's name (assuming the entry has 
+a "name" field):
 
 `name := person.Name() // returns Jane`
 
@@ -179,23 +219,30 @@ Get Jane's work title in a different locale:
 
 `name := person.Title(people.SpaceLocaleItalian)`
 
-Note that constants are available for all locales supported by the space. If a space is configured to have a fallback from one locale to the default one, the getter functions will return that in case the value is not set for locale passed to the function.
+Note that constants are available for all locales supported by the space. If a space is configured to have a fallback 
+from one locale to the default one, the getter functions will return that in case the value is not set for locale passed
+to the function.
 
 Contentful supports Rich Text editing and sooner or later you'll want to convert that to HTML:
 
 `htmlText := people.RichTextToHtml(person.Resume(), linkResolver, entryLinkResolver, imageResolver, embeddedEntryResolver locale)`
 
-_Note: linkResolver, entryLinkResolver, embeddedEntryResolver and imageResolver are functions that resolve URLs for links and attributes for embedded image assets or return the HTML snippet for an embedded entry in RichText. See API documentation below._
+_Note: linkResolver, entryLinkResolver, embeddedEntryResolver and imageResolver are functions that resolve URLs for 
+links and attributes for embedded image assets or return the HTML snippet for an embedded entry in RichText. See API 
+documentation below._
 
 ...or the other way around (often used when digesting data from external sources):
 
 `myRichText := HtmlToRichText(htmlSrc)`
 
-Gocontentful supports references out of the box, the internals of how those are managed at the API level are completely transparet. To get a list of Jane's pets (assuming _pets_ is a multiple reference field) just do:
+Gocontentful supports references out of the box, the internals of how those are managed at the API level are completely 
+transparet. To get a list of Jane's pets (assuming _pets_ is a multiple reference field) just do:
 
 `pets := person.Pets()`
 
-The value returned is a slice *[]*EntryReference* where each element carries the ID (string), the content type (string) and the value object as an *interface{}*. In case of references that can return multiple types this is useful to perform a switch on the content type and assert the type of the returned value object: 
+The value returned is a slice *[]*EntryReference* where each element carries the ID (string), the content type (string) 
+and the value object as an *interface{}*. In case of references that can return multiple types this is useful to perform 
+a switch on the content type and assert the type of the returned value object: 
 
 <pre><code>for _, pet := range pets {
   switch pet.ContentType {
@@ -230,8 +277,11 @@ When you need to change the value of the field, you can use any of the setter fu
 
 but consider the following:
 
-- To save the entry you need to use a client you instantiated with *ClientModeCMA*. Entries retrieved with ClientModeCDA or ClientModeCPA can be saved in memory (for example if you need to enrich the built-in cache) but not persisted to Contentful.
-- Make sure you Get and entry right before you manipulate it and upsert it / publish it to Contentful. In case it's been saved by someone else in the meantime, the upsert will fail with a version mismatch error.
+- To save the entry you need to use a client you instantiated with *ClientModeCMA*. Entries retrieved with ClientModeCDA 
+or ClientModeCPA can be saved in memory (for example if you need to enrich the built-in cache) but not persisted to 
+Contentful.
+- Make sure you Get and entry right before you manipulate it and upsert it / publish it to Contentful. In case it's 
+been saved by someone else in the meantime, the upsert will fail with a version mismatch error.
 
 To upsert (save) an entry: 
 
@@ -271,6 +321,11 @@ a test suite you can run with
 This generates the API in the test/testapi folder and runs a dozen unit tests to 
 make sure everything is working correctly. 
 
+### Caveats
+
+- Avoid creating content types that have field IDs equal to reserved Go words (e.g. "type"). Gocontentful won't scan
+for all of them and the generated code will break.
+
 Public functions and methods
 ---------------------
 
@@ -278,7 +333,8 @@ Public functions and methods
 
 >**NewContentfulClient**(spaceID string, clientMode string, clientKey string, optimisticPageSize uint16, logFn func(fields map[string]interface{}, level int, args ...interface{}), logLevel int, debug bool) (*ContentfulClient, error)
 
-Creates a Contentful client, this is the first function you need to call. For usage details please refer to the Quickstart above.
+Creates a Contentful client, this is the first function you need to call. For usage details please refer to the 
+Quickstart above.
 
 >**SetOfflineFallback**(filename string) error
 
@@ -287,11 +343,13 @@ Contentful is not reachable when you call UpdateCache() on the client
 
 >**NewOfflineContentfulClient**(filename string, logFn func(fields map[string]interface{}, level int, args ...interface{}), logLevel int, cacheAssets bool) (*ContentfulClient, error)
 
-Creates an offline Contentful client that loads space data from a JSON file containing a space export (use the contentful CLI tool to get one).
+Creates an offline Contentful client that loads space data from a JSON file containing a space export (use the 
+contentful CLI tool to get one).
 
 >(cc *ContentfulClient) **SetEnvironment**(environment string) 
 
-Sets the Contentful client's environment. All subsequent API calls will be directed to that environment in the selected space. Pass an empty string to reset to the _master_ environment. 
+Sets the Contentful client's environment. All subsequent API calls will be directed to that environment in the selected 
+space. Pass an empty string to reset to the _master_ environment. 
 
 **SPACE CACHING** 
 
@@ -321,7 +379,8 @@ might want to pass it most of the times or you won't be able to save the entry.
 
 >(cc *ContentfulClient) **GetAllPerson**() (voMap map[string]*CfPerson, err error)
 
-Retrieves all Person entries from the client and returnes a map where the key is the ID of the entry and the value is the Go value object for that entry.
+Retrieves all Person entries from the client and returnes a map where the key is the ID of the entry and the value is 
+the Go value object for that entry.
 
 >(cc *ContentfulClient) **GetFilteredPerson**(query *contentful.Query) (voMap map[string]*CfPerson, err error) 
 
@@ -346,7 +405,9 @@ Returns the Contentful content type of an entry ID.
 
 >(vo *CfPerson) **ToReference**() (refSys ContentTypeSys) 
 
-Converts a value object into a reference that can be added to a reference field of an entry. Note that functions that retrieve referenced entries return a more flexible and useful _[]*EntryReference_ (see Quickstart above) but to store a reference you need a ContentTypeSys.
+Converts a value object into a reference that can be added to a reference field of an entry. Note that functions that 
+retrieve referenced entries return a more flexible and useful _[]*EntryReference_ (see Quickstart above) but to store 
+a reference you need a ContentTypeSys.
 
 >(vo *CfPerson) **GetParents**() (parents []EntryReference, err error) 
 
@@ -354,7 +415,8 @@ Converts a value object into a reference that can be added to a reference field 
 
 Return a slice of EntryReference objects that represent entries that reference the value object or the entry reference. 
 
-Note that in case of parents of an entry reference you need to pass a pointer to a ContentfulClient because EntryReference objects are generic and can't carry any.
+Note that in case of parents of an entry reference you need to pass a pointer to a ContentfulClient because 
+EntryReference objects are generic and can't carry any.
 
 >(vo *CfPerson) **GetPublishingStatus**() string
 
@@ -371,11 +433,15 @@ Value returned is one of the following:
 
 **ENTRY FIELD GETTERS**
 
-Field getters are named after the field ID in Contentful and return the proper type. For example, if the Person content type has a Symbol (short text) field named 'Name', this will be the getter:
+Field getters are named after the field ID in Contentful and return the proper type. For example, if the Person content 
+type has a Symbol (short text) field named 'Name', this will be the getter:
 
 >(vo *CfPerson) **Name**(locale ...string) (string) 
 
-The locale parameter is optional and if not passed, the function will return the value for the default locale of the space. If the locale is specified and it's not available for the space, an error is returned. If the locale is valid but a value doesn't exist for the field and locale, the function will return the value for the default locale if that's specified as a fallback locale in the space definition in Contentful, otherwise will return an error.
+The locale parameter is optional and if not passed, the function will return the value for the default locale of the 
+space. If the locale is specified and it's not available for the space, an error is returned. If the locale is valid 
+but a value doesn't exist for the field and locale, the function will return the value for the default locale if that's 
+specified as a fallback locale in the space definition in Contentful, otherwise will return an error.
 
 Possible return types are:
 
@@ -388,13 +454,15 @@ Possible return types are:
 - _*ContentTypeFieldLocation_ for fields of type Location
 - *interface{} for fields of type Object or RichText
 
-If logLevel is set to LogDebug retrieving the value of a field that is not set and so not available in the API response even as a fallback to the default locale will log the event. This can become incredibly verbose, use with care.  
+If logLevel is set to LogDebug retrieving the value of a field that is not set and so not available in the API response 
+even as a fallback to the default locale will log the event. This can become incredibly verbose, use with care.  
 
 ---
 
 **ENTRY FIELD SETTERS  (only available for _ClientModeCMA_)**
 
-Field setters are named after the field ID in Contentful and require to pass in the proper type. See FIELD GETTERS above for a reference. Example:
+Field setters are named after the field ID in Contentful and require to pass in the proper type. See FIELD GETTERS above 
+for a reference. Example:
 
 >(vo *CfPerson) **SetName**(title string, locale ...string) (err error) 
 
@@ -404,19 +472,27 @@ Field setters are named after the field ID in Contentful and require to pass in 
 
 >(vo *CfPerson) **UpsertEntry**(cc *ContentfulClient) (err error) 
 
-Upserts the entry. This will appear as "Draft" (if it's a new entry) or "Changed" if it's already existing. In the latter case, you will need to retrieve the entry with one of the Manage* functions above to acquire the Sys object that contains the version information. Otherwise the API call will fail with a "Version mismatch" error.
+Upserts the entry. This will appear as "Draft" (if it's a new entry) or "Changed" if it's already existing. In the 
+latter case, you will need to retrieve the entry with one of the Manage* functions above to acquire the Sys object 
+that contains the version information. Otherwise the API call will fail with a "Version mismatch" error.
 
 >(vo *CfPerson) **PublishEntry**(cc *ContentfulClient) (err error) 
 
-Publishes the entry. Note that before publishing you will need to retrieve the entry with one of the Manage* functions above to acquire the Sys object that contains the version information. Otherwise the API call will fail with a "Version mismatch" error. This is needed even if you have just upserted the entry with the function above!
+Publishes the entry. Note that before publishing you will need to retrieve the entry with one of the Manage* functions 
+above to acquire the Sys object that contains the version information. Otherwise the API call will fail with a "Version 
+mismatch" error. This is needed even if you have just upserted the entry with the function above!
 
 >(vo *CfPerson) **UnpublishEntry**(cc *ContentfulClient) (err error) 
 
-Unpublishes the entry. Note that before unpublishing you will need to retrieve the entry with one of the Manage* functions above to acquire the Sys object that contains the version information. Otherwise the API call will fail with a "Version mismatch" error. This is needed even if you have just upserted the entry with the function above!
+Unpublishes the entry. Note that before unpublishing you will need to retrieve the entry with one of the Manage* 
+functions above to acquire the Sys object that contains the version information. Otherwise the API call will fail with 
+a "Version mismatch" error. This is needed even if you have just upserted the entry with the function above!
 
 >(vo *CfPerson) **UpdateEntry**(cc *ContentfulClient) (err error) 
 
-Shortcut function that upserts and publishes the entry. Note that before calling this you will need to retrieve the entry with one of the Manage* functions above to acquire the Sys object that contains the version information. Otherwise the API call will fail with a "Version mismatch" error. Using this shortcut function avoids retrieving the entry twice.
+Shortcut function that upserts and publishes the entry. Note that before calling this you will need to retrieve the 
+entry with one of the Manage* functions above to acquire the Sys object that contains the version information. Otherwise 
+the API call will fail with a "Version mismatch" error. Using this shortcut function avoids retrieving the entry twice.
 
 >(vo *CfPerson) **DeleteEntry**(cc *ContentfulClient) (err error) 
 
@@ -465,15 +541,25 @@ positives for content types that are in the space but not included in the cache.
 
 >**FieldToObject**(jsonField interface{}, targetObject interface{}) error
 
-Converts a JSON field into an object. Make sure you pass a pointer to an object which type has JSON definition for all fields you want to retrieve.
+Converts a JSON field into an object. Make sure you pass a pointer to an object which type has JSON definition for all 
+fields you want to retrieve.
 
 >**HtmlToRichText**(htmlSrc string) *RichTextNode
 
-Converts an HTML fragment to a RichTextNode. This is useful to migrate data from third-party systems to Contentful or support HTML paste operations in Web applications. It currently supports headings, paragraphs, hyperlinks, italic and bold tags, horizontal rules, blockquote, ordered and unordered lists, code. Unknown tags are stripped. This function doesn't return any error as it converts the input text into something as good as possible, without  validation.
+Converts an HTML fragment to a RichTextNode. This is useful to migrate data from third-party systems to Contentful or 
+support HTML paste operations in Web applications. It currently supports headings, paragraphs, hyperlinks, italic and 
+bold tags, horizontal rules, blockquote, ordered and unordered lists, code. Unknown tags are stripped. This function 
+doesn't return any error as it converts the input text into something as good as possible, without  validation.
 
 >**RichTextToHtml**(rt interface{}, linkResolver LinkResolverFunc, entryLinkResolver EntryLinkResolverFunc, imageResolver ImageResolverFunc, locale Locale) (string, error) {
 
-Converts an interface representing a Contentful RichText value (usually from a field getter) into HTML. It currently supports all tags except for embedded and inline entries and assets. It takes in three (optional) functions to resolve hyperlink URLs, permalinks to entries and to derive IMG tag attributes for embedded image assets. The three functions return a map of attributes for the HTML tag the RichTextToHtml function will emit (either an A or an IMG) and have the following signature. Note that the ImageResolverFunc function must return a customHTML value that can be empty but if set it will substitute the IMG tag with the returned HTML snippet. This allows you to emit custom mark-up for your images, e.g. a PICTURE tag.
+Converts an interface representing a Contentful RichText value (usually from a field getter) into HTML. It currently 
+supports all tags except for embedded and inline entries and assets. It takes in three (optional) functions to resolve 
+hyperlink URLs, permalinks to entries and to derive IMG tag attributes for embedded image assets. The three functions 
+return a map of attributes for the HTML tag the RichTextToHtml function will emit (either an A or an IMG) and have the
+following signature. Note that the ImageResolverFunc function must return a customHTML value that can be empty but if 
+set it will substitute the IMG tag with the returned HTML snippet. This allows you to emit custom mark-up for your 
+images, e.g. a PICTURE tag.
 
 >type LinkResolverFunc func(url string) (resolvedAttrs map[string]string, resolveError error)
 
@@ -489,7 +575,8 @@ All the three functions above can be passed as nil with different levels of grac
 
 **CONSTANTS AND GLOBAL VARIABLES**
 
-Each generated content type library file exports a constant with the Contentful ID of the content type itself, for example in _contentful_vo_lib_person.go_:
+Each generated content type library file exports a constant with the Contentful ID of the content type itself, for 
+example in _contentful_vo_lib_person.go_:
 
 >const ContentTypePerson = "person"
 
@@ -518,4 +605,6 @@ The Go package generated by ERM only relies on one external library:
 
 `https://github.com/foomo/contentful`
 
-That is the raw API client used to interact with Contentful's API. This was originally found at https://github.com/contentful-labs/contentful-go and was forked first by https://github.com/ohookins and then by us (https://github.com/foomo/contentful). You will need the foomo version.
+That is the raw API client used to interact with Contentful's API. This was originally found at 
+https://github.com/contentful-labs/contentful-go and was forked first by https://github.com/ohookins and then by us 
+(https://github.com/foomo/contentful). You will need the foomo version.
