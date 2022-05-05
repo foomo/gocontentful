@@ -68,10 +68,10 @@ func (cc *ContentfulClient) GetBrandByID(id string, forceNoCache ...bool) (vo *C
 	if cc == nil || cc.Client == nil {
 		return nil, errors.New("GetBrandByID: No client available")
 	}
-	if cc.Cache != nil && (len(forceNoCache) == 0 || !forceNoCache[0]) {
-		cc.Cache.entryMaps.brandGcLock.Lock()
+	if cc.Cache != nil && cc.CacheMutex != nil && (len(forceNoCache) == 0 || !forceNoCache[0]) {
+		cc.CacheMutex.brandGcLock.RLock()
+		defer cc.CacheMutex.brandGcLock.RUnlock()
 		vo, ok := cc.Cache.entryMaps.brand[id]
-		cc.Cache.entryMaps.brandGcLock.Unlock()
 		if ok {
 			return vo, nil
 		}
@@ -151,8 +151,8 @@ func (vo *CfBrand) CompanyName(locale ...Locale) string {
 	if vo.CC == nil {
 		return ""
 	}
-	vo.Fields.RWLockCompanyName.Lock()
-	defer vo.Fields.RWLockCompanyName.Unlock()
+	vo.Fields.RWLockCompanyName.RLock()
+	defer vo.Fields.RWLockCompanyName.RUnlock()
 	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
@@ -188,8 +188,8 @@ func (vo *CfBrand) Logo(locale ...Locale) *contentful.AssetNoLocale {
 	if vo.CC == nil {
 		return nil
 	}
-	vo.Fields.RWLockLogo.Lock()
-	defer vo.Fields.RWLockLogo.Unlock()
+	vo.Fields.RWLockLogo.RLock()
+	defer vo.Fields.RWLockLogo.RUnlock()
 	loc := defaultLocale
 	reqLoc := defaultLocale
 	if len(locale) != 0 {
@@ -253,8 +253,8 @@ func (vo *CfBrand) CompanyDescription(locale ...Locale) string {
 	if vo.CC == nil {
 		return ""
 	}
-	vo.Fields.RWLockCompanyDescription.Lock()
-	defer vo.Fields.RWLockCompanyDescription.Unlock()
+	vo.Fields.RWLockCompanyDescription.RLock()
+	defer vo.Fields.RWLockCompanyDescription.RUnlock()
 	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
@@ -290,8 +290,8 @@ func (vo *CfBrand) Website(locale ...Locale) string {
 	if vo.CC == nil {
 		return ""
 	}
-	vo.Fields.RWLockWebsite.Lock()
-	defer vo.Fields.RWLockWebsite.Unlock()
+	vo.Fields.RWLockWebsite.RLock()
+	defer vo.Fields.RWLockWebsite.RUnlock()
 	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
@@ -327,8 +327,8 @@ func (vo *CfBrand) Twitter(locale ...Locale) string {
 	if vo.CC == nil {
 		return ""
 	}
-	vo.Fields.RWLockTwitter.Lock()
-	defer vo.Fields.RWLockTwitter.Unlock()
+	vo.Fields.RWLockTwitter.RLock()
+	defer vo.Fields.RWLockTwitter.RUnlock()
 	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
@@ -364,8 +364,8 @@ func (vo *CfBrand) Email(locale ...Locale) string {
 	if vo.CC == nil {
 		return ""
 	}
-	vo.Fields.RWLockEmail.Lock()
-	defer vo.Fields.RWLockEmail.Unlock()
+	vo.Fields.RWLockEmail.RLock()
+	defer vo.Fields.RWLockEmail.RUnlock()
 	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
@@ -401,8 +401,8 @@ func (vo *CfBrand) Phone(locale ...Locale) []string {
 	if vo.CC == nil {
 		return nil
 	}
-	vo.Fields.RWLockPhone.Lock()
-	defer vo.Fields.RWLockPhone.Unlock()
+	vo.Fields.RWLockPhone.RLock()
+	defer vo.Fields.RWLockPhone.RUnlock()
 	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
@@ -774,12 +774,12 @@ func (cc *ContentfulClient) cacheBrandByID(ctx context.Context, id string) error
 	if err != nil {
 		return err
 	}
-	cc.Cache.entryMaps.brandGcLock.Lock()
-	defer cc.Cache.entryMaps.brandGcLock.Unlock()
-	cc.Cache.idContentTypeMapGcLock.Lock()
-	defer cc.Cache.idContentTypeMapGcLock.Unlock()
-	cc.Cache.parentMapGcLock.Lock()
-	defer cc.Cache.parentMapGcLock.Unlock()
+	cc.CacheMutex.brandGcLock.Lock()
+	defer cc.CacheMutex.brandGcLock.Unlock()
+	cc.CacheMutex.idContentTypeMapGcLock.Lock()
+	defer cc.CacheMutex.idContentTypeMapGcLock.Unlock()
+	cc.CacheMutex.parentMapGcLock.Lock()
+	defer cc.CacheMutex.parentMapGcLock.Unlock()
 	// It was deleted
 	if len(col.Items) == 0 {
 		delete(cc.Cache.entryMaps.brand, id)

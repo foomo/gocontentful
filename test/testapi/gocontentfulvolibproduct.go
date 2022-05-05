@@ -68,10 +68,10 @@ func (cc *ContentfulClient) GetProductByID(id string, forceNoCache ...bool) (vo 
 	if cc == nil || cc.Client == nil {
 		return nil, errors.New("GetProductByID: No client available")
 	}
-	if cc.Cache != nil && (len(forceNoCache) == 0 || !forceNoCache[0]) {
-		cc.Cache.entryMaps.productGcLock.Lock()
+	if cc.Cache != nil && cc.CacheMutex != nil && (len(forceNoCache) == 0 || !forceNoCache[0]) {
+		cc.CacheMutex.productGcLock.RLock()
+		defer cc.CacheMutex.productGcLock.RUnlock()
 		vo, ok := cc.Cache.entryMaps.product[id]
-		cc.Cache.entryMaps.productGcLock.Unlock()
 		if ok {
 			return vo, nil
 		}
@@ -161,8 +161,8 @@ func (vo *CfProduct) ProductName(locale ...Locale) string {
 	if vo.CC == nil {
 		return ""
 	}
-	vo.Fields.RWLockProductName.Lock()
-	defer vo.Fields.RWLockProductName.Unlock()
+	vo.Fields.RWLockProductName.RLock()
+	defer vo.Fields.RWLockProductName.RUnlock()
 	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
@@ -198,8 +198,8 @@ func (vo *CfProduct) Slug(locale ...Locale) string {
 	if vo.CC == nil {
 		return ""
 	}
-	vo.Fields.RWLockSlug.Lock()
-	defer vo.Fields.RWLockSlug.Unlock()
+	vo.Fields.RWLockSlug.RLock()
+	defer vo.Fields.RWLockSlug.RUnlock()
 	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
@@ -235,8 +235,8 @@ func (vo *CfProduct) ProductDescription(locale ...Locale) string {
 	if vo.CC == nil {
 		return ""
 	}
-	vo.Fields.RWLockProductDescription.Lock()
-	defer vo.Fields.RWLockProductDescription.Unlock()
+	vo.Fields.RWLockProductDescription.RLock()
+	defer vo.Fields.RWLockProductDescription.RUnlock()
 	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
@@ -272,8 +272,8 @@ func (vo *CfProduct) Sizetypecolor(locale ...Locale) string {
 	if vo.CC == nil {
 		return ""
 	}
-	vo.Fields.RWLockSizetypecolor.Lock()
-	defer vo.Fields.RWLockSizetypecolor.Unlock()
+	vo.Fields.RWLockSizetypecolor.RLock()
+	defer vo.Fields.RWLockSizetypecolor.RUnlock()
 	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
@@ -309,8 +309,8 @@ func (vo *CfProduct) Image(locale ...Locale) []*contentful.AssetNoLocale {
 	if vo.CC == nil {
 		return nil
 	}
-	vo.Fields.RWLockImage.Lock()
-	defer vo.Fields.RWLockImage.Unlock()
+	vo.Fields.RWLockImage.RLock()
+	defer vo.Fields.RWLockImage.RUnlock()
 	image := []*contentful.AssetNoLocale{}
 	loc := defaultLocale
 	reqLoc := defaultLocale
@@ -377,8 +377,8 @@ func (vo *CfProduct) Tags(locale ...Locale) []string {
 	if vo.CC == nil {
 		return nil
 	}
-	vo.Fields.RWLockTags.Lock()
-	defer vo.Fields.RWLockTags.Unlock()
+	vo.Fields.RWLockTags.RLock()
+	defer vo.Fields.RWLockTags.RUnlock()
 	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
@@ -414,8 +414,8 @@ func (vo *CfProduct) Categories(locale ...Locale) []*EntryReference {
 	if vo.CC == nil {
 		return nil
 	}
-	vo.Fields.RWLockCategories.Lock()
-	defer vo.Fields.RWLockCategories.Unlock()
+	vo.Fields.RWLockCategories.RLock()
+	defer vo.Fields.RWLockCategories.RUnlock()
 	categories := []*EntryReference{}
 	loc := defaultLocale
 	if len(locale) != 0 {
@@ -494,8 +494,8 @@ func (vo *CfProduct) Price(locale ...Locale) float64 {
 	if vo.CC == nil {
 		return 0
 	}
-	vo.Fields.RWLockPrice.Lock()
-	defer vo.Fields.RWLockPrice.Unlock()
+	vo.Fields.RWLockPrice.RLock()
+	defer vo.Fields.RWLockPrice.RUnlock()
 	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
@@ -531,8 +531,8 @@ func (vo *CfProduct) Brand(locale ...Locale) *EntryReference {
 	if vo.CC == nil {
 		return nil
 	}
-	vo.Fields.RWLockBrand.Lock()
-	defer vo.Fields.RWLockBrand.Unlock()
+	vo.Fields.RWLockBrand.RLock()
+	defer vo.Fields.RWLockBrand.RUnlock()
 	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
@@ -609,8 +609,8 @@ func (vo *CfProduct) Quantity(locale ...Locale) float64 {
 	if vo.CC == nil {
 		return 0
 	}
-	vo.Fields.RWLockQuantity.Lock()
-	defer vo.Fields.RWLockQuantity.Unlock()
+	vo.Fields.RWLockQuantity.RLock()
+	defer vo.Fields.RWLockQuantity.RUnlock()
 	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
@@ -646,8 +646,8 @@ func (vo *CfProduct) Sku(locale ...Locale) string {
 	if vo.CC == nil {
 		return ""
 	}
-	vo.Fields.RWLockSku.Lock()
-	defer vo.Fields.RWLockSku.Unlock()
+	vo.Fields.RWLockSku.RLock()
+	defer vo.Fields.RWLockSku.RUnlock()
 	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
@@ -683,8 +683,8 @@ func (vo *CfProduct) Website(locale ...Locale) string {
 	if vo.CC == nil {
 		return ""
 	}
-	vo.Fields.RWLockWebsite.Lock()
-	defer vo.Fields.RWLockWebsite.Unlock()
+	vo.Fields.RWLockWebsite.RLock()
+	defer vo.Fields.RWLockWebsite.RUnlock()
 	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
@@ -1180,12 +1180,12 @@ func (cc *ContentfulClient) cacheProductByID(ctx context.Context, id string) err
 	if err != nil {
 		return err
 	}
-	cc.Cache.entryMaps.productGcLock.Lock()
-	defer cc.Cache.entryMaps.productGcLock.Unlock()
-	cc.Cache.idContentTypeMapGcLock.Lock()
-	defer cc.Cache.idContentTypeMapGcLock.Unlock()
-	cc.Cache.parentMapGcLock.Lock()
-	defer cc.Cache.parentMapGcLock.Unlock()
+	cc.CacheMutex.productGcLock.Lock()
+	defer cc.CacheMutex.productGcLock.Unlock()
+	cc.CacheMutex.idContentTypeMapGcLock.Lock()
+	defer cc.CacheMutex.idContentTypeMapGcLock.Unlock()
+	cc.CacheMutex.parentMapGcLock.Lock()
+	defer cc.CacheMutex.parentMapGcLock.Unlock()
 	// It was deleted
 	if len(col.Items) == 0 {
 		delete(cc.Cache.entryMaps.product, id)

@@ -68,10 +68,10 @@ func (cc *ContentfulClient) GetCategoryByID(id string, forceNoCache ...bool) (vo
 	if cc == nil || cc.Client == nil {
 		return nil, errors.New("GetCategoryByID: No client available")
 	}
-	if cc.Cache != nil && (len(forceNoCache) == 0 || !forceNoCache[0]) {
-		cc.Cache.entryMaps.categoryGcLock.Lock()
+	if cc.Cache != nil && cc.CacheMutex != nil && (len(forceNoCache) == 0 || !forceNoCache[0]) {
+		cc.CacheMutex.categoryGcLock.RLock()
+		defer cc.CacheMutex.categoryGcLock.RUnlock()
 		vo, ok := cc.Cache.entryMaps.category[id]
-		cc.Cache.entryMaps.categoryGcLock.Unlock()
 		if ok {
 			return vo, nil
 		}
@@ -143,8 +143,8 @@ func (vo *CfCategory) Title(locale ...Locale) string {
 	if vo.CC == nil {
 		return ""
 	}
-	vo.Fields.RWLockTitle.Lock()
-	defer vo.Fields.RWLockTitle.Unlock()
+	vo.Fields.RWLockTitle.RLock()
+	defer vo.Fields.RWLockTitle.RUnlock()
 	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
@@ -180,8 +180,8 @@ func (vo *CfCategory) Icon(locale ...Locale) *contentful.AssetNoLocale {
 	if vo.CC == nil {
 		return nil
 	}
-	vo.Fields.RWLockIcon.Lock()
-	defer vo.Fields.RWLockIcon.Unlock()
+	vo.Fields.RWLockIcon.RLock()
+	defer vo.Fields.RWLockIcon.RUnlock()
 	loc := defaultLocale
 	reqLoc := defaultLocale
 	if len(locale) != 0 {
@@ -245,8 +245,8 @@ func (vo *CfCategory) CategoryDescription(locale ...Locale) string {
 	if vo.CC == nil {
 		return ""
 	}
-	vo.Fields.RWLockCategoryDescription.Lock()
-	defer vo.Fields.RWLockCategoryDescription.Unlock()
+	vo.Fields.RWLockCategoryDescription.RLock()
+	defer vo.Fields.RWLockCategoryDescription.RUnlock()
 	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
@@ -538,12 +538,12 @@ func (cc *ContentfulClient) cacheCategoryByID(ctx context.Context, id string) er
 	if err != nil {
 		return err
 	}
-	cc.Cache.entryMaps.categoryGcLock.Lock()
-	defer cc.Cache.entryMaps.categoryGcLock.Unlock()
-	cc.Cache.idContentTypeMapGcLock.Lock()
-	defer cc.Cache.idContentTypeMapGcLock.Unlock()
-	cc.Cache.parentMapGcLock.Lock()
-	defer cc.Cache.parentMapGcLock.Unlock()
+	cc.CacheMutex.categoryGcLock.Lock()
+	defer cc.CacheMutex.categoryGcLock.Unlock()
+	cc.CacheMutex.idContentTypeMapGcLock.Lock()
+	defer cc.CacheMutex.idContentTypeMapGcLock.Unlock()
+	cc.CacheMutex.parentMapGcLock.Lock()
+	defer cc.CacheMutex.parentMapGcLock.Unlock()
 	// It was deleted
 	if len(col.Items) == 0 {
 		delete(cc.Cache.entryMaps.category, id)

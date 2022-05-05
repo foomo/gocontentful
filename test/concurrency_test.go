@@ -47,7 +47,7 @@ func TestConcurrentReadWrites(t *testing.T) {
 		testLogger.Errorf("testConcurrentReadWrites: %v", err)
 	}
 	var wg sync.WaitGroup
-	for i := 1; i <= 100; i++ {
+	for i := 1; i <= 1000; i++ {
 		wg.Add(1)
 		i := i
 		go func() {

@@ -66,10 +66,10 @@ func (cc *ContentfulClient) Get{{ firstCap $contentType.Sys.ID }}ByID(id string,
 	if cc == nil || cc.Client == nil {
 		return nil, errors.New("Get{{ firstCap $contentType.Sys.ID }}ByID: No client available")
 	}
-	if cc.Cache != nil && (len(forceNoCache) == 0 || !forceNoCache[0]) {
-		cc.Cache.entryMaps.{{ $contentType.Sys.ID }}GcLock.Lock()
+	if cc.Cache != nil && cc.CacheMutex != nil && (len(forceNoCache) == 0 || !forceNoCache[0]) {
+		cc.CacheMutex.{{ $contentType.Sys.ID }}GcLock.RLock()
+		defer cc.CacheMutex.{{ $contentType.Sys.ID }}GcLock.RUnlock()
 		vo, ok := cc.Cache.entryMaps.{{ $contentType.Sys.ID }}[id]
-		cc.Cache.entryMaps.{{ $contentType.Sys.ID }}GcLock.Unlock()
 		if ok {
 			return vo, nil
 		}
@@ -138,8 +138,8 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
     if vo.CC == nil {
         return {{ mapFieldTypeLiteral $contentType.Sys.ID $field }}
     }
-	vo.Fields.RWLock{{ firstCap $field.ID }}.Lock()
-	defer vo.Fields.RWLock{{ firstCap $field.ID }}.Unlock()
+	vo.Fields.RWLock{{ firstCap $field.ID }}.RLock()
+	defer vo.Fields.RWLock{{ firstCap $field.ID }}.RUnlock()
 	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
@@ -176,8 +176,8 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
     if vo.CC == nil {
         return {{ mapFieldTypeLiteral $contentType.Sys.ID $field }}
     }
-	vo.Fields.RWLock{{ firstCap $field.ID }}.Lock()
-	defer vo.Fields.RWLock{{ firstCap $field.ID }}.Unlock()
+	vo.Fields.RWLock{{ firstCap $field.ID }}.RLock()
+	defer vo.Fields.RWLock{{ firstCap $field.ID }}.RUnlock()
 	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
@@ -215,8 +215,8 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 	if vo.CC == nil {
 	    return nil
 	}
-	vo.Fields.RWLock{{ firstCap $field.ID }}.Lock()
-	defer vo.Fields.RWLock{{ firstCap $field.ID }}.Unlock()
+	vo.Fields.RWLock{{ firstCap $field.ID }}.RLock()
+	defer vo.Fields.RWLock{{ firstCap $field.ID }}.RUnlock()
 	{{ $field.ID }} := []*EntryReference{}
 	loc := defaultLocale
 	if len(locale) != 0 {
@@ -276,8 +276,8 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 	if vo.CC == nil {
         return nil
     }
-	vo.Fields.RWLock{{ firstCap $field.ID }}.Lock()
-	defer vo.Fields.RWLock{{ firstCap $field.ID }}.Unlock()
+	vo.Fields.RWLock{{ firstCap $field.ID }}.RLock()
+	defer vo.Fields.RWLock{{ firstCap $field.ID }}.RUnlock()
 	loc := defaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
@@ -335,8 +335,8 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 	if vo.CC == nil {
         return nil
     }
-	vo.Fields.RWLock{{ firstCap $field.ID }}.Lock()
-	defer vo.Fields.RWLock{{ firstCap $field.ID }}.Unlock()
+	vo.Fields.RWLock{{ firstCap $field.ID }}.RLock()
+	defer vo.Fields.RWLock{{ firstCap $field.ID }}.RUnlock()
 	{{ $field.ID }} := []*contentful.AssetNoLocale{}
 	loc := defaultLocale
 	reqLoc := defaultLocale
@@ -404,8 +404,8 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 	if vo.CC == nil {
         return nil
     }
-	vo.Fields.RWLock{{ firstCap $field.ID }}.Lock()
-	defer vo.Fields.RWLock{{ firstCap $field.ID }}.Unlock()
+	vo.Fields.RWLock{{ firstCap $field.ID }}.RLock()
+	defer vo.Fields.RWLock{{ firstCap $field.ID }}.RUnlock()
 	loc := defaultLocale
 	reqLoc := defaultLocale
 	if len(locale) != 0 {
@@ -714,12 +714,12 @@ func (cc *ContentfulClient) cache{{ firstCap $contentType.Sys.ID }}ByID(ctx cont
 	if err != nil {
 		return err
 	}
-	cc.Cache.entryMaps.{{ $contentType.Sys.ID }}GcLock.Lock()
-	defer cc.Cache.entryMaps.{{ $contentType.Sys.ID }}GcLock.Unlock()
-	cc.Cache.idContentTypeMapGcLock.Lock()
-	defer cc.Cache.idContentTypeMapGcLock.Unlock()
-	cc.Cache.parentMapGcLock.Lock()
-	defer cc.Cache.parentMapGcLock.Unlock()
+	cc.CacheMutex.{{ $contentType.Sys.ID }}GcLock.Lock()
+	defer cc.CacheMutex.{{ $contentType.Sys.ID }}GcLock.Unlock()
+	cc.CacheMutex.idContentTypeMapGcLock.Lock()
+	defer cc.CacheMutex.idContentTypeMapGcLock.Unlock()
+	cc.CacheMutex.parentMapGcLock.Lock()
+	defer cc.CacheMutex.parentMapGcLock.Unlock()
 	// It was deleted
 	if len(col.Items) == 0 {
 		delete(cc.Cache.entryMaps.{{ $contentType.Sys.ID }}, id)

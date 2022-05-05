@@ -20,7 +20,6 @@ import (
 
 type cacheEntryMaps struct {
 	{{ range $index , $contentType := $contentTypes }}	{{ $contentType.Sys.ID }} map[string]*Cf{{ firstCap $contentType.Sys.ID }}
-	{{ $contentType.Sys.ID }}GcLock sync.Mutex
 	{{ end }}
 }
 
@@ -28,19 +27,25 @@ type ClientMode string
 
 type ContentfulCache struct {
 	assets                 assetCacheMap
-	assetsGcLock           sync.Mutex
 	contentTypes           []string
 	entryMaps              cacheEntryMaps
 	idContentTypeMap       map[string]string
-	idContentTypeMapGcLock sync.Mutex
 	parentMap              map[string][]EntryReference
-	parentMapGcLock        sync.Mutex
+}
+
+type ContentfulCacheMutex struct {
+	assetsGcLock           sync.RWMutex
+	idContentTypeMapGcLock sync.RWMutex
+	parentMapGcLock        sync.RWMutex
+	{{ range $index , $contentType := $contentTypes }}	{{ $contentType.Sys.ID }}GcLock sync.RWMutex
+    {{ end }}
 }
 
 type assetCacheMap map[string]*contentful.Asset
 
 type ContentfulClient struct {
 	Cache  *ContentfulCache
+	CacheMutex *ContentfulCacheMutex
 	clientMode ClientMode
 	Client     *contentful.Contentful
 	locales    []Locale
@@ -153,14 +158,14 @@ var SpaceContentTypeInfoMap = ContentTypeInfoMap{ {{ range $index , $contentType
         },{{ end }}
 }
 func (cc *ContentfulClient) BrokenReferences() (brokenReferences []BrokenReference) {
-	if cc.Cache == nil {
-		return
-	}
-	cc.Cache.parentMapGcLock.Lock()
-	defer cc.Cache.parentMapGcLock.Unlock()
-	cc.Cache.idContentTypeMapGcLock.Lock()
-	defer cc.Cache.idContentTypeMapGcLock.Unlock()
-	for childID, parents := range cc.Cache.parentMap {
+    if cc.Cache == nil || cc.CacheMutex == nil {
+        return
+    }
+    cc.CacheMutex.parentMapGcLock.Lock()
+    defer cc.CacheMutex.parentMapGcLock.Unlock()
+    cc.CacheMutex.idContentTypeMapGcLock.Lock()
+    defer cc.CacheMutex.idContentTypeMapGcLock.Unlock()
+    for childID, parents := range cc.Cache.parentMap {
 		if _, okGotEntry := cc.Cache.idContentTypeMap[childID]; !okGotEntry {
 			for _, parent := range parents {
 				brokenReferences = append(brokenReferences, BrokenReference{
@@ -249,9 +254,9 @@ func (cc *ContentfulClient) GetAssetByID(id string, forceNoCache ...bool) (*cont
 		return nil, errors.New("GetAssetByID: No client available")
 	}
 	if cc.Cache != nil && cc.Cache.assets != nil && (len(forceNoCache) == 0 || !forceNoCache[0]) {
-		cc.Cache.assetsGcLock.Lock()
+		cc.CacheMutex.assetsGcLock.Lock()
 		asset, okAsset := cc.Cache.assets[id]
-		cc.Cache.assetsGcLock.Unlock()
+		cc.CacheMutex.assetsGcLock.Unlock()
 		if okAsset {
 			return asset, nil
 		}
@@ -287,12 +292,12 @@ func (cc *ContentfulClient) GetContentTypeOfID(id string) (string, error) {
 	if cc == nil || cc.Client == nil {
 		return "", errors.New("GetContentTypeOfID: No client available")
 	}
-	if cc.Cache != nil {
+	if cc.Cache != nil && cc.CacheMutex != nil {
 		okVo := false
 		{{ range $index , $contentType := $contentTypes }}
-		cc.Cache.entryMaps.{{ $contentType.Sys.ID }}GcLock.Lock()
+		cc.CacheMutex.{{ $contentType.Sys.ID }}GcLock.Lock()
 		_, okVo = cc.Cache.entryMaps.{{ $contentType.Sys.ID }}[id]
-		cc.Cache.entryMaps.{{ $contentType.Sys.ID }}GcLock.Unlock()
+		cc.CacheMutex.{{ $contentType.Sys.ID }}GcLock.Unlock()
 		if okVo {
 			return ContentType{{ firstCap $contentType.Sys.ID }}, nil
 		}
@@ -512,6 +517,15 @@ func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []stri
 			}
 		}
 	}
+	if cc.CacheMutex == nil {
+		cc.CacheMutex = &ContentfulCacheMutex{
+			assetsGcLock:           sync.RWMutex{},
+			idContentTypeMapGcLock: sync.RWMutex{},
+			parentMapGcLock:        sync.RWMutex{},
+			{{ range $index , $contentType := $contentTypes }}	{{ $contentType.Sys.ID }}GcLock: sync.RWMutex{},
+            {{ end }}
+		}
+	}
 	tempCache := &ContentfulCache{
 		contentTypes:     contentTypes,
 		idContentTypeMap: map[string]string{},
@@ -650,20 +664,23 @@ func (cc *ContentfulClient) cacheGcAssetByID(ctx context.Context, id string) err
 			asset.Fields.File[string(loc)].URL = "https:" + asset.Fields.File[string(loc)].URL
 		}
 	}
-	cc.Cache.assetsGcLock.Lock()
+	cc.CacheMutex.assetsGcLock.Lock()
 	cc.Cache.assets[id] = &asset
-	cc.Cache.assetsGcLock.Unlock()
+	cc.CacheMutex.assetsGcLock.Unlock()
 	return nil
 }
 
 func (cc *ContentfulClient) deleteAssetFromCache(key string) error {
-	cc.Cache.assetsGcLock.Lock()
+	if cc.Cache == nil || cc.CacheMutex == nil {
+    		return errors.New("no cache available")
+    	}
+    cc.CacheMutex.assetsGcLock.Lock()
 	if _, ok := cc.Cache.assets[key]; ok {
 		delete(cc.Cache.assets, key)
-		cc.Cache.assetsGcLock.Unlock()
+		cc.CacheMutex.assetsGcLock.Unlock()
 		return nil
 	}
-	cc.Cache.assetsGcLock.Unlock()
+	cc.CacheMutex.assetsGcLock.Unlock()
 	return errors.New("asset not found in cache, could not delete")
 }
 
