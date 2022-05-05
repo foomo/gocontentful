@@ -7,8 +7,6 @@ import (
 	"testing"
 )
 
-var maxRead = 0.0
-var maxWrite = 0.0
 var testProductID = "6dbjWqNd9SqccegcqYq224"
 
 func readWorker(contentfulClient *testapi.ContentfulClient, i int) error {
@@ -18,9 +16,6 @@ func readWorker(contentfulClient *testapi.ContentfulClient, i int) error {
 	}
 	price := product.Price()
 	testLogger.Infof("Read worker %d read price: %f", i, price)
-	if price > maxRead {
-		maxRead = price
-	}
 	return nil
 }
 
@@ -35,9 +30,6 @@ func writeWorker(contentfulClient *testapi.ContentfulClient, i int) error {
 	}
 	contentfulClient.SetProductInCache(product)
 	testLogger.Infof("Write worker %d set price: %d", i, i)
-	if float64(i) > maxWrite {
-		maxWrite = float64(i)
-	}
 	return nil
 }
 
@@ -53,29 +45,29 @@ func TestConcurrentReadWrites(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			testLogger.Infof("testConcurrentReadWrites: caching run %d", i)
-			err = contentfulClient.UpdateCache(context.TODO(), nil, false)
+			err := contentfulClient.UpdateCache(context.TODO(), nil, false)
 			if err != nil {
 				testLogger.Errorf("testConcurrentReadWrites: %v", err)
 			}
 		}()
 	}
-	for i := 1; i <= 10000; i++ {
+	for i := 1; i <= 1000; i++ {
 		wg.Add(1)
 		i := i
 		go func() {
 			defer wg.Done()
-			err = writeWorker(contentfulClient, i)
+			err := writeWorker(contentfulClient, i)
 			if err != nil {
 				testLogger.Errorf("testConcurrentReadWrites: %v", err)
 			}
 		}()
 	}
-	for i := 1; i <= 10000; i++ {
+	for i := 1; i <= 1000; i++ {
 		wg.Add(1)
 		i := i
 		go func() {
 			defer wg.Done()
-			err = readWorker(contentfulClient, i)
+			err := readWorker(contentfulClient, i)
 			if err != nil {
 				testLogger.Errorf("testConcurrentReadWrites: %v", err)
 			}

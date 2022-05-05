@@ -1100,6 +1100,7 @@ func (cc *ContentfulClient) cacheAllProduct(ctx context.Context, resultChan chan
 	col := &contentful.Collection{
 		Items: []interface{}{},
 	}
+	cc.CacheMutex.sharedDataGcLock.RLock()
 	if cc.offline {
 		for _, entry := range cc.offlineTemp.Entries {
 			if entry.Sys.ContentType.Sys.ID == ContentTypeProduct {
@@ -1112,6 +1113,7 @@ func (cc *ContentfulClient) cacheAllProduct(ctx context.Context, resultChan chan
 			return nil, err
 		}
 	}
+	cc.CacheMutex.sharedDataGcLock.RUnlock()
 	allProduct, err = colToCfProduct(col, cc)
 	if err != nil {
 		return nil, err

@@ -718,6 +718,7 @@ func (cc *ContentfulClient) cacheAllBrand(ctx context.Context, resultChan chan<-
 	col := &contentful.Collection{
 		Items: []interface{}{},
 	}
+	cc.CacheMutex.sharedDataGcLock.RLock()
 	if cc.offline {
 		for _, entry := range cc.offlineTemp.Entries {
 			if entry.Sys.ContentType.Sys.ID == ContentTypeBrand {
@@ -730,6 +731,7 @@ func (cc *ContentfulClient) cacheAllBrand(ctx context.Context, resultChan chan<-
 			return nil, err
 		}
 	}
+	cc.CacheMutex.sharedDataGcLock.RUnlock()
 	allBrand, err = colToCfBrand(col, cc)
 	if err != nil {
 		return nil, err

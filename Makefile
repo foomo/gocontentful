@@ -18,6 +18,10 @@ test:
 	go run ./main.go -exportfile ./test/test-space-export.json ./test/testapi
 	go test ./...
 
+race:
+	go run ./main.go -exportfile ./test/test-space-export.json ./test/testapi
+	go test -race ./...
+
 .PHONY: lint
 ## Run linter
 lint:

@@ -36,6 +36,8 @@ type ContentfulCache struct {
 }
 
 type ContentfulCacheMutex struct {
+	fullCacheGcLock        sync.RWMutex
+	sharedDataGcLock       sync.RWMutex
 	assetsGcLock           sync.RWMutex
 	idContentTypeMapGcLock sync.RWMutex
 	parentMapGcLock        sync.RWMutex
@@ -549,6 +551,8 @@ func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []stri
 	}
 	if cc.CacheMutex == nil {
 		cc.CacheMutex = &ContentfulCacheMutex{
+			fullCacheGcLock:        sync.RWMutex{},
+			sharedDataGcLock:       sync.RWMutex{},
 			assetsGcLock:           sync.RWMutex{},
 			idContentTypeMapGcLock: sync.RWMutex{},
 			parentMapGcLock:        sync.RWMutex{},
@@ -566,13 +570,17 @@ func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []stri
 		contentTypes = append([]string{assetWorkerType}, contentTypes...)
 	}
 	_, errCanWeEvenConnect := cc.Client.Spaces.Get(cc.SpaceID)
+	cc.CacheMutex.sharedDataGcLock.RLock()
 	offlinePreviousState := cc.offline
+	cc.CacheMutex.sharedDataGcLock.RUnlock()
 	if errCanWeEvenConnect != nil {
 		if len(cc.offlineTemp.Entries) > 0 && (cc.Cache == nil || offlinePreviousState == true) {
 			if cc.logFn != nil && cc.logLevel <= LogInfo {
 				cc.logFn(map[string]interface{}{"method": "UpdateCache"}, LogInfo, InfoFallingBackToFile)
 			}
+			cc.CacheMutex.sharedDataGcLock.Lock()
 			cc.offline = true
+			cc.CacheMutex.sharedDataGcLock.Unlock()
 		} else {
 			if cc.logFn != nil && cc.logLevel <= LogInfo {
 				cc.logFn(map[string]interface{}{"method": "UpdateCache"}, LogInfo, InfoPreservingExistingCache)
@@ -618,7 +626,9 @@ func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []stri
 		// drain contentTypeChan
 		for _ = range contentTypeChan {
 		}
+		cc.CacheMutex.sharedDataGcLock.Lock()
 		cc.offline = offlinePreviousState
+		cc.CacheMutex.sharedDataGcLock.Unlock()
 		return err
 	}
 	// Signal that the cache build is done
@@ -627,8 +637,12 @@ func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []stri
 	if cc.logFn != nil && cc.logLevel <= LogInfo {
 		cc.logFn(map[string]interface{}{"time elapsed": fmt.Sprint(time.Since(start)), "method": "UpdateCache"}, LogInfo, InfoUpdateCacheTime)
 	}
+	cc.CacheMutex.fullCacheGcLock.Lock()
+	defer cc.CacheMutex.fullCacheGcLock.Unlock()
 	cc.Cache = tempCache
+	cc.CacheMutex.sharedDataGcLock.Lock()
 	cc.offline = offlinePreviousState
+	cc.CacheMutex.sharedDataGcLock.Unlock()
 	return nil
 }
 

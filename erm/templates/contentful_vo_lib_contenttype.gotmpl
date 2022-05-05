@@ -631,6 +631,7 @@ func (cc *ContentfulClient) cacheAll{{ firstCap $contentType.Sys.ID }}(ctx conte
 	col := &contentful.Collection{
 		Items: []interface{}{},
 	}
+	cc.CacheMutex.sharedDataGcLock.RLock()
 	if cc.offline {
 		for _, entry := range cc.offlineTemp.Entries {
 			if entry.Sys.ContentType.Sys.ID == ContentType{{ firstCap $contentType.Sys.ID }} {
@@ -643,6 +644,7 @@ func (cc *ContentfulClient) cacheAll{{ firstCap $contentType.Sys.ID }}(ctx conte
 			return nil, err
 		}
 	}
+	cc.CacheMutex.sharedDataGcLock.RUnlock()
 	all{{ firstCap $contentType.Sys.ID }}, err = colToCf{{ firstCap $contentType.Sys.ID }}(col,cc)
 	if err != nil {
 		return nil, err

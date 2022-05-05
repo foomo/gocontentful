@@ -482,6 +482,7 @@ func (cc *ContentfulClient) cacheAllCategory(ctx context.Context, resultChan cha
 	col := &contentful.Collection{
 		Items: []interface{}{},
 	}
+	cc.CacheMutex.sharedDataGcLock.RLock()
 	if cc.offline {
 		for _, entry := range cc.offlineTemp.Entries {
 			if entry.Sys.ContentType.Sys.ID == ContentTypeCategory {
@@ -494,6 +495,7 @@ func (cc *ContentfulClient) cacheAllCategory(ctx context.Context, resultChan cha
 			return nil, err
 		}
 	}
+	cc.CacheMutex.sharedDataGcLock.RUnlock()
 	allCategory, err = colToCfCategory(col, cc)
 	if err != nil {
 		return nil, err

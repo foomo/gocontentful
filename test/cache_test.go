@@ -7,11 +7,6 @@ import (
 	"testing"
 )
 
-func TestAndFailOnlineClient(t *testing.T) {
-	_, err := testapi.NewContentfulClient("fake", testapi.ClientModeCMA, "fake", 100, GetContenfulLogger(testLogger), LogDebug, true)
-	require.Error(t, err)
-}
-
 func TestCache(t *testing.T) {
 	contentfulClient, err := getTestClient()
 	require.NoError(t, err)
