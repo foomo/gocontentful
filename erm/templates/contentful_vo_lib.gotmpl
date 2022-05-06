@@ -354,16 +354,12 @@ func HtmlToRichText(htmlSrc string) *RichTextNode {
 	var isBasic bool
 	rtnd.Content, _, isBasic = richTextHtmlLinesToNode(htmlLines, 0, "", nil, true)
 	if isBasic {
-		basicRich := &RichTextNode{
-			NodeType: RichTextNodeDocument,
-		}
-		par := RichTextNode{
-			NodeType: RichTextNodeParagraph,
-		}
-		par.Content = rtnd.Content
-		basicRich.Content = append(basicRich.Content, par)
-		return basicRich
-	}
+        basicRich := &RichTextNode{
+            NodeType: RichTextNodeDocument,
+            Content:  rtnd.Content,
+        }
+        return basicRich
+    }
 	return rtnd
 }
 
