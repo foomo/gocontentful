@@ -25,12 +25,12 @@ func (cc *ContentfulClient) SetProductInCache(product *CfProduct) {
 	if cc.Cache == nil {
 		return
 	}
-	cc.CacheMutex.productGcLock.Lock()
-	defer cc.CacheMutex.productGcLock.Unlock()
-	cc.CacheMutex.idContentTypeMapGcLock.Lock()
-	defer cc.CacheMutex.idContentTypeMapGcLock.Unlock()
-	cc.CacheMutex.parentMapGcLock.Lock()
-	defer cc.CacheMutex.parentMapGcLock.Unlock()
+	cc.cacheMutex.productGcLock.Lock()
+	defer cc.cacheMutex.productGcLock.Unlock()
+	cc.cacheMutex.idContentTypeMapGcLock.Lock()
+	defer cc.cacheMutex.idContentTypeMapGcLock.Unlock()
+	cc.cacheMutex.parentMapGcLock.Lock()
+	defer cc.cacheMutex.parentMapGcLock.Unlock()
 	cc.Cache.entryMaps.product[product.Sys.ID] = product
 	cc.Cache.idContentTypeMap[product.Sys.ID] = product.Sys.ContentType.Sys.ID
 	return

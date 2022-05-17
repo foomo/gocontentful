@@ -4,11 +4,13 @@ import (
 	"github.com/foomo/gocontentful/test/testapi"
 	"github.com/stretchr/testify/require"
 	"testing"
+	"time"
 )
 
 func TestPublishingStatus(t *testing.T) {
 	contentfulClient, err := getTestClient()
 	require.NoError(t, err)
+	time.Sleep(time.Second)
 	draft, err := contentfulClient.GetProductByID("6dbjWqNd9SqccegcqYq224")
 	require.NoError(t, err)
 	require.Equal(t, testapi.StatusDraft, draft.GetPublishingStatus())

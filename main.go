@@ -14,7 +14,7 @@ import (
 	"github.com/foomo/gocontentful/erm"
 )
 
-var VERSION = "v1.0.10"
+var VERSION = "v1.0.11"
 
 type contentfulRc struct {
 	ManagementToken string `json:"managementToken"`
@@ -108,7 +108,7 @@ func main() {
 		}
 	}
 
-	err = erm.GenerateAPI(filepath.Dir(path), packageName, *flagSpaceID, cmaKey, *flagEnvironment, *flagGenerateFromExport, flagContentTypesSlice)
+	err = erm.GenerateAPI(filepath.Dir(path), packageName, *flagSpaceID, cmaKey, *flagEnvironment, *flagGenerateFromExport, flagContentTypesSlice, VERSION)
 	if err != nil {
 		fatal("Something went horribly wrong...", err)
 	}

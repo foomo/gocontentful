@@ -84,7 +84,7 @@ func TestPreserveCacheIfNewer(t *testing.T) {
 	err = contentfulClient.SetOfflineFallback("./test-space-export-older.json")
 	require.NoError(t, err)
 	err = contentfulClient.UpdateCache(context.TODO(), nil, false)
-	require.Error(t, err)
+	require.NoError(t, err)
 	brand, err := contentfulClient.GetBrandByID("JrePkDVYomE8AwcuCUyMi")
 	require.NoError(t, err)
 	require.Equal(t, 2.0, brand.Sys.Version)

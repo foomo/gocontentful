@@ -22,6 +22,7 @@ type spaceConf struct {
 	Locales      []Locale
 	ContentTypes []ContentType
 	ContentType  ContentType
+	Version      string
 }
 
 // GetLocales retrieves locale definition from Contentful
@@ -127,7 +128,7 @@ func getData(spaceID, cmaKey, environment, exportFile string, flagContentTypes [
 }
 
 // GenerateAPI calls the generators
-func GenerateAPI(dir, packageName, spaceID, cmaKey, environment, exportFile string, flagContentTypes []string) (err error) {
+func GenerateAPI(dir, packageName, spaceID, cmaKey, environment, exportFile string, flagContentTypes []string, version string) (err error) {
 	contentTypes, locales, errGetData := getData(spaceID, cmaKey, environment, exportFile, flagContentTypes)
 	if errGetData != nil {
 		return errGetData
@@ -145,6 +146,7 @@ func GenerateAPI(dir, packageName, spaceID, cmaKey, environment, exportFile stri
 		PackageName:  packageName,
 		Locales:      locales,
 		ContentTypes: contentTypes,
+		Version:      version,
 	}
 	return generateCode(conf)
 }
