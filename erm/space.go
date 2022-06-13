@@ -59,6 +59,13 @@ func getContentTypes(CMA *contentful.Contentful, spaceID string) (contentTypes [
 		if err != nil {
 			break
 		}
+		var filteredFields []ContentTypeField
+		for _, field := range contentType.Fields {
+			if !field.Omitted {
+				filteredFields = append(filteredFields, field)
+			}
+		}
+		contentType.Fields = filteredFields
 		contentTypes = append(contentTypes, contentType)
 	}
 	sort.Slice(
