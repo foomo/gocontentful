@@ -706,24 +706,35 @@ func (cc *ContentfulClient) cacheAll{{ firstCap $contentType.Sys.ID }}(ctx conte
 	return {{ $contentType.Sys.ID }}Map, nil
 }
 
-func (cc *ContentfulClient) cache{{ firstCap $contentType.Sys.ID }}ByID(ctx context.Context, id string) error {
-	if cc == nil || cc.Client == nil {
-		return errors.New("cache{{ firstCap $contentType.Sys.ID }}ByID: No client available")
-	}
-		col := cc.Client.Entries.List(cc.SpaceID)
-		col.Query.ContentType("{{ $contentType.Sys.ID }}").Locale("*").Include(0).Equal("sys.id", id)
-		_, err := col.GetAll()
-	if err != nil {
-		return err
-	}
+func (cc *ContentfulClient) cache{{ firstCap $contentType.Sys.ID }}ByID(ctx context.Context, id string, entryPayload *contentful.Entry, entryDelete bool) error {
 	cc.cacheMutex.{{ $contentType.Sys.ID }}GcLock.Lock()
 	defer cc.cacheMutex.{{ $contentType.Sys.ID }}GcLock.Unlock()
 	cc.cacheMutex.idContentTypeMapGcLock.Lock()
 	defer cc.cacheMutex.idContentTypeMapGcLock.Unlock()
 	cc.cacheMutex.parentMapGcLock.Lock()
 	defer cc.cacheMutex.parentMapGcLock.Unlock()
+	
+	var col *contentful.Collection
+	if entryPayload != nil {
+		col = &contentful.Collection{
+			Items: []interface{}{entryPayload},
+		}
+		id = entryPayload.Sys.ID
+	} else {
+		if cc.Client == nil {
+			return errors.New("cache{{ firstCap $contentType.Sys.ID }}ByID: No client available")
+		}
+		if !entryDelete {
+			col := cc.Client.Entries.List(cc.SpaceID)
+			col.Query.ContentType("{{ $contentType.Sys.ID }}").Locale("*").Include(0).Equal("sys.id", id)
+			_, err := col.GetAll()
+			if err != nil {
+				return err
+			}
+		}	
+	}
 	// It was deleted
-	if len(col.Items) == 0 {
+	if len(col.Items) == 0 || entryDelete {
 		delete(cc.Cache.entryMaps.{{ $contentType.Sys.ID }}, id)
 		delete(cc.Cache.idContentTypeMap, id)
 		// delete as child
@@ -740,11 +751,14 @@ func (cc *ContentfulClient) cache{{ firstCap $contentType.Sys.ID }}ByID(ctx cont
 		}
 		return nil
 	}
-		vos, err := colToCf{{ firstCap $contentType.Sys.ID }}(col, cc)
+	vos, err := colToCf{{ firstCap $contentType.Sys.ID }}(col, cc)
 	if err != nil {
 		return fmt.Errorf("cache{{ firstCap $contentType.Sys.ID }}ByID: Error converting %s to VO: %w", id, err)
 	}
 	{{ $contentType.Sys.ID }} := vos[0]
+	if cc.Cache.entryMaps.{{ $contentType.Sys.ID }} == nil {
+		cc.Cache.entryMaps.{{ $contentType.Sys.ID }} = map[string]*Cf{{ firstCap $contentType.Sys.ID }}{}
+	}
 	cc.Cache.entryMaps.{{ $contentType.Sys.ID }}[id] = {{ $contentType.Sys.ID }}
 			cc.Cache.idContentTypeMap[id] = {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID
 	{{ range $fieldIndex, $field := $contentType.Fields }}

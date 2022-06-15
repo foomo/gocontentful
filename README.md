@@ -178,8 +178,11 @@ The first parameter is the context. If you don't use a context in your applicati
 
 The third parameter of UpdateCache toggles asset caching on or off. If you deal with assets you want this to be always on.
 
-The cache update uses 4 workers to speed up the process. This is safe since Contentful allows up to 5 concurrent 
-connections. If you have content types that have a lot of entries, it might make sense to keep them close to each other 
+#### Full cache init and rebuild
+
+By default the client will cache the whole space using 4 parallel workers to speed up the process. 
+This is safe since Contentful allows up to 5 concurrent connections. 
+If you have content types that have a lot of entries, it might make sense to keep them close to each other 
 in the content types slice passed to UpdateCache(), so that they will run in parallel and not one after the other 
 (in case you have more than 4 content types, that is). 
 
@@ -191,12 +194,27 @@ gocontentful also supports selective entry and asset cache updates through the f
 <pre><code>err = cc.UpdateCacheForEntity(context, sysType, contentType, entityID string)
 </code></pre>
 
-Note that when something changes in the space at Contentful you need to regenerate the cache. This can be done setting 
-up a webhook at Contentful and handling its call in your service through one of the cache update methods. It's highly 
-recommended that you regenerate the entire CDA cache when something is published (because you want production data to 
-be 100% up to date in your application) and that you only update a single entry in the cache for the CPA cache (because 
-it's a whole lot faster for preview features).
+Note that when something changes in the space at Contentful you need to update the cache. This can be done setting 
+up a webhook at Contentful and handling its call in your service through one of the cache update methods. 
+
+You can regenerate the entire CDA cache when something is published (because you want production data to 
+be 100% up to date in your application) and update a single entry in the cache for the CPA cache (because 
+it's a whole lot faster for preview features). This can get expensive on the API overage. 
+
+#### Sync API support
+
+In versions newer than v1.0.11, gocontentful supports the Contentful Sync API and that's the recommended way to cache spaces and manage updates.
+To enable support for the Sync API you need to call the SetSyncMode method on the client:
+
+<pre><code>cc.SetSyncMode(true)</code></pre>
  
+ From that moment on, the cache updates will happen transparently through incremental changes download. The syntax is the same:
+
+ <pre><code>err = cc.UpdateCache(context, contentTypes, true)</code></pre>
+
+ The first synchronization will be slower than the full cache init because sync calls cannot be parallelized,
+ but subsequent updates will be much faster because only changes in the space from the previous sync will be downloaded.
+ This includes entries and assets that were deleted.
 
 ### Have fun with persons and pets
 

@@ -65,6 +65,8 @@ type ContentfulClient struct {
 	SpaceID            string
 	offline            bool
 	offlineTemp        offlineTemp
+	sync 			   bool
+	syncToken          string
 }
 
 type offlineTemp struct {
@@ -136,27 +138,34 @@ const cacheUpdateConcurrency = 4
 const (
 	sysTypeEntry = "Entry"
 	sysTypeAsset = "Asset"
+	sysTypeDeletedEntry = "DeletedEntry"
+	sysTypeDeletedAsset = "DeletedAsset"
 )
 
 var (
-	ErrLocaleUnsupported        = errors.New("locale not supported by this space")
-	ErrNotSet                   = errors.New("field value not set")
-	ErrNotSetNoFallback         = errors.New("field value not set and no fallback locale available")
-	ErrRefNotIncludes           = errors.New("referenced entry not found in includes")
-	ErrNoTypeOfRefEntry         = errors.New("couldn't get contentType of referenced entry")
-	ErrNoTypeOfRefAsset         = errors.New("couldn't get contentType of referenced asset")
-	InfoUpdatedEntityCache      = "updated cache for entity"
-	InfoCachedAllEntries        = "cached all entries of content type"
-	InfoCachedAllAssets         = "cached all assets"
-	InfoFallingBackToFile       = "gonna use a local file"
-	InfoLoadingFromFile         = "loading space from local file"
-    InfoCacheWorkerStart        = "cache worker starting"
-    InfoCacheUpdateQueued       = "cache update queued"
-    InfoCacheUpdateDone         = "cache update returning"
-    InfoCacheUpdateSkipped      = "cache update skipped, already one in the queue"
-	InfoOfflineEntitiesLoaded   = "downloaded entries and assets from offline file"
-	InfoPreservingExistingCache = "could not connect for cache update, preserving the existing cache"
-	InfoUpdateCacheTime         = "space caching done, time recorded"
+	ErrLocaleUnsupported             = errors.New("locale not supported by this space")
+	ErrNotSet                        = errors.New("field value not set")
+	ErrNotSetNoFallback              = errors.New("field value not set and no fallback locale available")
+	ErrRefNotIncludes                = errors.New("referenced entry not found in includes")
+	ErrNoTypeOfRefEntry              = errors.New("couldn't get contentType of referenced entry")
+	ErrNoTypeOfRefAsset              = errors.New("couldn't get contentType of referenced asset")
+	InfoUpdatedEntityCache           = "updated cache for entity"
+	InfoCachedAllEntries             = "cached all entries of content type"
+	InfoCachedAllAssets              = "cached all assets"
+	InfoFallingBackToFile            = "gonna use a local file"
+	InfoLoadingFromFile              = "loading space from local file"
+	InfoCacheWorkerStart             = "contentful cache worker starting"
+	InfoCacheUpdateQueued            = "contentful cache update queued"
+	InfoCacheUpdateDone              = "contentful cache update returning"
+	InfoCacheUpdateSkipped           = "contentful cache update skipped, already one in the queue"
+	InfoOfflineEntitiesLoaded        = "downloaded entries and assets from offline file"
+	InfoPreservingExistingCache      = "could not connect for cache update, preserving the existing cache"
+	InfoUpdateCacheTime              = "space caching done, time recorded"
+	ErrorEnvironmentSetToMaster      = "environment was empty string, set to master"
+	ErrorEntryIsNil 			     = "entry is nil"
+	ErrorEntrySysIsNil 			     = "entry.Sys is nil"
+	ErrorEntrySysContentTypeIsNil    = "entry.Sys.ContentType is nil"
+	ErrorEntrySysContentTypeSysIsNil = "entry.Sys.ContentType.Sys is nil"
 )
 
 var spaceContentTypes = []string{ {{ range $index , $contentType := $contentTypes }}ContentType{{ firstCap $contentType.Sys.ID }}, {{ end }} }
@@ -330,10 +339,10 @@ func (cc *ContentfulClient) GetContentTypeOfID(id string) (string, error) {
 
 func (ref *EntryReference) GetParents(cc *ContentfulClient) (parents []EntryReference, err error) {
 	if ref == nil {
-		return nil, errors.New("GetParents: reference is nil!")
+		return nil, errors.New("GetParents: reference is nil")
 	}
 	if cc == nil {
-		return nil, errors.New("GetParents: Contentful client is nil!")
+		return nil, errors.New("GetParents: Contentful client is nil")
 	}
 	if cc.Cache == nil {
 		return nil, errors.New("GetParents: only available in cached mode")
@@ -350,7 +359,7 @@ func HtmlToRichText(htmlSrc string) *RichTextNode {
 	re := regexp.MustCompile(`>([^\n])`)
 	htmlClean = re.ReplaceAllString(htmlClean, fmt.Sprintf(">\n"+`$1`))
 	re = regexp.MustCompile(`(.{1})<`)
-	htmlClean = re.ReplaceAllString(htmlClean, `$1`+fmt.Sprintf("\n<"))
+	htmlClean = re.ReplaceAllString(htmlClean, `$1`+"\n<")
 	htmlLines := strings.Split(htmlClean, "\n")
 	rtnd := &RichTextNode{
 		NodeType: RichTextNodeDocument,
@@ -429,10 +438,12 @@ func NewContentfulClient(spaceID string, clientMode ClientMode, clientKey string
 		clientMode:         clientMode,
 		Client:             apiClient,
 		Cache: &ContentfulCache{
-            contentTypes:     []string{},
-            idContentTypeMap: map[string]string{},
-            parentMap:        map[string][]EntryReference{},
-            },
+			assets:           assetCacheMap{},
+			contentTypes :    []string{},
+			entryMaps:        cacheEntryMaps{},
+			idContentTypeMap: map[string]string{},
+			parentMap:        map[string][]EntryReference{},
+		},
         cacheMutex: &ContentfulCacheMutex{
             fullCacheGcLock:        sync.RWMutex{},
             sharedDataGcLock:       sync.RWMutex{},
@@ -519,7 +530,7 @@ func RichTextToHtml(rt interface{}, linkResolver LinkResolverFunc, entryLinkReso
 	if err != nil {
 		return "", err
 	}
-	out := string(w.Bytes())
+	out := w.String()
 	if out == "<p></p>" {
 		return "", nil
 	}
@@ -527,8 +538,14 @@ func RichTextToHtml(rt interface{}, linkResolver LinkResolverFunc, entryLinkReso
 }
 
 func (cc *ContentfulClient) SetEnvironment(environment string) {
+	if environment == "" {
+		cc.Client.Environment = "master"
+		if cc.logFn != nil && cc.logLevel <= LogWarn {
+			cc.logFn(map[string]interface{}{"task":"UpdateCache"}, LogWarn, ErrorEnvironmentSetToMaster)
+		}
+		return
+	}
 	cc.Client.Environment = environment
-	return
 }
 
 func (cc *ContentfulClient) SetOfflineFallback(filename string) error {
@@ -537,6 +554,14 @@ func (cc *ContentfulClient) SetOfflineFallback(filename string) error {
 		return err
 	}
 	cc.offlineTemp = *offlineTemp
+	return nil
+}
+
+func (cc *ContentfulClient) SetSyncMode(mode bool) error {
+	if cc.offline {
+		return errors.New("SetSyncMode: client is set offline, can't enable sync")
+	}
+	cc.sync = mode
 	return nil
 }
 
@@ -549,6 +574,9 @@ func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []stri
 				return fmt.Errorf("UpdateCache: Content Type %q not available in this space", contentType)
 			}
 		}
+	}
+	if cc.sync {
+		return cc.syncCache(ctx, contentTypes)
 	}
 	cc.cacheWorkerOnce.Do(func() {
 		go cc.cacheWorker(ctx, contentTypes, cacheAssets)
@@ -571,11 +599,78 @@ func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []stri
 	return nil
 }
 
+func (cc *ContentfulClient) syncCache(ctx context.Context, contentTypes []string) error {
+	start := time.Now()
+	cc.Cache.contentTypes = contentTypes
+	if cc.logFn != nil && cc.logLevel <= LogInfo {
+			cc.logFn(map[string]interface{}{"task": "syncCache"}, LogInfo, InfoCacheUpdateQueued)
+	}
+	for {
+		col := cc.Client.Entries.Sync(
+			cc.SpaceID,
+			cc.syncToken == "",
+			cc.syncToken,
+		)
+		col.GetAll()
+		cc.syncToken = col.SyncToken
+		cc.cacheInit = true
+		if len(col.Items) == 0 {
+			if cc.logFn != nil && cc.logLevel <= LogInfo {
+				cc.logFn(map[string]interface{}{"time elapsed": fmt.Sprint(time.Since(start)), "task": "syncCache"}, LogInfo, InfoUpdateCacheTime)
+			}
+			return nil
+		}
+		var entries []*contentful.Entry
+		var assets []*contentful.Asset
+		for _, item := range col.Items {
+			entry := &contentful.Entry{}
+			byteArray, _ := json.Marshal(item)
+			errEntry := json.NewDecoder(bytes.NewReader(byteArray)).Decode(entry)
+			if errEntry == nil && entry.Sys != nil && (entry.Sys.Type == sysTypeAsset || entry.Sys.Type == sysTypeDeletedAsset) {
+				asset := &contentful.Asset{}
+				errAsset := json.NewDecoder(bytes.NewReader(byteArray)).Decode(asset)
+				if errAsset != nil {
+					continue
+				}
+				if asset.Sys != nil {
+					assets = append(assets, asset)
+				}
+				continue
+			}
+			if entry.Sys != nil {
+				entries = append(entries, entry)
+			}
+		}
+		for _, entry := range entries {
+			switch entry.Sys.Type {
+			case sysTypeEntry:
+				if !stringSliceContains(spaceContentTypes, entry.Sys.ContentType.Sys.ID) {
+					continue
+				}
+				updateCacheForContentTypeAndEntity(ctx, cc, entry.Sys.ContentType.Sys.ID, entry.Sys.ID, entry, false)
+			case sysTypeDeletedEntry:
+				contentType := cc.Cache.idContentTypeMap[entry.Sys.ID]
+				updateCacheForContentTypeAndEntity(ctx, cc, contentType, entry.Sys.ID, entry, true)
+			default:
+			}
+		}
+		for _, asset := range assets {
+			switch asset.Sys.Type {
+			case sysTypeAsset:
+				updateCacheForContentTypeAndEntity(ctx, cc, assetWorkerType, asset.Sys.ID, asset, false)
+			case sysTypeDeletedAsset:
+				updateCacheForContentTypeAndEntity(ctx, cc, assetWorkerType, asset.Sys.ID, nil, true)
+			default:
+			}
+		}
+	}
+}
+
 func (cc *ContentfulClient) cacheWorker(ctx context.Context, contentTypes []string, cacheAssets bool) {
 	if cc.logFn != nil && cc.logLevel <= LogInfo {
         cc.logFn(map[string]interface{}{"task":"UpdateCache"}, LogInfo, InfoCacheWorkerStart)
     }
-	for _ = range cc.cacheQueue {
+	for range cc.cacheQueue {
 	    cc.cacheSpace(ctx, contentTypes, cacheAssets)
 		cc.cacheDone <- struct{}{}
 	}
@@ -595,7 +690,7 @@ func (cc *ContentfulClient) cacheSpace(ctx context.Context, contentTypes []strin
     offlinePreviousState := cc.offline
     cc.cacheMutex.sharedDataGcLock.RUnlock()
     if errCanWeEvenConnect != nil {
-        if len(cc.offlineTemp.Entries) > 0 && (cc.Cache == nil || offlinePreviousState == true) {
+        if len(cc.offlineTemp.Entries) > 0 && (cc.Cache == nil || offlinePreviousState) {
             if cc.logFn != nil && cc.logLevel <= LogInfo {
                 cc.logFn(map[string]interface{}{"task": "UpdateCache"}, LogInfo, InfoFallingBackToFile)
             }
@@ -645,7 +740,7 @@ func (cc *ContentfulClient) cacheSpace(ctx context.Context, contentTypes []strin
     close(results)
     if err != nil {
         // drain contentTypeChan
-        for _ = range contentTypeChan {
+		for range contentTypeChan {
         }
         cc.cacheMutex.sharedDataGcLock.Lock()
         cc.offline = offlinePreviousState
@@ -686,11 +781,7 @@ func (cc *ContentfulClient) UpdateCacheForEntity(ctx context.Context, sysType st
 	if contentType != assetWorkerType && !stringSliceContains(spaceContentTypes, contentType) {
 		return fmt.Errorf("UpdateCache: Content Type %q not available in this space", contentType)
 	}
-	err := updateCacheForContentTypeAndEntity(ctx, cc, sysType, contentType, entityID)
-	if err != nil {
-		return err
-	}
-	return nil
+	return updateCacheForContentTypeAndEntity(ctx, cc, contentType, entityID, nil, false)
 }
 
 func FieldToObject(jsonField interface{}, targetObject interface{}) error {
@@ -705,28 +796,29 @@ func FieldToObject(jsonField interface{}, targetObject interface{}) error {
 	return nil
 }
 
-func (cc *ContentfulClient) cacheGcAssetByID(ctx context.Context, id string) error {
-	if cc == nil || cc.Client == nil {
-		return errors.New("cacheGcAssetByID: No client available")
-	}
-	col := cc.Client.Assets.List(cc.SpaceID)
-	col.Query.Locale("*").Equal("sys.id", id)
-	_, err := col.Next()
-	if err != nil {
-		return err
-	}
-	if len(col.Items) == 0 {
-		return errors.New("cacheGcAssetByID: Not found " + id)
-	}
-	item := col.Items[0]
-	asset := contentful.Asset{}
-	byt, err := json.Marshal(item)
-	if err != nil {
-		return err
-	}
-	err = json.Unmarshal(byt, &asset)
-	if err != nil {
-		return err
+func (cc *ContentfulClient) cacheGcAssetByID(ctx context.Context, id string, asset *contentful.Asset) error {
+	if asset == nil {
+		if cc.Client == nil {
+			return errors.New("cacheGcAssetByID: No client available")
+		}
+		col := cc.Client.Assets.List(cc.SpaceID)
+		col.Query.Locale("*").Equal("sys.id", id)
+		_, err := col.Next()
+		if err != nil {
+			return err
+		}
+		if len(col.Items) == 0 {
+			return errors.New("cacheGcAssetByID: Not found " + id)
+		}
+		item := col.Items[0]
+		byt, err := json.Marshal(item)
+		if err != nil {
+			return err
+		}
+		err = json.Unmarshal(byt, asset)
+		if err != nil {
+			return err
+		}	
 	}
 	for _, loc := range []Locale{ {{ range $index , $locale := $locales }}SpaceLocale{{ onlyLetters $locale.Name }},{{end}} } {
 		if _, ok := asset.Fields.File[string(loc)]; ok {
@@ -734,7 +826,7 @@ func (cc *ContentfulClient) cacheGcAssetByID(ctx context.Context, id string) err
 		}
 	}
 	cc.cacheMutex.assetsGcLock.Lock()
-	cc.Cache.assets[id] = &asset
+	cc.Cache.assets[id] = asset
 	cc.cacheMutex.assetsGcLock.Unlock()
 	return nil
 }
@@ -854,9 +946,9 @@ func (cc *ContentfulClient) optimisticPageSizeGetAll(contentType string, limit u
 		}
 	}
 	col.Items = allItems
-	switch err.(type) {
+	switch errTyped := err.(type) {
 	case contentful.ErrorResponse:
-		msg := err.(contentful.ErrorResponse).Message
+		msg := errTyped.Message
 		if strings.Contains(msg, "Response size too big") && limit >= 20 {
 			smallerPageCol, err := cc.optimisticPageSizeGetAll(contentType, limit/2)
 			return smallerPageCol, err
@@ -979,9 +1071,8 @@ func richTextHtmlLinesToNode(htmlLines []string, start int, pendingTag string, m
 			case HtmlBreak:
 				if len(nodeSlice) > 0 {
 					myNode := nodeSlice[len(nodeSlice)-1]
-					switch myNode.(type) {
+					switch myNodeTyped := myNode.(type) {
 					case RichTextNodeTextNode:
-						myNodeTyped := myNode.(RichTextNodeTextNode)
 						if myNodeTyped.NodeType == RichTextNodeText {
 							myNodeTyped.Value += "\n"
 							nodeSlice[len(nodeSlice)-1] = myNodeTyped
@@ -1143,11 +1234,10 @@ func (n *RichTextGenericNode) richTextRenderHTML(w io.Writer, linkResolver LinkR
 	case RichTextNodeText:
 		tags = []richTextHtmlTag{}
 	case RichTextNodeHyperlink:
-		uri, _ := n.Data["uri"]
+		uri := n.Data["uri"]
 		attrs := map[string]string{}
-		switch uri.(type) {
+		switch uriString := uri.(type) {
 		case string:
-			uriString := uri.(string)
 			if uriString != "" {
 				resolvedAttrs, errResolveAttrs := linkResolver(uriString)
 				if errResolveAttrs != nil {
@@ -1159,7 +1249,7 @@ func (n *RichTextGenericNode) richTextRenderHTML(w io.Writer, linkResolver LinkR
 		}
 		tags = []richTextHtmlTag{richTextHtmlTag{name: HtmlAnchor, attrs: attrs}}
 	case RichTextNodeEntryHyperlink:
-		target, _ := n.Data["target"]
+		target := n.Data["target"]
 		attrs := map[string]string{}
 		switch target.(type) {
 		case map[string]interface{}:
@@ -1177,7 +1267,7 @@ func (n *RichTextGenericNode) richTextRenderHTML(w io.Writer, linkResolver LinkR
 		tags = []richTextHtmlTag{richTextHtmlTag{name: HtmlAnchor, attrs: attrs}}
 	case RichTextNodeEmbeddedAsset:
 		if imageResolver == nil {
-			return errors.New("Can't resolve image asset URL")
+			return errors.New("can't resolve image asset URL")
 		}
 		dataObj := RichTextData{}
 		byt, err := json.Marshal(n.Data)
@@ -1185,8 +1275,11 @@ func (n *RichTextGenericNode) richTextRenderHTML(w io.Writer, linkResolver LinkR
 			return err
 		}
 		err = json.Unmarshal(byt, &dataObj)
+		if err != nil {
+			return err
+		}
 		if dataObj.Target == nil {
-			return errors.New("Data target is empty")
+			return errors.New("data target is empty")
 		}
 		attrs, customHTML, err := imageResolver(dataObj.Target.Sys.ID, locale)
 		if err != nil {
@@ -1204,7 +1297,7 @@ func (n *RichTextGenericNode) richTextRenderHTML(w io.Writer, linkResolver LinkR
 			return errUnmarshal
 		}
 		if dataObj.Target == nil {
-			return errors.New("Data target is empty")
+			return errors.New("data target is empty")
 		}
 		rawHTML, errResolve := embeddedEntryResolver(dataObj.Target.Sys.ID, locale)
 		if errResolve != nil {
@@ -1286,26 +1379,33 @@ func updateCacheForContentType(ctx context.Context, results chan ContentTypeResu
 	return nil
 }
 
-func updateCacheForContentTypeAndEntity(ctx context.Context, cc *ContentfulClient, sysType string, contentType string, entityID string) error {
+func updateCacheForContentTypeAndEntity(ctx context.Context, cc *ContentfulClient, contentType string, entityID string, entityPayload interface{}, entryDelete bool) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 	switch contentType {
 	case assetWorkerType:
-		err := cc.cacheGcAssetByID(ctx, entityID)
-		if err != nil {
-			return err
+		if entryDelete {
+			err := cc.deleteAssetFromCache(entityID)
+			if err != nil {
+				return err
+			}
+		} else {
+			err := cc.cacheGcAssetByID(ctx, entityID, entityPayload.(*contentful.Asset))
+			if err != nil {
+				return err
+			}
 		}
-		if cc.logFn != nil && cc.logLevel <= LogInfo {
+		if cc.logFn != nil && cc.logLevel <= LogInfo && entityPayload == nil {
 			cc.logFn(map[string]interface{}{"contentType": "Asset", "method": "updateCacheForContentTypeAndEntity", "entityID": entityID}, LogInfo, InfoUpdatedEntityCache)
 		}
 	{{ range $index , $contentType := $contentTypes }}
 	case ContentType{{ firstCap $contentType.Sys.ID }}:
-		err := cc.cache{{ firstCap $contentType.Sys.ID }}ByID(ctx, entityID)
+		err := cc.cache{{ firstCap $contentType.Sys.ID }}ByID(ctx, entityID, entityPayload.(*contentful.Entry), entryDelete)
 		if err != nil {
 			return err
 		}
-		if cc.logFn != nil && cc.logLevel <= LogInfo {
+		if cc.logFn != nil && cc.logLevel <= LogInfo && entityPayload == nil {
 			cc.logFn(map[string]interface{}{"contentType": "{{ $contentType.Sys.ID }}", "method": "updateCacheForContentTypeAndEntity", "entityID": entityID}, LogInfo, InfoUpdatedEntityCache)
 		}
 	{{ end }}
