@@ -725,7 +725,7 @@ func (cc *ContentfulClient) cache{{ firstCap $contentType.Sys.ID }}ByID(ctx cont
 			return errors.New("cache{{ firstCap $contentType.Sys.ID }}ByID: No client available")
 		}
 		if !entryDelete {
-			col := cc.Client.Entries.List(cc.SpaceID)
+			col = cc.Client.Entries.List(cc.SpaceID)
 			col.Query.ContentType("{{ $contentType.Sys.ID }}").Locale("*").Include(0).Equal("sys.id", id)
 			_, err := col.GetAll()
 			if err != nil {
@@ -734,7 +734,7 @@ func (cc *ContentfulClient) cache{{ firstCap $contentType.Sys.ID }}ByID(ctx cont
 		}	
 	}
 	// It was deleted
-	if len(col.Items) == 0 || entryDelete {
+	if col != nil && len(col.Items) == 0 || entryDelete {
 		delete(cc.Cache.entryMaps.{{ $contentType.Sys.ID }}, id)
 		delete(cc.Cache.idContentTypeMap, id)
 		// delete as child

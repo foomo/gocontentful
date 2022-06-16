@@ -203,18 +203,21 @@ it's a whole lot faster for preview features). This can get expensive on the API
 
 #### Sync API support
 
-In versions newer than v1.0.11, gocontentful supports the Contentful Sync API and that's the recommended way to cache spaces and manage updates.
-To enable support for the Sync API you need to call the SetSyncMode method on the client:
+In versions v1.0.12 and newer, gocontentful supports the Contentful Sync API and that's the recommended way to cache spaces and manage updates.
+Sync is enabled by default when you create a client with CDA mode. 
+To enable support for the Sync API explicitly, you can call the SetSyncMode method on the client:
 
 <pre><code>cc.SetSyncMode(true)</code></pre>
  
- From that moment on, the cache updates will happen transparently through incremental changes download. The syntax is the same:
+With sync on, the cache updates will happen transparently through incremental changes download. The syntax to update the cache doesn't change:
 
  <pre><code>err = cc.UpdateCache(context, contentTypes, true)</code></pre>
 
  The first synchronization will be slower than the full cache init because sync calls cannot be parallelized,
  but subsequent updates will be much faster because only changes in the space from the previous sync will be downloaded.
  This includes entries and assets that were deleted.
+
+ Note that the Sync API is not officially supported by Contentful on the Preview API. Use it at your own risk.
 
 ### Have fun with persons and pets
 

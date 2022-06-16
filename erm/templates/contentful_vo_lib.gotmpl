@@ -460,6 +460,7 @@ func NewContentfulClient(spaceID string, clientMode ClientMode, clientKey string
 		logLevel:           logLevel,
 		optimisticPageSize: optimisticPageSize,
 		SpaceID:            spaceID,
+		sync:               clientMode == ClientModeCDA,
 	}
 	_, err = cc.Client.Spaces.Get(spaceID)
 	if err != nil {
@@ -815,7 +816,7 @@ func (cc *ContentfulClient) cacheGcAssetByID(ctx context.Context, id string, ass
 		if err != nil {
 			return err
 		}
-		err = json.Unmarshal(byt, asset)
+		err = json.Unmarshal(byt, &asset)
 		if err != nil {
 			return err
 		}	
@@ -1383,6 +1384,8 @@ func updateCacheForContentTypeAndEntity(ctx context.Context, cc *ContentfulClien
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
+	var entityEntry *contentful.Entry
+	var entityAsset *contentful.Asset
 	switch contentType {
 	case assetWorkerType:
 		if entryDelete {
@@ -1391,7 +1394,10 @@ func updateCacheForContentTypeAndEntity(ctx context.Context, cc *ContentfulClien
 				return err
 			}
 		} else {
-			err := cc.cacheGcAssetByID(ctx, entityID, entityPayload.(*contentful.Asset))
+			if entityPayload != nil {
+				entityAsset = entityPayload.(*contentful.Asset)
+			}
+			err := cc.cacheGcAssetByID(ctx, entityID, entityAsset)
 			if err != nil {
 				return err
 			}
@@ -1401,7 +1407,10 @@ func updateCacheForContentTypeAndEntity(ctx context.Context, cc *ContentfulClien
 		}
 	{{ range $index , $contentType := $contentTypes }}
 	case ContentType{{ firstCap $contentType.Sys.ID }}:
-		err := cc.cache{{ firstCap $contentType.Sys.ID }}ByID(ctx, entityID, entityPayload.(*contentful.Entry), entryDelete)
+		if entityPayload != nil {
+			entityEntry = entityPayload.(*contentful.Entry)
+		}
+		err := cc.cache{{ firstCap $contentType.Sys.ID }}ByID(ctx, entityID, entityEntry, entryDelete)
 		if err != nil {
 			return err
 		}
