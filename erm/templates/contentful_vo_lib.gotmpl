@@ -1306,6 +1306,14 @@ func (n *RichTextGenericNode) richTextRenderHTML(w io.Writer, linkResolver LinkR
 		}
 		w.Write([]byte(rawHTML))
 		return
+	case RichTextNodeTable:
+		tags = []richTextHtmlTag{ {name: HtmlTable} }
+	case RichTextNodeTableRow:
+		tags = []richTextHtmlTag{ {name: HtmlTableRow} }
+	case RichTextNodeTableHeaderCell:
+		tags = []richTextHtmlTag{ {name: HtmlTableHeaderCell} }
+	case RichTextNodeTableCell:
+		tags = []richTextHtmlTag{ {name: HtmlTableCell} }
 	default:
 	}
 	for _, m := range n.Marks {
