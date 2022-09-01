@@ -770,15 +770,15 @@ func (cc *ContentfulClient) cache{{ firstCap $contentType.Sys.ID }}ByID(ctx cont
 				if cc.Cache.parentMap[child.Sys.ID] == nil {
 					cc.Cache.parentMap[child.Sys.ID] = []EntryReference{}
 				}
-				found := false
+				newParentRef := EntryReference{ContentType: {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID, ID: {{ $contentType.Sys.ID }}.Sys.ID, VO: {{ $contentType.Sys.ID }}}
+				newParentSlice := []EntryReference{}
 				for _, parent := range cc.Cache.parentMap[child.Sys.ID] {
-					if parent.ID == id {
-						found = true
+					if parent.ID != id {
+						newParentSlice = append(newParentSlice, parent)
 					}
 				}
-				if !found {
-					cc.Cache.parentMap[child.Sys.ID] = append(cc.Cache.parentMap[child.Sys.ID], EntryReference{ContentType: {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID, ID: {{ $contentType.Sys.ID }}.Sys.ID, VO: {{ $contentType.Sys.ID }}})
-				}
+				newParentSlice = append(newParentSlice, newParentRef)
+				cc.Cache.parentMap[child.Sys.ID] = newParentSlice
 			}
 		}
 	}
@@ -790,15 +790,15 @@ func (cc *ContentfulClient) cache{{ firstCap $contentType.Sys.ID }}ByID(ctx cont
 				if cc.Cache.parentMap[child.Sys.ID] == nil {
 					cc.Cache.parentMap[child.Sys.ID] = []EntryReference{}
 				}
-				found := false
+				newParentRef := EntryReference{ContentType: {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID, ID: {{ $contentType.Sys.ID }}.Sys.ID, VO: {{ $contentType.Sys.ID }}}
+				newParentSlice := []EntryReference{}
 				for _, parent := range cc.Cache.parentMap[child.Sys.ID] {
-					if parent.ID == id {
-						found = true
+					if parent.ID != id {
+						newParentSlice = append(newParentSlice, parent)
 					}
 				}
-				if !found {
-					cc.Cache.parentMap[child.Sys.ID] = append(cc.Cache.parentMap[child.Sys.ID], EntryReference{ContentType: {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID, ID: {{ $contentType.Sys.ID }}.Sys.ID, VO: {{ $contentType.Sys.ID }}})
-				}
+				newParentSlice = append(newParentSlice, newParentRef)
+				cc.Cache.parentMap[child.Sys.ID] = newParentSlice
 			}
 		}
 	{{ end }}

@@ -274,6 +274,8 @@ func (cc *ContentfulClient) GetAssetByID(id string, forceNoCache ...bool) (*cont
 		cc.cacheMutex.assetsGcLock.Unlock()
 		if okAsset {
 			return asset, nil
+		} else {
+			return nil, errors.New("GetAssetByID: not found")
 		}
 	}
 	col := cc.Client.Assets.List(cc.SpaceID)
