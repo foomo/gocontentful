@@ -568,6 +568,10 @@ func (cc *ContentfulClient) SetSyncMode(mode bool) error {
 	return nil
 }
 
+func (cc *ContentfulClient) ResetSync() {
+	cc.syncToken = ""
+}
+
 func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []string, cacheAssets bool) error {
 	if contentTypes == nil {
 		contentTypes = spaceContentTypes

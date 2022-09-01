@@ -378,6 +378,14 @@ space. Pass an empty string to reset to the _master_ environment.
 
 Returns true if the specified contentTypeID is cached by the client, false otherwise.
 
+>(cc *ContentfulClient) **SetSyncMode**(mode bool) error
+
+Switches on/off the sync mode. This method will return an error if called on an offline client.
+
+>(cc *ContentfulClient) **ResetSync**()
+
+Resets the sync token: the next call to UpdateCache() will rebuild the cache from scratch.
+
 >(cc *ContentfulClient) **UpdateCache**(ctx context.Context, contentTypes []string, cacheAssets bool) error
 
 Builds or re-builds the entire client cache.
