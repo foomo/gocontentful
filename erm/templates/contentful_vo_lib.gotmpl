@@ -46,16 +46,17 @@ type ContentfulCacheMutex struct {
 type assetCacheMap map[string]*contentful.Asset
 
 type ContentfulClient struct {
-	Cache           *ContentfulCache
-    cacheInit       bool
-	cacheMutex      *ContentfulCacheMutex
-	cacheQueue      chan struct{}
-	cacheDone       chan struct{}
-	cacheWorkerOnce sync.Once
-	clientMode      ClientMode
-	Client          *contentful.Contentful
-	locales         []Locale
-	logFn           func(
+	Cache              *ContentfulCache
+    cacheInit          bool
+	cacheMutex         *ContentfulCacheMutex
+	cacheQueue         chan struct{}
+	cacheDone          chan struct{}
+	cacheUpdateTimeout int64
+	cacheWorkerOnce    sync.Once
+	clientMode         ClientMode
+	Client             *contentful.Contentful
+	locales            []Locale
+	logFn              func(
 		fields map[string]interface{},
 		level int,
 		args ...interface{},
@@ -156,6 +157,7 @@ var (
 	InfoLoadingFromFile              = "loading space from local file"
 	InfoCacheWorkerStart             = "contentful cache worker starting"
 	InfoCacheUpdateQueued            = "contentful cache update queued"
+	InfoCacheUpdateCanceled          = "contentful cache update canceled"
 	InfoCacheUpdateDone              = "contentful cache update returning"
 	InfoCacheUpdateSkipped           = "contentful cache update skipped, already one in the queue"
 	InfoOfflineEntitiesLoaded        = "downloaded entries and assets from offline file"
@@ -455,8 +457,9 @@ func NewContentfulClient(spaceID string, clientMode ClientMode, clientKey string
             {{ range $index , $contentType := $contentTypes }}	{{ $contentType.Sys.ID }}GcLock: sync.RWMutex{},
             {{ end }}
         },
-        cacheQueue: make(chan struct{}, 1),
-        cacheDone: make(chan struct{}, 1),
+        cacheQueue:         make(chan struct{}, 1),
+        cacheDone:          make(chan struct{}, 1),
+        cacheUpdateTimeout: 120,
 		locales:			[]Locale{ {{ range $index , $locale := $locales }}SpaceLocale{{ onlyLetters $locale.Name }}, {{ end }} },
 		logFn:              logFn,
 		logLevel:           logLevel,
@@ -499,6 +502,7 @@ func NewOfflineContentfulClient(filename string, logFn func(fields map[string]in
         },
 		cacheQueue: make(chan struct{}, 1),
 		cacheDone: make(chan struct{}, 1),
+		cacheUpdateTimeout: 120,
 		locales:     []Locale{
 			{{ range $index , $locale := $locales }}SpaceLocale{{ onlyLetters $locale.Name }},
 {{ end}}},
@@ -540,6 +544,10 @@ func RichTextToHtml(rt interface{}, linkResolver LinkResolverFunc, entryLinkReso
 	return out, nil
 }
 
+func (cc *ContentfulClient) SetCacheUpdateTimeout(seconds int64) {
+	cc.cacheUpdateTimeout = seconds
+}
+
 func (cc *ContentfulClient) SetEnvironment(environment string) {
 	if environment == "" {
 		cc.Client.Environment = "master"
@@ -573,6 +581,11 @@ func (cc *ContentfulClient) ResetSync() {
 }
 
 func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []string, cacheAssets bool) error {
+    ctxAtWork, cancel := context.WithTimeout(ctx, time.Second*time.Duration(cc.cacheUpdateTimeout))
+    defer cancel()
+    if cc.offline {
+        ctxAtWork = ctx
+    }
 	if contentTypes == nil {
 		contentTypes = spaceContentTypes
 	} else {
@@ -583,18 +596,27 @@ func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []stri
 		}
 	}
 	if cc.sync {
-		return cc.syncCache(ctx, contentTypes)
+		return cc.syncCache(ctxAtWork, contentTypes)
 	}
 	cc.cacheWorkerOnce.Do(func() {
-		go cc.cacheWorker(ctx, contentTypes, cacheAssets)
+		go cc.cacheWorker(ctxAtWork, contentTypes, cacheAssets)
 	})
 	if len(cc.cacheQueue) == 0 {
 		if cc.logFn != nil && cc.logLevel <= LogInfo {
             cc.logFn(map[string]interface{}{"task":"UpdateCache"}, LogInfo, InfoCacheUpdateQueued)
         }
         cc.cacheQueue <- struct{}{}
-		<-cc.cacheDone
-		cc.cacheInit = true
+		select {
+        case <-cc.cacheDone:
+            if cc.logFn != nil && cc.logLevel <= LogInfo {
+                cc.logFn(map[string]interface{}{"task": "UpdateCache"}, LogInfo, InfoCacheUpdateDone)
+            }
+        case <-ctxAtWork.Done():
+            if cc.logFn != nil && cc.logLevel <= LogInfo {
+                cc.logFn(map[string]interface{}{"task": "UpdateCache"}, LogInfo, InfoCacheUpdateCanceled)
+            }
+        }
+        cc.cacheInit = true
 		if cc.logFn != nil && cc.logLevel <= LogInfo {
             cc.logFn(map[string]interface{}{"task":"UpdateCache"}, LogInfo, InfoCacheUpdateDone)
         }

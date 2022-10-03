@@ -378,6 +378,11 @@ space. Pass an empty string to reset to the _master_ environment.
 
 Returns true if the specified contentTypeID is cached by the client, false otherwise.
 
+>(cc *ContentfulClient) **SetCacheUpdateTimeout**(seconds int64)
+
+Sets the cache update timeout to the specified length. A new client by default times out
+caching in 120 seconds.
+
 >(cc *ContentfulClient) **SetSyncMode**(mode bool) error
 
 Switches on/off the sync mode. This method will return an error if called on an offline client.

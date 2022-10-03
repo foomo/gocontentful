@@ -2,9 +2,10 @@ package test
 
 import (
 	"context"
+	"testing"
+
 	"github.com/foomo/gocontentful/test/testapi"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestCache(t *testing.T) {
@@ -71,7 +72,7 @@ func TestCacheIfNewEntry(t *testing.T) {
 	require.Equal(t, 9, stats.EntryCount)
 	err = contentfulClient.SetOfflineFallback("./test-space-export-newer.json")
 	require.NoError(t, err)
-	err = contentfulClient.UpdateCache(context.TODO(), nil, false)
+	err = contentfulClient.UpdateCache(context.Background(), nil, false)
 	require.NoError(t, err)
 	stats, err = contentfulClient.GetCacheStats()
 	require.NoError(t, err)
