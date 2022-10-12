@@ -618,6 +618,9 @@ func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []stri
 	if cc.offline {
 		ctxAtWork = ctx
 	}
+	if !cc.offline {
+		time.Sleep(time.Second * 2)
+	}
 	if contentTypes == nil {
 		contentTypes = spaceContentTypes
 	} else {
