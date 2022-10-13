@@ -1266,37 +1266,41 @@ func (n *RichTextGenericNode) richTextRenderHTML(w io.Writer, linkResolver LinkR
 	case RichTextNodeText:
 		tags = []richTextHtmlTag{}
 	case RichTextNodeHyperlink:
-		uri := n.Data["uri"]
-		attrs := map[string]string{}
-		switch uriString := uri.(type) {
-		case string:
-			if uriString != "" {
-				resolvedAttrs, errResolveAttrs := linkResolver(uriString)
-				if errResolveAttrs != nil {
-					err = errResolveAttrs
-					return
-				}
-				attrs = resolvedAttrs
-			}
-		}
-		tags = []richTextHtmlTag{richTextHtmlTag{name: HtmlAnchor, attrs: attrs}}
+		if n.Data != nil {
+            uri := n.Data["uri"]
+            attrs := map[string]string{}
+            switch uriString := uri.(type) {
+            case string:
+                if uriString != "" {
+                    resolvedAttrs, errResolveAttrs := linkResolver(uriString)
+                    if errResolveAttrs != nil {
+                        err = errResolveAttrs
+                        return
+                    }
+                    attrs = resolvedAttrs
+                }
+            }
+            tags = []richTextHtmlTag{richTextHtmlTag{name: HtmlAnchor, attrs: attrs}}
+        }
 	case RichTextNodeEntryHyperlink:
-		target := n.Data["target"]
-		attrs := map[string]string{}
-		switch target.(type) {
-		case map[string]interface{}:
-			targetSys, ok := target.(map[string]interface{})["sys"]
-			if ok {
-				entryID := targetSys.(map[string]interface{})["id"].(string)
-				resolvedAttrs, errResolveAttrs := entryLinkResolver(entryID, locale)
-				if errResolveAttrs != nil {
-					err = errResolveAttrs
-					return
-				}
-				attrs = resolvedAttrs
-			}
-		}
-		tags = []richTextHtmlTag{richTextHtmlTag{name: HtmlAnchor, attrs: attrs}}
+		if n.Data != nil {
+            target := n.Data["target"]
+            attrs := map[string]string{}
+            switch target.(type) {
+            case map[string]interface{}:
+                targetSys, ok := target.(map[string]interface{})["sys"]
+                if ok {
+                    entryID := targetSys.(map[string]interface{})["id"].(string)
+                    resolvedAttrs, errResolveAttrs := entryLinkResolver(entryID, locale)
+                    if errResolveAttrs != nil {
+                        err = errResolveAttrs
+                        return
+                    }
+                    attrs = resolvedAttrs
+                }
+            }
+            tags = []richTextHtmlTag{richTextHtmlTag{name: HtmlAnchor, attrs: attrs}}
+        }
 	case RichTextNodeEmbeddedAsset:
 		if imageResolver == nil {
 			return errors.New("can't resolve image asset URL")
