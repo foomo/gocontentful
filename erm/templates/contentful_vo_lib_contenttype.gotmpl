@@ -641,13 +641,13 @@ func (cc *ContentfulClient) cacheAll{{ firstCap $contentType.Sys.ID }}(ctx conte
 	} else {
 		col, err = cc.optimisticPageSizeGetAll("{{ $contentType.Sys.ID }}", cc.optimisticPageSize)
 		if err != nil {
-			return nil, err
+			return nil, errors.New("optimisticPageSizeGetAll for {{ firstCap $contentType.Sys.ID }} failed: "+err.Error())
 		}
 	}
 	cc.cacheMutex.sharedDataGcLock.RUnlock()
 	all{{ firstCap $contentType.Sys.ID }}, err = colToCf{{ firstCap $contentType.Sys.ID }}(col,cc)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("colToCf{{ firstCap $contentType.Sys.ID }} failed: "+err.Error())
 	}
 	{{ $contentType.Sys.ID }}Map := map[string]*Cf{{ firstCap $contentType.Sys.ID }}{}
 	for _, {{ $contentType.Sys.ID }} := range all{{ firstCap $contentType.Sys.ID }} {

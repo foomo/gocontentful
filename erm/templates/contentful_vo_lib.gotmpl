@@ -1406,7 +1406,7 @@ func updateCacheForContentType(ctx context.Context, results chan ContentTypeResu
 	case ContentType{{ firstCap $contentType.Sys.ID }}:
 		all{{ firstCap $contentType.Sys.ID }}, err := cc.cacheAll{{ firstCap $contentType.Sys.ID }}(ctx, results)
 		if err != nil {
-			return err
+			return errors.New("updateCacheForContentType failed for contentType {{ $contentType.Sys.ID }}: "+err.Error())
 		}
 		tempCache.entryMaps.{{ $contentType.Sys.ID }} = all{{ firstCap $contentType.Sys.ID }}
 		if cc.logFn != nil && cc.logLevel <= LogInfo {
@@ -1416,7 +1416,7 @@ func updateCacheForContentType(ctx context.Context, results chan ContentTypeResu
 	case assetWorkerType:
 		allAssets, err := cc.getAllAssets(false)
 		if err != nil {
-			return err
+			return errors.New("updateCacheForContentType failed for assets")
 		}
 		tempCache.assets = allAssets
 		if cc.logFn != nil && cc.logLevel <= LogInfo {
