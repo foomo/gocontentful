@@ -89,6 +89,10 @@ type CfProductFields struct {
 	RWLockSku                sync.RWMutex                `json:"-"`
 	Website                  map[string]string           `json:"website,omitempty"`
 	RWLockWebsite            sync.RWMutex                `json:"-"`
+	SeoText                  map[string]interface{}      `json:"seoText,omitempty"`
+	RWLockSeoText            sync.RWMutex                `json:"-"`
+	Nodes                    map[string]interface{}      `json:"nodes,omitempty"`
+	RWLockNodes              sync.RWMutex                `json:"-"`
 }
 
 type genericEntryNoFields struct {

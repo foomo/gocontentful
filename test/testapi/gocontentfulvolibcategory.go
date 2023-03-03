@@ -483,6 +483,7 @@ func (cc *ContentfulClient) cacheAllCategory(ctx context.Context, resultChan cha
 		Items: []interface{}{},
 	}
 	cc.cacheMutex.sharedDataGcLock.RLock()
+	defer cc.cacheMutex.sharedDataGcLock.RUnlock()
 	if cc.offline {
 		for _, entry := range cc.offlineTemp.Entries {
 			if entry.Sys.ContentType.Sys.ID == ContentTypeCategory {
@@ -495,7 +496,6 @@ func (cc *ContentfulClient) cacheAllCategory(ctx context.Context, resultChan cha
 			return nil, errors.New("optimisticPageSizeGetAll for Category failed: " + err.Error())
 		}
 	}
-	cc.cacheMutex.sharedDataGcLock.RUnlock()
 	allCategory, err = colToCfCategory(col, cc)
 	if err != nil {
 		return nil, errors.New("colToCfCategory failed: " + err.Error())
@@ -596,6 +596,13 @@ func colToCfCategory(col *contentful.Collection, cc *ContentfulClient) (vos []*C
 		err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&vo)
 		if err != nil {
 			break
+		}
+		if cc.textJanitor {
+
+			vo.Fields.Title = cleanUpStringField(vo.Fields.Title)
+
+			vo.Fields.CategoryDescription = cleanUpStringField(vo.Fields.CategoryDescription)
+
 		}
 		vo.CC = cc
 		vos = append(vos, &vo)

@@ -9,11 +9,12 @@ import (
 	"fmt"
 	"html"
 	"io"
-	"io/ioutil"
+	"os"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/foomo/contentful"
 	"golang.org/x/sync/errgroup"
@@ -65,12 +66,13 @@ type ContentfulClient struct {
 		args ...interface{},
 	)
 	logLevel           int
-	optimisticPageSize uint16 // Start downloading entries at this page size
+	optimisticPageSize uint16
 	SpaceID            string
 	offline            bool
 	offlineTemp        offlineTemp
 	sync               bool
 	syncToken          string
+	textJanitor        bool
 }
 
 type offlineTemp struct {
@@ -280,6 +282,14 @@ func (cc *ContentfulClient) DeleteAsset(asset *contentful.Asset) error {
 
 func (cc *ContentfulClient) DeleteAssetFromCache(key string) error {
 	return cc.deleteAssetFromCache(key)
+}
+
+func (cc *ContentfulClient) DisableTextJanitor() {
+	cc.textJanitor = false
+}
+
+func (cc *ContentfulClient) EnableTextJanitor() {
+	cc.textJanitor = true
 }
 
 func (cc *ContentfulClient) GetAllAssets() (map[string]*contentful.Asset, error) {
@@ -513,7 +523,7 @@ func NewContentfulClient(spaceID string, clientMode ClientMode, clientKey string
 	return cc, nil
 }
 
-func NewOfflineContentfulClient(filename string, logFn func(fields map[string]interface{}, level int, args ...interface{}), logLevel int, cacheAssets bool) (*ContentfulClient, error) {
+func NewOfflineContentfulClient(filename string, logFn func(fields map[string]interface{}, level int, args ...interface{}), logLevel int, cacheAssets bool, textJanitor bool) (*ContentfulClient, error) {
 	offlineTemp, err := getOfflineSpaceFromFile(filename)
 	if err != nil {
 		return nil, fmt.Errorf("NewOfflineContentfulClient could not parse space export file: %v", err)
@@ -548,6 +558,7 @@ func NewOfflineContentfulClient(filename string, logFn func(fields map[string]in
 		SpaceID:     "OFFLINE",
 		offline:     true,
 		offlineTemp: *offlineTemp,
+		textJanitor: textJanitor,
 	}
 	if cc.logFn != nil && cc.logLevel <= LogInfo {
 		cc.logFn(map[string]interface{}{"entries": len(offlineTemp.Entries), "assets": len(offlineTemp.Assets)}, LogInfo, InfoLoadingFromFile)
@@ -997,7 +1008,7 @@ func (cc *ContentfulClient) getAllAssets(tryCacheFirst bool) (map[string]*conten
 }
 
 func getOfflineSpaceFromFile(filename string) (*offlineTemp, error) {
-	fileBytes, err := ioutil.ReadFile(filename)
+	fileBytes, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, fmt.Errorf("getOfflineSpaceFromFile could not read space export file: %v", err)
 	}
@@ -1636,4 +1647,91 @@ func commonGetParents(cc *ContentfulClient, id string, contentType []string) (pa
 		}
 	}
 	return parents, nil
+}
+
+// Unicode clean-up
+
+func cleanUpStringField(field map[string]string) map[string]string {
+	cleanField := map[string]string{}
+	for locale, value := range field {
+		cleanField[locale] = stripInvisibleUnicodeChars(value)
+	}
+	return cleanField
+}
+
+func cleanUpStringSliceField(field map[string][]string) map[string][]string {
+	cleanField := map[string][]string{}
+	for locale, value := range field {
+		cleanLocalizedSliceElems := []string{}
+		for _, sliceElem := range value {
+			cleanLocalizedSliceElems = append(cleanLocalizedSliceElems, stripInvisibleUnicodeChars(sliceElem))
+		}
+		cleanField[locale] = cleanLocalizedSliceElems
+	}
+	return cleanField
+}
+
+func cleanUpRichTextField(field map[string]interface{}) map[string]interface{} {
+	cleanField := map[string]interface{}{}
+	for locale, value := range field {
+		node, err := objectToRichTextGenericNode(value)
+		if err != nil {
+			return field
+		}
+		cleanNode := cleanUpRichTextIterateNode(node)
+		cleanField[locale] = cleanNode
+	}
+	return cleanField
+}
+
+func cleanUpRichTextIterateNode(node *RichTextGenericNode) *RichTextGenericNode {
+	cleanNode := &RichTextGenericNode{
+		NodeType: node.NodeType,
+		Data:     node.Data,
+		Value:    stripInvisibleUnicodeChars(node.Value),
+		Marks:    node.Marks,
+	}
+	for _, childNode := range node.Content {
+		cleanNode.Content = append(cleanNode.Content, cleanUpRichTextIterateNode(childNode))
+	}
+	return cleanNode
+}
+
+func isFieldRichText(field map[string]interface{}) bool {
+	for _, value := range field {
+		if value == nil {
+			continue
+		}
+		node, err := objectToRichTextGenericNode(value)
+		if err != nil {
+			return false
+		}
+		if node.NodeType == "document" && node.Content != nil {
+			return true
+		}
+	}
+	return false
+}
+
+func objectToRichTextGenericNode(value interface{}) (*RichTextGenericNode, error) {
+	node := &RichTextGenericNode{}
+	byt, err := json.Marshal(value)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(byt, node)
+	if err != nil {
+		return nil, err
+	}
+	return node, nil
+}
+
+func stripInvisibleUnicodeChars(dirty string) string {
+	clean := strings.Map(func(r rune) rune {
+		if unicode.IsGraphic(r) || unicode.IsControl(r) {
+			return r
+		}
+		return -1
+	}, dirty)
+	return clean
 }

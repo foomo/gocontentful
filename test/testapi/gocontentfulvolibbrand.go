@@ -719,6 +719,7 @@ func (cc *ContentfulClient) cacheAllBrand(ctx context.Context, resultChan chan<-
 		Items: []interface{}{},
 	}
 	cc.cacheMutex.sharedDataGcLock.RLock()
+	defer cc.cacheMutex.sharedDataGcLock.RUnlock()
 	if cc.offline {
 		for _, entry := range cc.offlineTemp.Entries {
 			if entry.Sys.ContentType.Sys.ID == ContentTypeBrand {
@@ -731,7 +732,6 @@ func (cc *ContentfulClient) cacheAllBrand(ctx context.Context, resultChan chan<-
 			return nil, errors.New("optimisticPageSizeGetAll for Brand failed: " + err.Error())
 		}
 	}
-	cc.cacheMutex.sharedDataGcLock.RUnlock()
 	allBrand, err = colToCfBrand(col, cc)
 	if err != nil {
 		return nil, errors.New("colToCfBrand failed: " + err.Error())
@@ -832,6 +832,21 @@ func colToCfBrand(col *contentful.Collection, cc *ContentfulClient) (vos []*CfBr
 		err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&vo)
 		if err != nil {
 			break
+		}
+		if cc.textJanitor {
+
+			vo.Fields.CompanyName = cleanUpStringField(vo.Fields.CompanyName)
+
+			vo.Fields.CompanyDescription = cleanUpStringField(vo.Fields.CompanyDescription)
+
+			vo.Fields.Website = cleanUpStringField(vo.Fields.Website)
+
+			vo.Fields.Twitter = cleanUpStringField(vo.Fields.Twitter)
+
+			vo.Fields.Email = cleanUpStringField(vo.Fields.Email)
+
+			vo.Fields.Phone = cleanUpStringSliceField(vo.Fields.Phone)
+
 		}
 		vo.CC = cc
 		vos = append(vos, &vo)

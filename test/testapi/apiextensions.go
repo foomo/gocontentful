@@ -1,6 +1,8 @@
 package testapi
 
-import "errors"
+import (
+	"errors"
+)
 
 type CacheStats struct {
 	AssetCount   int
@@ -33,5 +35,4 @@ func (cc *ContentfulClient) SetProductInCache(product *CfProduct) {
 	defer cc.cacheMutex.parentMapGcLock.Unlock()
 	cc.Cache.entryMaps.product[product.Sys.ID] = product
 	cc.Cache.idContentTypeMap[product.Sys.ID] = product.Sys.ContentType.Sys.ID
-	return
 }

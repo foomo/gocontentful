@@ -124,6 +124,10 @@ func NewCfProduct(contentfulClient ...*ContentfulClient) (cfProduct *CfProduct) 
 
 	cfProduct.Fields.Website = map[string]string{}
 
+	cfProduct.Fields.SeoText = map[string]interface{}{}
+
+	cfProduct.Fields.Nodes = map[string]interface{}{}
+
 	cfProduct.Sys.ContentType.Sys.ID = "product"
 	cfProduct.Sys.ContentType.Sys.Type = FieldTypeLink
 	cfProduct.Sys.ContentType.Sys.LinkType = "ContentType"
@@ -713,6 +717,82 @@ func (vo *CfProduct) Website(locale ...Locale) string {
 	return vo.Fields.Website[string(loc)]
 }
 
+func (vo *CfProduct) SeoText(locale ...Locale) *interface{} {
+	if vo == nil {
+		return nil
+	}
+	if vo.CC == nil {
+		return nil
+	}
+	vo.Fields.RWLockSeoText.RLock()
+	defer vo.Fields.RWLockSeoText.RUnlock()
+	loc := defaultLocale
+	if len(locale) != 0 {
+		loc = locale[0]
+		if _, ok := localeFallback[loc]; !ok {
+			if vo.CC.logFn != nil && vo.CC.logLevel <= LogError {
+				vo.CC.logFn(map[string]interface{}{"content type": vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method": "SeoText()"}, LogError, ErrLocaleUnsupported)
+			}
+			return nil
+		}
+	}
+	if _, ok := vo.Fields.SeoText[string(loc)]; !ok {
+		if _, ok := localeFallback[loc]; !ok {
+			if vo.CC.logFn != nil && vo.CC.logLevel == LogDebug {
+				vo.CC.logFn(map[string]interface{}{"content type": vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method": "SeoText()"}, LogWarn, ErrNotSet)
+			}
+			return nil
+		}
+		loc = localeFallback[loc]
+		if _, ok := vo.Fields.SeoText[string(loc)]; !ok {
+			if vo.CC.logFn != nil && vo.CC.logLevel == LogDebug {
+				vo.CC.logFn(map[string]interface{}{"content type": vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method": "SeoText()"}, LogWarn, ErrNotSetNoFallback)
+			}
+			return nil
+		}
+	}
+	seoText := vo.Fields.SeoText[string(loc)]
+	return &seoText
+}
+
+func (vo *CfProduct) Nodes(locale ...Locale) *interface{} {
+	if vo == nil {
+		return nil
+	}
+	if vo.CC == nil {
+		return nil
+	}
+	vo.Fields.RWLockNodes.RLock()
+	defer vo.Fields.RWLockNodes.RUnlock()
+	loc := defaultLocale
+	if len(locale) != 0 {
+		loc = locale[0]
+		if _, ok := localeFallback[loc]; !ok {
+			if vo.CC.logFn != nil && vo.CC.logLevel <= LogError {
+				vo.CC.logFn(map[string]interface{}{"content type": vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method": "Nodes()"}, LogError, ErrLocaleUnsupported)
+			}
+			return nil
+		}
+	}
+	if _, ok := vo.Fields.Nodes[string(loc)]; !ok {
+		if _, ok := localeFallback[loc]; !ok {
+			if vo.CC.logFn != nil && vo.CC.logLevel == LogDebug {
+				vo.CC.logFn(map[string]interface{}{"content type": vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method": "Nodes()"}, LogWarn, ErrNotSet)
+			}
+			return nil
+		}
+		loc = localeFallback[loc]
+		if _, ok := vo.Fields.Nodes[string(loc)]; !ok {
+			if vo.CC.logFn != nil && vo.CC.logLevel == LogDebug {
+				vo.CC.logFn(map[string]interface{}{"content type": vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method": "Nodes()"}, LogWarn, ErrNotSetNoFallback)
+			}
+			return nil
+		}
+	}
+	nodes := vo.Fields.Nodes[string(loc)]
+	return &nodes
+}
+
 // Product Field setters
 
 func (vo *CfProduct) SetProductName(productName string, locale ...Locale) (err error) {
@@ -955,6 +1035,46 @@ func (vo *CfProduct) SetWebsite(website string, locale ...Locale) (err error) {
 	return
 }
 
+func (vo *CfProduct) SetSeoText(seoText interface{}, locale ...Locale) (err error) {
+	if vo == nil {
+		return errors.New("SetSeoText(seoText: Value Object is nil")
+	}
+	loc := defaultLocale
+	if len(locale) != 0 {
+		loc = locale[0]
+		if _, ok := localeFallback[loc]; !ok {
+			return ErrLocaleUnsupported
+		}
+	}
+	vo.Fields.RWLockSeoText.Lock()
+	defer vo.Fields.RWLockSeoText.Unlock()
+	if vo.Fields.SeoText == nil {
+		vo.Fields.SeoText = make(map[string]interface{})
+	}
+	vo.Fields.SeoText[string(loc)] = seoText
+	return
+}
+
+func (vo *CfProduct) SetNodes(nodes interface{}, locale ...Locale) (err error) {
+	if vo == nil {
+		return errors.New("SetNodes(nodes: Value Object is nil")
+	}
+	loc := defaultLocale
+	if len(locale) != 0 {
+		loc = locale[0]
+		if _, ok := localeFallback[loc]; !ok {
+			return ErrLocaleUnsupported
+		}
+	}
+	vo.Fields.RWLockNodes.Lock()
+	defer vo.Fields.RWLockNodes.Unlock()
+	if vo.Fields.Nodes == nil {
+		vo.Fields.Nodes = make(map[string]interface{})
+	}
+	vo.Fields.Nodes[string(loc)] = nodes
+	return
+}
+
 func (vo *CfProduct) UpsertEntry() (err error) {
 	if vo == nil {
 		return errors.New("UpsertEntry: Value Object is nil")
@@ -1101,6 +1221,7 @@ func (cc *ContentfulClient) cacheAllProduct(ctx context.Context, resultChan chan
 		Items: []interface{}{},
 	}
 	cc.cacheMutex.sharedDataGcLock.RLock()
+	defer cc.cacheMutex.sharedDataGcLock.RUnlock()
 	if cc.offline {
 		for _, entry := range cc.offlineTemp.Entries {
 			if entry.Sys.ContentType.Sys.ID == ContentTypeProduct {
@@ -1113,7 +1234,6 @@ func (cc *ContentfulClient) cacheAllProduct(ctx context.Context, resultChan chan
 			return nil, errors.New("optimisticPageSizeGetAll for Product failed: " + err.Error())
 		}
 	}
-	cc.cacheMutex.sharedDataGcLock.RUnlock()
 	allProduct, err = colToCfProduct(col, cc)
 	if err != nil {
 		return nil, errors.New("colToCfProduct failed: " + err.Error())
@@ -1276,6 +1396,25 @@ func colToCfProduct(col *contentful.Collection, cc *ContentfulClient) (vos []*Cf
 		err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&vo)
 		if err != nil {
 			break
+		}
+		if cc.textJanitor {
+
+			vo.Fields.ProductName = cleanUpStringField(vo.Fields.ProductName)
+
+			vo.Fields.Slug = cleanUpStringField(vo.Fields.Slug)
+
+			vo.Fields.ProductDescription = cleanUpStringField(vo.Fields.ProductDescription)
+
+			vo.Fields.Sizetypecolor = cleanUpStringField(vo.Fields.Sizetypecolor)
+
+			vo.Fields.Tags = cleanUpStringSliceField(vo.Fields.Tags)
+
+			vo.Fields.Sku = cleanUpStringField(vo.Fields.Sku)
+
+			vo.Fields.Website = cleanUpStringField(vo.Fields.Website)
+
+			vo.Fields.SeoText = cleanUpRichTextField(vo.Fields.SeoText)
+
 		}
 		vo.CC = cc
 		vos = append(vos, &vo)

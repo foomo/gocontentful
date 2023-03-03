@@ -15,7 +15,7 @@ const (
 var testLogger = logrus.StandardLogger()
 
 func getTestClient() (*testapi.ContentfulClient, error) {
-	return testapi.NewOfflineContentfulClient("./test-space-export.json", GetContenfulLogger(testLogger), LogDebug, true)
+	return testapi.NewOfflineContentfulClient("./test-space-export.json", GetContenfulLogger(testLogger), LogDebug, true, true)
 }
 
 func GetContenfulLogger(log *logrus.Logger) func(fields map[string]interface{}, level int, args ...interface{}) {

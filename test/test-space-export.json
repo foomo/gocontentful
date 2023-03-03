@@ -57,8 +57,7 @@
           "type": "Text",
           "localized": false,
           "required": true,
-          "validations": [
-          ],
+          "validations": [],
           "disabled": false,
           "omitted": false
         },
@@ -68,8 +67,7 @@
           "type": "Link",
           "localized": false,
           "required": false,
-          "validations": [
-          ],
+          "validations": [],
           "disabled": false,
           "omitted": false,
           "linkType": "Asset"
@@ -80,8 +78,7 @@
           "type": "Text",
           "localized": false,
           "required": false,
-          "validations": [
-          ],
+          "validations": [],
           "disabled": false,
           "omitted": false
         },
@@ -91,8 +88,7 @@
           "type": "Symbol",
           "localized": false,
           "required": false,
-          "validations": [
-          ],
+          "validations": [],
           "disabled": false,
           "omitted": false
         },
@@ -102,8 +98,7 @@
           "type": "Symbol",
           "localized": false,
           "required": false,
-          "validations": [
-          ],
+          "validations": [],
           "disabled": false,
           "omitted": false
         },
@@ -113,8 +108,7 @@
           "type": "Symbol",
           "localized": false,
           "required": false,
-          "validations": [
-          ],
+          "validations": [],
           "disabled": false,
           "omitted": false
         },
@@ -124,14 +118,12 @@
           "type": "Array",
           "localized": false,
           "required": false,
-          "validations": [
-          ],
+          "validations": [],
           "disabled": false,
           "omitted": false,
           "items": {
             "type": "Symbol",
-            "validations": [
-            ]
+            "validations": []
           }
         }
       ]
@@ -193,8 +185,7 @@
           "type": "Text",
           "localized": false,
           "required": true,
-          "validations": [
-          ],
+          "validations": [],
           "disabled": false,
           "omitted": false
         },
@@ -204,8 +195,7 @@
           "type": "Link",
           "localized": false,
           "required": false,
-          "validations": [
-          ],
+          "validations": [],
           "disabled": false,
           "omitted": false,
           "linkType": "Asset"
@@ -216,8 +206,7 @@
           "type": "Text",
           "localized": false,
           "required": false,
-          "validations": [
-          ],
+          "validations": [],
           "disabled": false,
           "omitted": false
         }
@@ -280,8 +269,7 @@
           "type": "Text",
           "localized": false,
           "required": true,
-          "validations": [
-          ],
+          "validations": [],
           "disabled": false,
           "omitted": false
         },
@@ -291,8 +279,7 @@
           "type": "Symbol",
           "localized": false,
           "required": false,
-          "validations": [
-          ],
+          "validations": [],
           "disabled": false,
           "omitted": false
         },
@@ -302,8 +289,7 @@
           "type": "Text",
           "localized": false,
           "required": false,
-          "validations": [
-          ],
+          "validations": [],
           "disabled": false,
           "omitted": false
         },
@@ -313,8 +299,7 @@
           "type": "Symbol",
           "localized": false,
           "required": false,
-          "validations": [
-          ],
+          "validations": [],
           "disabled": false,
           "omitted": false
         },
@@ -324,14 +309,12 @@
           "type": "Array",
           "localized": false,
           "required": false,
-          "validations": [
-          ],
+          "validations": [],
           "disabled": false,
           "omitted": false,
           "items": {
             "type": "Link",
-            "validations": [
-            ],
+            "validations": [],
             "linkType": "Asset"
           }
         },
@@ -341,14 +324,12 @@
           "type": "Array",
           "localized": false,
           "required": false,
-          "validations": [
-          ],
+          "validations": [],
           "disabled": false,
           "omitted": false,
           "items": {
             "type": "Symbol",
-            "validations": [
-            ]
+            "validations": []
           }
         },
         {
@@ -357,17 +338,14 @@
           "type": "Array",
           "localized": false,
           "required": false,
-          "validations": [
-          ],
+          "validations": [],
           "disabled": false,
           "omitted": false,
           "items": {
             "type": "Link",
             "validations": [
               {
-                "linkContentType": [
-                  "category"
-                ]
+                "linkContentType": ["category"]
               }
             ],
             "linkType": "Entry"
@@ -379,8 +357,7 @@
           "type": "Number",
           "localized": false,
           "required": false,
-          "validations": [
-          ],
+          "validations": [],
           "disabled": false,
           "omitted": false
         },
@@ -392,9 +369,7 @@
           "required": false,
           "validations": [
             {
-              "linkContentType": [
-                "brand"
-              ]
+              "linkContentType": ["brand"]
             }
           ],
           "disabled": false,
@@ -407,8 +382,7 @@
           "type": "Integer",
           "localized": false,
           "required": false,
-          "validations": [
-          ],
+          "validations": [],
           "disabled": false,
           "omitted": false
         },
@@ -418,8 +392,7 @@
           "type": "Symbol",
           "localized": false,
           "required": false,
-          "validations": [
-          ],
+          "validations": [],
           "disabled": false,
           "omitted": false
         },
@@ -429,16 +402,62 @@
           "type": "Symbol",
           "localized": false,
           "required": false,
+          "validations": [],
+          "disabled": false,
+          "omitted": false
+        },
+        {
+          "id": "seoText",
+          "name": "SEO Text",
+          "type": "RichText",
+          "localized": true,
+          "required": true,
           "validations": [
+            {
+              "enabledMarks": ["bold", "italic", "underline", "code"],
+              "message": "Only bold, italic, underline, and code marks are allowed"
+            },
+            {
+              "enabledNodeTypes": [
+                "heading-1",
+                "heading-2",
+                "heading-3",
+                "heading-4",
+                "heading-5",
+                "heading-6",
+                "ordered-list",
+                "unordered-list",
+                "hr",
+                "blockquote",
+                "embedded-asset-block",
+                "hyperlink",
+                "entry-hyperlink",
+                "embedded-entry-block",
+                "table"
+              ],
+              "message": "Only heading 1, heading 2, heading 3, heading 4, heading 5, heading 6, ordered list, unordered list, horizontal rule, quote, asset, link to Url, link to entry, block entry, and table nodes are allowed"
+            },
+            {
+              "nodes": {}
+            }
           ],
+          "disabled": false,
+          "omitted": false
+        },
+        {
+          "id": "nodes",
+          "name": "Nodes",
+          "type": "Object",
+          "localized": true,
+          "required": false,
+          "validations": [],
           "disabled": false,
           "omitted": false
         }
       ]
     }
   ],
-  "tags": [
-  ],
+  "tags": [],
   "editorInterfaces": [
     {
       "sys": {
@@ -672,8 +691,7 @@
   "entries": [
     {
       "metadata": {
-        "tags": [
-        ]
+        "tags": []
       },
       "sys": {
         "space": {
@@ -729,7 +747,7 @@
       },
       "fields": {
         "productName": {
-          "de": "Whisk Beater"
+          "de": "Whisk \u0009Beater\u2028"
         },
         "slug": {
           "de": "whisk-beater"
@@ -754,10 +772,10 @@
         "tags": {
           "de": [
             "kitchen",
-            "accessories",
+            "accesso\u2028ries",
             "whisk",
             "scandinavia",
-            "design"
+            "\u0009design"
           ]
         },
         "categories": {
@@ -791,13 +809,182 @@
         },
         "website": {
           "de": "http://www.amazon.com/dp/B0081F2CCK/"
+        },
+        "seoText": {
+          "de": {
+            "nodeType": "document",
+            "data": {},
+            "content": [
+              {
+                "nodeType": "heading-1",
+                "content": [
+                  {
+                    "nodeType": "text",
+                    "value": "Header 1",
+                    "marks": [],
+                    "data": {}
+                  }
+                ],
+                "data": {}
+              },
+              {
+                "nodeType": "heading-2",
+                "content": [
+                  {
+                    "nodeType": "text",
+                    "value": "Header 2",
+                    "marks": [],
+                    "data": {}
+                  }
+                ],
+                "data": {}
+              },
+              {
+                "nodeType": "heading-3",
+                "content": [
+                  {
+                    "nodeType": "text",
+                    "value": "Hello",
+                    "marks": [],
+                    "data": {}
+                  }
+                ],
+                "data": {}
+              },
+              {
+                "nodeType": "heading-4",
+                "content": [
+                  {
+                    "nodeType": "text",
+                    "value": "Lorem \u2028ipsum (4)",
+                    "marks": [],
+                    "data": {}
+                  }
+                ],
+                "data": {}
+              },
+              {
+                "nodeType": "paragraph",
+                "content": [
+                  {
+                    "nodeType": "text",
+                    "value": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi nisi orci, aliquam id ipsum sit amet, convallis volutpat enim. Cras vitae nibh sit amet justo lacinia posuere. Pellentesque luctus imperdiet pharetra. Etiam varius, tortor quis bibendum pharetra, dolor mi consequat quam, et pharetra nulla ante eu quam. Morbi venenatis libero nisl, ut ultricies dui interdum sit amet. Sed in tellus est. Mauris varius ante nec massa tincidunt aliquet. Nam gravida lacus arcu, ac pharetra nunc interdum et. ",
+                    "marks": [],
+                    "data": {}
+                  }
+                ],
+                "data": {}
+              },
+              {
+                "nodeType": "paragraph",
+                "content": [
+                  {
+                    "nodeType": "text",
+                    "value": "Maecenas vehicula pretium augue eget interdumSed posuere purus quis urna dignissim, ac consectetur nisl venenatis. Sed consectetur nisl leo, sit amet pharetra enim vestibulum sed. Donec pulvinar turpis vel urna gravida, et sollicitudin velit pellentesque. Vivamus ut ex et eros iaculis efficitur nec a enim. In hac habitasse platea dictumst. Morbi semper felis id odio tempor, id blandit purus placerat. Aliquam iaculis vestibulum tortor non placerat. Pellentesque fermentum rutrum risus eget dapibus. Vestibulum aliquam aliquam velit, vel dapibus ipsum ullamcorper quis. Aliquam in velit quis nunc volutpat commodo. Nunc aliquam neque metus, a commodo turpis porttitor eget. Etiam euismod arcu nec mi maximus, et vestibulum ligula consectetur. Curabitur sit amet enim eget purus placerat dapibus tempor a elit.",
+                    "marks": [],
+                    "data": {}
+                  }
+                ],
+                "data": {}
+              },
+              {
+                "nodeType": "paragraph",
+                "content": [
+                  {
+                    "nodeType": "text",
+                    "value": "Duis viverra rhoncus \u200bmagna at fringilla. Vivamus imperdiet tellus eu luctus aliquam. Donec ac ligula sit amet ante tincidunt pharetra. Vestibulum hendrerit commodo varius. Vivamus massa tellus, ornare id tincidunt eu, lacinia et metus. Morbi vitae finibus velit. Sed venenatis sagittis felis non tempus. Fusce ante leo, bibendum eu ante eu, blandit\n interdum ligula. Aliquam lectus tortor, gravida sit amet nisl id, pretium sodales mauris. Ut dapibus massa eget pretium porttitor. Aenean lacinia sapien id arcu vulputate malesuada. Pellentesque vitae enim sapien. Integer pulvinar eros in tincidunt semper. Nulla facilisi.",
+                    "marks": [],
+                    "data": {}
+                  }
+                ],
+                "data": {}
+              },
+              {
+                "nodeType": "unordered-list",
+                "content": [
+                  {
+                    "nodeType": "list-item",
+                    "content": [
+                      {
+                        "nodeType": "paragraph",
+                        "content": [
+                          {
+                            "nodeType": "text",
+                            "value": "One\t",
+                            "marks": [],
+                            "data": {}
+                          }
+                        ],
+                        "data": {}
+                      }
+                    ],
+                    "data": {}
+                  },
+                  {
+                    "nodeType": "list-item",
+                    "content": [
+                      {
+                        "nodeType": "paragraph",
+                        "content": [
+                          {
+                            "nodeType": "text",
+                            "value": "Two",
+                            "marks": [],
+                            "data": {}
+                          }
+                        ],
+                        "data": {}
+                      }
+                    ],
+                    "data": {}
+                  },
+                  {
+                    "nodeType": "list-item",
+                    "content": [
+                      {
+                        "nodeType": "paragraph",
+                        "content": [
+                          {
+                            "nodeType": "text",
+                            "value": "Three!",
+                            "marks": [],
+                            "data": {}
+                          }
+                        ],
+                        "data": {}
+                      }
+                    ],
+                    "data": {}
+                  }
+                ],
+                "data": {}
+              },
+              {
+                "nodeType": "paragraph",
+                "content": [
+                  {
+                    "nodeType": "text",
+                    "value": "",
+                    "marks": [],
+                    "data": {}
+                  }
+                ],
+                "data": {}
+              }
+            ]
+          }
+        },
+        "nodes": {
+          "de": {
+            "destinationID": "123123",
+            "static": true
+          }
         }
       }
     },
     {
       "metadata": {
-        "tags": [
-        ]
+        "tags": []
       },
       "sys": {
         "space": {
@@ -872,8 +1059,7 @@
     },
     {
       "metadata": {
-        "tags": [
-        ]
+        "tags": []
       },
       "sys": {
         "space": {
@@ -953,11 +1139,7 @@
           ]
         },
         "tags": {
-          "de": [
-            "vase",
-            "flowers",
-            "accessories"
-          ]
+          "de": ["vase", "flowers", "accessories"]
         },
         "categories": {
           "de": [
@@ -995,8 +1177,7 @@
     },
     {
       "metadata": {
-        "tags": [
-        ]
+        "tags": []
       },
       "sys": {
         "space": {
@@ -1076,13 +1257,7 @@
           ]
         },
         "tags": {
-          "de": [
-            "home décor",
-            "clocks",
-            "interior design",
-            "yellow",
-            "gifts"
-          ]
+          "de": ["home décor", "clocks", "interior design", "yellow", "gifts"]
         },
         "categories": {
           "de": [
@@ -1120,8 +1295,7 @@
     },
     {
       "metadata": {
-        "tags": [
-        ]
+        "tags": []
       },
       "sys": {
         "space": {
@@ -1201,13 +1375,7 @@
           ]
         },
         "tags": {
-          "de": [
-            "wood",
-            "toy",
-            "car",
-            "sweden",
-            "design"
-          ]
+          "de": ["wood", "toy", "car", "sweden", "design"]
         },
         "categories": {
           "de": [
@@ -1252,8 +1420,7 @@
     },
     {
       "metadata": {
-        "tags": [
-        ]
+        "tags": []
       },
       "sys": {
         "space": {
@@ -1331,8 +1498,7 @@
     },
     {
       "metadata": {
-        "tags": [
-        ]
+        "tags": []
       },
       "sys": {
         "space": {
@@ -1407,8 +1573,7 @@
     },
     {
       "metadata": {
-        "tags": [
-        ]
+        "tags": []
       },
       "sys": {
         "space": {
@@ -1486,16 +1651,13 @@
           "de": "info@acgears.com"
         },
         "phone": {
-          "de": [
-            "+1 212 260 2269"
-          ]
+          "de": ["+1 212 260 2269"]
         }
       }
     },
     {
       "metadata": {
-        "tags": [
-        ]
+        "tags": []
       },
       "sys": {
         "space": {
@@ -1576,9 +1738,7 @@
           "de": "normann@normann-copenhagen.com"
         },
         "phone": {
-          "de": [
-            "+45 35 55 44 59"
-          ]
+          "de": ["+45 35 55 44 59"]
         }
       }
     }
@@ -1586,8 +1746,7 @@
   "assets": [
     {
       "metadata": {
-        "tags": [
-        ]
+        "tags": []
       },
       "sys": {
         "space": {
@@ -1660,8 +1819,7 @@
     },
     {
       "metadata": {
-        "tags": [
-        ]
+        "tags": []
       },
       "sys": {
         "space": {
@@ -1734,8 +1892,7 @@
     },
     {
       "metadata": {
-        "tags": [
-        ]
+        "tags": []
       },
       "sys": {
         "space": {
@@ -1808,8 +1965,7 @@
     },
     {
       "metadata": {
-        "tags": [
-        ]
+        "tags": []
       },
       "sys": {
         "space": {
@@ -1882,8 +2038,7 @@
     },
     {
       "metadata": {
-        "tags": [
-        ]
+        "tags": []
       },
       "sys": {
         "space": {
@@ -1956,8 +2111,7 @@
     },
     {
       "metadata": {
-        "tags": [
-        ]
+        "tags": []
       },
       "sys": {
         "space": {
@@ -2030,8 +2184,7 @@
     },
     {
       "metadata": {
-        "tags": [
-        ]
+        "tags": []
       },
       "sys": {
         "space": {
@@ -2104,8 +2257,7 @@
     },
     {
       "metadata": {
-        "tags": [
-        ]
+        "tags": []
       },
       "sys": {
         "space": {
@@ -2178,8 +2330,7 @@
     },
     {
       "metadata": {
-        "tags": [
-        ]
+        "tags": []
       },
       "sys": {
         "space": {
@@ -2252,8 +2403,7 @@
     },
     {
       "metadata": {
-        "tags": [
-        ]
+        "tags": []
       },
       "sys": {
         "space": {
@@ -2326,8 +2476,7 @@
     },
     {
       "metadata": {
-        "tags": [
-        ]
+        "tags": []
       },
       "sys": {
         "space": {
@@ -2400,8 +2549,7 @@
     },
     {
       "metadata": {
-        "tags": [
-        ]
+        "tags": []
       },
       "sys": {
         "space": {
@@ -2562,8 +2710,6 @@
       }
     }
   ],
-  "webhooks": [
-  ],
-  "roles": [
-  ]
+  "webhooks": [],
+  "roles": []
 }

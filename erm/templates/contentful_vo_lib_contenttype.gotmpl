@@ -632,6 +632,7 @@ func (cc *ContentfulClient) cacheAll{{ firstCap $contentType.Sys.ID }}(ctx conte
 		Items: []interface{}{},
 	}
 	cc.cacheMutex.sharedDataGcLock.RLock()
+	defer cc.cacheMutex.sharedDataGcLock.RUnlock()
 	if cc.offline {
 		for _, entry := range cc.offlineTemp.Entries {
 			if entry.Sys.ContentType.Sys.ID == ContentType{{ firstCap $contentType.Sys.ID }} {
@@ -644,7 +645,6 @@ func (cc *ContentfulClient) cacheAll{{ firstCap $contentType.Sys.ID }}(ctx conte
 			return nil, errors.New("optimisticPageSizeGetAll for {{ firstCap $contentType.Sys.ID }} failed: "+err.Error())
 		}
 	}
-	cc.cacheMutex.sharedDataGcLock.RUnlock()
 	all{{ firstCap $contentType.Sys.ID }}, err = colToCf{{ firstCap $contentType.Sys.ID }}(col,cc)
 	if err != nil {
 		return nil, errors.New("colToCf{{ firstCap $contentType.Sys.ID }} failed: "+err.Error())
@@ -813,6 +813,16 @@ func colToCf{{ firstCap $contentType.Sys.ID }}(col *contentful.Collection, cc *C
 		err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&vo)
 		if err != nil {
 			break
+		}
+		if cc.textJanitor {
+			{{ range $fieldIndex, $field := $contentType.Fields }}
+			{{ if or (fieldIsSymbol $field) (fieldIsText $field) }} 
+			vo.Fields.{{ firstCap $field.ID }} = cleanUpStringField(vo.Fields.{{ firstCap $field.ID }}){{ end }}
+			{{ if fieldIsSymbolList $field }} 
+			vo.Fields.{{ firstCap $field.ID }} = cleanUpStringSliceField(vo.Fields.{{ firstCap $field.ID }}){{ end }}
+			{{ if fieldIsRichText $field }} 
+			vo.Fields.{{ firstCap $field.ID }} = cleanUpRichTextField(vo.Fields.{{ firstCap $field.ID }}){{ end }}
+			{{ end }}
 		}
 		vo.CC = cc
 		vos = append(vos, &vo)

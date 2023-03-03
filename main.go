@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -46,7 +45,7 @@ func getCmaKeyFromRcFile() string {
 	if errGetUser != nil {
 		return ""
 	}
-	contentfulRcBytes, errReadFile := ioutil.ReadFile(currentUser.HomeDir + "/.contentfulrc.json")
+	contentfulRcBytes, errReadFile := os.ReadFile(currentUser.HomeDir + "/.contentfulrc.json")
 	if errReadFile != nil {
 		return ""
 	}
@@ -113,5 +112,4 @@ func main() {
 		fatal("Something went horribly wrong...", err)
 	}
 	fmt.Println("ALL DONE!")
-
 }
