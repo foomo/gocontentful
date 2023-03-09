@@ -695,7 +695,9 @@ func (cc *ContentfulClient) syncCache(ctx context.Context, contentTypes []string
 				}
 				updateCacheForContentTypeAndEntity(ctx, cc, entry.Sys.ContentType.Sys.ID, entry.Sys.ID, entry, false)
 			case sysTypeDeletedEntry:
+				cc.Cache.idContentTypeMapGcLock.RLock()
 				contentType := cc.Cache.idContentTypeMap[entry.Sys.ID]
+				cc.Cache.idContentTypeMapGcLock.RUnlock()
 				updateCacheForContentTypeAndEntity(ctx, cc, contentType, entry.Sys.ID, entry, true)
 			default:
 			}
