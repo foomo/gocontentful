@@ -8,4 +8,4 @@ A Contentful API code generator for Go. Features:
 - Simplifies management/resolution of references
 - Adds several utility functions for RichText from/to HTML conversion, assets handling and more
 
-Full documentation available at [foomo.org](https://www.foomo.org/docs/backend/gocontentful/introduction)
+Full documentation available at [foomo.org](https://www.foomo.org/docs/projects/cms/gocontentful/introduction)

@@ -616,7 +616,7 @@ func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []stri
 		return cc.syncCache(ctxAtWork, contentTypes)
 	}
 	cc.cacheWorkerOnce.Do(func() {
-		go cc.cacheWorker(ctxAtWork, contentTypes, cacheAssets)
+		go cc.cacheWorker(ctx, contentTypes, cacheAssets)
 	})
 	if len(cc.cacheQueue) == 0 {
 		if cc.logFn != nil && cc.logLevel <= LogInfo {
@@ -695,9 +695,9 @@ func (cc *ContentfulClient) syncCache(ctx context.Context, contentTypes []string
 				}
 				updateCacheForContentTypeAndEntity(ctx, cc, entry.Sys.ContentType.Sys.ID, entry.Sys.ID, entry, false)
 			case sysTypeDeletedEntry:
-				cc.Cache.idContentTypeMapGcLock.RLock()
+				cc.cacheMutex.idContentTypeMapGcLock.RLock()
 				contentType := cc.Cache.idContentTypeMap[entry.Sys.ID]
-				cc.Cache.idContentTypeMapGcLock.RUnlock()
+				cc.cacheMutex.idContentTypeMapGcLock.RUnlock()
 				updateCacheForContentTypeAndEntity(ctx, cc, contentType, entry.Sys.ID, entry, true)
 			default:
 			}
