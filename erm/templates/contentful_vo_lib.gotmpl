@@ -1484,6 +1484,8 @@ func updateCacheForContentTypeAndEntity(ctx context.Context, cc *ContentfulClien
 func commonGetParents(cc *ContentfulClient, id string, contentType []string) (parents []EntryReference, err error) {
 	parents = []EntryReference{}
 	if cc.cacheInit {
+		cc.cacheMutex.parentMapGcLock.RLock()
+		defer cc.cacheMutex.parentMapGcLock.RUnlock()
 		if len(contentType) != 0 {
 			for _, parent := range cc.Cache.parentMap[id] {
 				if parent.ContentType == contentType[0] {
