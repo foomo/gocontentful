@@ -210,6 +210,8 @@ func (cc *ContentfulClient) CacheHasContentType(contentTypeID string) bool {
 	if cc.Cache == nil {
 		return false
 	}
+	cc.cacheMutex.sharedDataGcLock.RLock()
+	defer cc.cacheMutex.sharedDataGcLock.RUnlock()
 	for _, cachedContentType := range cc.Cache.contentTypes {
 		if cachedContentType == contentTypeID {
 			return true
@@ -223,6 +225,8 @@ func (cc *ContentfulClient) ClientStats() {
 		cc.logFn(nil, LogWarn, "ClientStats: no client available")
 		return
 	}
+	cc.cacheMutex.sharedDataGcLock.RLock()
+	defer cc.cacheMutex.sharedDataGcLock.RUnlock()
 	if cc.logFn != nil {
 		fieldsMap := map[string]interface{}{
 			"space ID":     cc.SpaceID,
@@ -235,7 +239,14 @@ func (cc *ContentfulClient) ClientStats() {
 		if cc.cacheInit {
 			fieldsMap["cache asset count"] = len(cc.Cache.assets)
 			fieldsMap["cache entry count"] = len(cc.Cache.idContentTypeMap)
-			fieldsMap["cache parentMap length"] = len(cc.Cache.parentMap)
+			fieldsMap["cache parentMap children"] = len(cc.Cache.parentMap)
+			cc.cacheMutex.parentMapGcLock.RLock()
+			defer cc.cacheMutex.parentMapGcLock.RUnlock()
+			referenceCount := 0
+			for _, parents := range cc.Cache.parentMap {
+				referenceCount += len(parents)
+			}
+			fieldsMap["cache parentMap parents"] = referenceCount		
 		}
 		cc.logFn(fieldsMap, LogInfo, "Contentful ClientStats")
 	}
@@ -283,10 +294,13 @@ func (cc *ContentfulClient) GetAssetByID(id string, forceNoCache ...bool) (*cont
 	if cc == nil || cc.Client == nil {
 		return nil, errors.New("GetAssetByID: No client available")
 	}
-	if cc.cacheInit && cc.Cache.assets != nil && (len(forceNoCache) == 0 || !forceNoCache[0]) {
-		cc.cacheMutex.assetsGcLock.Lock()
+	cc.cacheMutex.sharedDataGcLock.Lock()
+	cacheInit := cc.cacheInit
+	cc.cacheMutex.sharedDataGcLock.Unlock()
+	cc.cacheMutex.assetsGcLock.Lock()
+	defer cc.cacheMutex.assetsGcLock.Unlock()
+	if cacheInit && cc.Cache.assets != nil && (len(forceNoCache) == 0 || !forceNoCache[0]) {
 		asset, okAsset := cc.Cache.assets[id]
-		cc.cacheMutex.assetsGcLock.Unlock()
 		if okAsset {
 			return asset, nil
 		} else {
@@ -583,6 +597,8 @@ func (cc *ContentfulClient) SetOfflineFallback(filename string) error {
 }
 
 func (cc *ContentfulClient) SetSyncMode(mode bool) error {
+	cc.cacheMutex.sharedDataGcLock.RLock()
+	defer cc.cacheMutex.sharedDataGcLock.RUnlock()
 	if cc.offline {
 		return errors.New("SetSyncMode: client is set offline, can't enable sync")
 	}
@@ -595,14 +611,18 @@ func (cc *ContentfulClient) ResetSync() {
 }
 
 func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []string, cacheAssets bool) error {
+	cc.cacheMutex.sharedDataGcLock.RLock()
     ctxAtWork, cancel := context.WithTimeout(ctx, time.Second*time.Duration(cc.cacheUpdateTimeout))
-    defer cancel()
-    if cc.offline {
-        ctxAtWork = ctx
-    }
-    if !cc.offline {
-        time.Sleep(time.Second * 2)
-    }
+	defer cancel()
+	localOffline := cc.offline
+	cc.cacheMutex.sharedDataGcLock.RUnlock()
+
+	if localOffline {
+		ctxAtWork = ctx
+	}
+	if !localOffline {
+		time.Sleep(time.Second * 2)
+	}
 	if contentTypes == nil {
 		contentTypes = spaceContentTypes
 	} else {
@@ -647,7 +667,9 @@ func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []stri
 
 func (cc *ContentfulClient) syncCache(ctx context.Context, contentTypes []string) error {
 	start := time.Now()
+	cc.cacheMutex.sharedDataGcLock.Lock()
 	cc.Cache.contentTypes = contentTypes
+	cc.cacheMutex.sharedDataGcLock.Unlock()
 	if cc.logFn != nil && cc.logLevel <= LogInfo {
 			cc.logFn(map[string]interface{}{"task": "syncCache"}, LogInfo, InfoCacheUpdateQueued)
 	}
@@ -658,8 +680,10 @@ func (cc *ContentfulClient) syncCache(ctx context.Context, contentTypes []string
 			cc.syncToken,
 		)
 		col.GetAll()
+		cc.cacheMutex.sharedDataGcLock.Lock()
 		cc.syncToken = col.SyncToken
 		cc.cacheInit = true
+		cc.cacheMutex.sharedDataGcLock.Unlock()
 		if len(col.Items) == 0 {
 			if cc.logFn != nil && cc.logLevel <= LogInfo {
 				cc.logFn(map[string]interface{}{"time elapsed": fmt.Sprint(time.Since(start)), "task": "syncCache"}, LogInfo, InfoUpdateCacheTime)
@@ -805,11 +829,21 @@ func (cc *ContentfulClient) cacheSpace(ctx context.Context, contentTypes []strin
         cc.logFn(map[string]interface{}{"time elapsed": fmt.Sprint(time.Since(start)), "task": "UpdateCache"}, LogInfo, InfoUpdateCacheTime)
     }
     cc.cacheMutex.fullCacheGcLock.Lock()
-    defer cc.cacheMutex.fullCacheGcLock.Unlock()
-    cc.Cache = tempCache
     cc.cacheMutex.sharedDataGcLock.Lock()
+    cc.cacheMutex.assetsGcLock.Lock()
+    cc.cacheMutex.idContentTypeMapGcLock.Lock()
+    cc.cacheMutex.parentMapGcLock.Lock()
+    {{ range $index , $contentType := $contentTypes }}cc.cacheMutex.{{ $contentType.Sys.ID }}GcLock.Lock()
+    {{ end }}
+	cc.Cache = tempCache
     cc.offline = offlinePreviousState
+    {{ range $index , $contentType := $contentTypes }}cc.cacheMutex.{{ $contentType.Sys.ID }}GcLock.Unlock()
+    {{ end }}
+    cc.cacheMutex.parentMapGcLock.Unlock()
+    cc.cacheMutex.idContentTypeMapGcLock.Unlock()
+	cc.cacheMutex.assetsGcLock.Unlock()
     cc.cacheMutex.sharedDataGcLock.Unlock()
+	cc.cacheMutex.fullCacheGcLock.Unlock()
 }
 
 func ToAssetReference(asset *contentful.Asset) (refSys ContentTypeSys) {
@@ -922,12 +956,17 @@ func (cc *ContentfulClient) getAllAssets(tryCacheFirst bool) (map[string]*conten
 	if cc == nil || cc.Client == nil {
 		return nil, errors.New("getAllAssets: No client available")
 	}
-	if cc.cacheInit && cc.Cache.assets != nil && tryCacheFirst {
+	cc.cacheMutex.sharedDataGcLock.RLock()
+	offline := cc.offline
+	cacheInit := cc.cacheInit
+	cc.cacheMutex.sharedDataGcLock.RUnlock()
+
+	if cacheInit && cc.Cache.assets != nil && tryCacheFirst {
 		return cc.Cache.assets, nil
 	}
 	allItems := []interface{}{}
 	assets := map[string]*contentful.Asset{}
-	if cc.offline {
+	if offline {
 		for _, asset := range cc.offlineTemp.Assets {
 			allItems = append(allItems,asset)
 		}

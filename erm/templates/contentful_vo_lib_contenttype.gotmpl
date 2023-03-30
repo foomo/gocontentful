@@ -20,10 +20,14 @@ func (cc *ContentfulClient) GetAll{{ firstCap $contentType.Sys.ID }}() (voMap ma
 	if cc == nil {
 		return nil, errors.New("GetAll{{ firstCap $contentType.Sys.ID }}: No client available")
 	}
-	if cc.cacheInit {
+	cc.cacheMutex.sharedDataGcLock.RLock()
+	cacheInit := cc.cacheInit
+	optimisticPageSize := cc.optimisticPageSize
+	cc.cacheMutex.sharedDataGcLock.RUnlock()
+	if cacheInit {
 		return cc.Cache.entryMaps.{{ $contentType.Sys.ID }}, nil
 	}
-	col, err := cc.optimisticPageSizeGetAll("{{ $contentType.Sys.ID }}", cc.optimisticPageSize)
+	col, err := cc.optimisticPageSizeGetAll("{{ $contentType.Sys.ID }}", optimisticPageSize)
 	if err != nil {
 		return nil, err
 	}
@@ -740,9 +744,9 @@ func (cc *ContentfulClient) cache{{ firstCap $contentType.Sys.ID }}ByID(ctx cont
 		// delete as child
 		delete(cc.Cache.parentMap, id)
 		// delete as parent
-		for childID, child := range cc.Cache.parentMap {
+		for childID, parents := range cc.Cache.parentMap {
 			newParents := []EntryReference{}
-			for _, parent := range child {
+			for _, parent := range parents {
 				if parent.ID != id {
 					newParents = append(newParents, parent)
 				}
@@ -761,12 +765,14 @@ func (cc *ContentfulClient) cache{{ firstCap $contentType.Sys.ID }}ByID(ctx cont
 	}
 	cc.Cache.entryMaps.{{ $contentType.Sys.ID }}[id] = {{ $contentType.Sys.ID }}
 			cc.Cache.idContentTypeMap[id] = {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID
+	allChildrensIds := map[string]bool{}
 	{{ range $fieldIndex, $field := $contentType.Fields }}
 	{{ if fieldIsMultipleReference $field }}
 	for _, loc := range cc.locales {
 		children, okChildren := {{ $contentType.Sys.ID }}.Fields.{{ firstCap $field.ID }}[string(loc)]
 		if okChildren {
 			for _, child := range children {
+				allChildrensIds[child.Sys.ID] = true
 				if cc.Cache.parentMap[child.Sys.ID] == nil {
 					cc.Cache.parentMap[child.Sys.ID] = []EntryReference{}
 				}
@@ -787,6 +793,7 @@ func (cc *ContentfulClient) cache{{ firstCap $contentType.Sys.ID }}ByID(ctx cont
 		for _, loc := range cc.locales {
 			child, okChild := {{ $contentType.Sys.ID }}.Fields.{{ firstCap $field.ID }}[string(loc)]
 			if okChild {
+				allChildrensIds[child.Sys.ID] = true
 				if cc.Cache.parentMap[child.Sys.ID] == nil {
 					cc.Cache.parentMap[child.Sys.ID] = []EntryReference{}
 				}
@@ -803,6 +810,20 @@ func (cc *ContentfulClient) cache{{ firstCap $contentType.Sys.ID }}ByID(ctx cont
 		}
 	{{ end }}
 	{{ end }}
+	_ = allChildrensIds // safety net
+	// clean up child-parents that don't exist anymore
+	for childID, parents := range cc.Cache.parentMap {
+		if _, isCollectedChildID := allChildrensIds[childID]; isCollectedChildID {
+			continue
+		} 
+		newParents := []EntryReference{}
+		for _, parent := range parents {
+			if parent.ID != id {
+				newParents = append(newParents, parent)
+			}
+		}
+		cc.Cache.parentMap[childID] = newParents
+	}
 	return nil
 }
 

@@ -19,8 +19,26 @@ func readWorker(contentfulClient *testapi.ContentfulClient, i int) error {
 	if err != nil {
 		return err
 	}
+	_, err = contentfulClient.GetAllProduct()
+	if err != nil {
+		return err
+	}
 	price := product.Price()
 	testLogger.Infof("Read worker %d read price: %f", i, price)
+	_ = product.Brand()
+	_ = product.Categories()
+	_ = product.Image()
+	_ = product.Nodes()
+	_ = product.ProductDescription()
+	_ = product.ProductName()
+	_ = product.Quantity()
+	_ = product.SeoText()
+	_ = product.Sizetypecolor()
+	_ = product.Sku()
+	_ = product.Slug()
+	_ = product.Tags()
+	_ = product.Website()
+	_ = product.GetPublishingStatus()
 	return nil
 }
 
@@ -48,6 +66,19 @@ func writeWorker(contentfulClient *testapi.ContentfulClient, i int) error {
 	}
 	contentfulClient.SetProductInCache(product)
 	testLogger.Infof("Write worker %d set price: %d", i, i)
+	product.SetBrand(testapi.ContentTypeSys{})
+	product.SetCategories([]testapi.ContentTypeSys{})
+	product.SetImage([]testapi.ContentTypeSys{})
+	product.SetNodes(nil)
+	product.SetProductDescription("")
+	product.SetProductName("")
+	product.SetQuantity(1)
+	product.SetSeoText("")
+	product.SetSizetypecolor("")
+	product.SetSku("")
+	product.SetSlug("")
+	product.SetTags([]string{""})
+	product.SetWebsite("")
 	return nil
 }
 

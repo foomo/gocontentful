@@ -10,6 +10,7 @@ import (
 
 func TestCache(t *testing.T) {
 	contentfulClient, err := getTestClient()
+	contentfulClient.ClientStats()
 	require.NoError(t, err)
 	stats, err := contentfulClient.GetCacheStats()
 	require.NoError(t, err)
@@ -17,6 +18,8 @@ func TestCache(t *testing.T) {
 	require.Equal(t, 12, stats.AssetCount)
 	require.Equal(t, 9, stats.EntryCount)
 	require.Equal(t, 6, stats.ParentCount)
+	err = contentfulClient.SetSyncMode(true)
+	require.Error(t, err)
 }
 
 func TestBrokenReferences(t *testing.T) {
@@ -30,6 +33,15 @@ func TestCacheHasContentType(t *testing.T) {
 	contentfulClient, err := getTestClient()
 	require.NoError(t, err)
 	require.True(t, contentfulClient.CacheHasContentType("brand"))
+}
+
+func TestGetAsset(t *testing.T) {
+	contentfulClient, err := getTestClient()
+	require.NoError(t, err)
+	_, err = contentfulClient.GetAssetByID("Xc0ny7GWsMEMCeASWO2um")
+	require.NoError(t, err)
+	newAsset := testapi.NewAssetFromURL("12345", "https://example.com", "PNG", "New Asset")
+	require.NotNil(t, newAsset)
 }
 
 func TestDeleteAssetFromCache(t *testing.T) {
@@ -91,7 +103,7 @@ func TestPreserveCacheIfNewer(t *testing.T) {
 	require.Equal(t, 2.0, brand.Sys.Version)
 }
 
-func TestAddEntryAndSet(t *testing.T) {
+func TestEntry(t *testing.T) {
 	contentfulClient, err := getTestClient()
 	require.NoError(t, err)
 	cfProduct := testapi.NewCfProduct(contentfulClient)

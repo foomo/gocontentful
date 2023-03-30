@@ -16,11 +16,17 @@ build:
 ## Run tests
 test:
 	go run ./main.go -exportfile ./test/test-space-export.json ./test/testapi
-	go test -count=1 ./...
+	go test ./...
 
 race:
 	go run ./main.go -exportfile ./test/test-space-export.json ./test/testapi
 	go test -race ./...
+
+cover:
+	rm cover.out cover.html
+	go run ./main.go -exportfile ./test/test-space-export.json ./test/testapi
+	go test -cover -coverprofile cover.out -coverpkg=./test/testapi ./...
+	go tool cover -html=cover.out -o cover.html; open cover.html
 
 .PHONY: lint
 ## Run linter
