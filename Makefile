@@ -16,11 +16,11 @@ build:
 ## Run tests
 test:
 	go run ./main.go -exportfile ./test/test-space-export.json ./test/testapi
-	go test ./...
+	go test -count=1 ./...
 
 race:
 	go run ./main.go -exportfile ./test/test-space-export.json ./test/testapi
-	go test -race ./...
+	go test -race -count=1 ./...
 
 cover:
 	rm cover.out cover.html
