@@ -1,0 +1,7 @@
+spaceId: "abc123"
+environment: "dev"
+exportFile: "foo.json"
+requireVersion: v1.0.19
+contentTypes:
+  - person
+  - pet

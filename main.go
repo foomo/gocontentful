@@ -10,10 +10,11 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/foomo/gocontentful/config"
 	"github.com/foomo/gocontentful/erm"
 )
 
-var VERSION = "v1.0.18"
+var VERSION = "v1.0.19"
 
 type contentfulRc struct {
 	ManagementToken string `json:"managementToken"`
@@ -59,6 +60,7 @@ func getCmaKeyFromRcFile() string {
 
 func main() {
 	// Get parameters from cmd line flags
+	flagConfigFile := flag.String("configfile", "", "Full path to configuration file")
 	flagSpaceID := flag.String("spaceid", "", "Contentful space ID")
 	flagCMAKey := flag.String("cmakey", "", "[Optional] Contentful CMA key")
 	flagEnvironment := flag.String("environment", "", "[Optional] Contentful space environment")
@@ -77,37 +79,62 @@ func main() {
 		Usage()
 		os.Exit(0)
 	}
+	var conf *config.Config
+	var err error
+	if *flagConfigFile != "" {
+		conf, err = config.LoadConfigFromYAML(*flagConfigFile)
+		if err != nil {
+			fatal(err)
+		}
+		if conf.RequireVersion != "" && conf.RequireVersion != VERSION {
+			fatal("Required version mismatch. Want: " + conf.RequireVersion + "  Have: " + VERSION)
+		}
+	} else {
+		conf = &config.Config{
+			SpaceID:     *flagSpaceID,
+			Environment: *flagEnvironment,
+			ExportFile:  *flagGenerateFromExport,
+		}
+		if *flagContentTypes != "" {
+			conf.ContentTypes = strings.Split(*flagContentTypes, ",")
+		}
+	}
 	cmaKey := *flagCMAKey
 	if cmaKey == "" && *flagGenerateFromExport == "" {
 		cmaKey = getCmaKeyFromRcFile()
 	}
-	if *flagGenerateFromExport == "" && (*flagSpaceID == "" || cmaKey == "") ||
-		*flagGenerateFromExport != "" && (*flagSpaceID != "" || cmaKey != "") {
-		usageError("Please specify either a Contentful Space ID and CMA access token or an export file name")
+	if conf.ExportFile == "" && (conf.SpaceID == "" || cmaKey == "") ||
+		conf.ExportFile != "" && (conf.SpaceID != "" || cmaKey != "") {
+		usageError("Please provide either a Contentful Space ID and CMA access token or an export file name")
 	}
-
-	if len(flag.Args()) != 1 {
+	var path string
+	if len(flag.Args()) != 1 && conf.PathTargetPackage == "" {
 		usageError("Missing arg path/to/target/package")
 	}
-
-	path := flag.Arg(0)
+	if conf.PathTargetPackage != "" {
+		path = conf.PathTargetPackage
+	} else {
+		path = flag.Arg(0)
+	}
 	packageName := filepath.Base(path)
+	fmt.Println("output path:", path)
+	fmt.Println("packageName:", packageName)
 
 	matched, err := regexp.MatchString(`[a-z].{2,}`, packageName)
-	if !matched {
+	if !matched || err != nil {
 		usageError("Please specify the package name correctly (only small caps letters)")
 	}
 
 	fmt.Printf("Contentful API Generator %s starting...\n\n", VERSION)
 
-	var flagContentTypesSlice []string
-	if *flagContentTypes != "" {
-		for _, contentType := range strings.Split(*flagContentTypes, ",") {
-			flagContentTypesSlice = append(flagContentTypesSlice, strings.TrimSpace(contentType))
+	var cleanContentTypes []string
+	if len(conf.ContentTypes) > 0 {
+		for _, contentType := range conf.ContentTypes {
+			cleanContentTypes = append(cleanContentTypes, strings.TrimSpace(contentType))
 		}
 	}
 
-	err = erm.GenerateAPI(filepath.Dir(path), packageName, *flagSpaceID, cmaKey, *flagEnvironment, *flagGenerateFromExport, flagContentTypesSlice, VERSION)
+	err = erm.GenerateAPI(filepath.Dir(path), packageName, conf.SpaceID, cmaKey, conf.Environment, conf.ExportFile, cleanContentTypes, VERSION)
 	if err != nil {
 		fatal("Something went horribly wrong...", err)
 	}
