@@ -14,7 +14,7 @@ import (
 	"github.com/foomo/gocontentful/erm"
 )
 
-var VERSION = "v1.0.22"
+var VERSION = "v1.0.23"
 
 type contentfulRc struct {
 	ManagementToken string `json:"managementToken"`
@@ -86,7 +86,7 @@ func main() {
 		if err != nil {
 			fatal(err)
 		}
-		if conf.RequireVersion != "" && conf.RequireVersion != VERSION {
+		if conf.RequireVersion != "" && conf.RequireVersion != VERSION && conf.RequireVersion != strings.Trim(VERSION, "v") {
 			fatal("Required version mismatch. Want: " + conf.RequireVersion + "  Have: " + VERSION)
 		}
 	} else {

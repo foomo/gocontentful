@@ -144,7 +144,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
     }
 	vo.Fields.RWLock{{ firstCap $field.ID }}.RLock()
 	defer vo.Fields.RWLock{{ firstCap $field.ID }}.RUnlock()
-	loc := defaultLocale
+	loc := DefaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
 		if _, ok := localeFallback[loc]; !ok {
@@ -182,7 +182,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
     }
 	vo.Fields.RWLock{{ firstCap $field.ID }}.RLock()
 	defer vo.Fields.RWLock{{ firstCap $field.ID }}.RUnlock()
-	loc := defaultLocale
+	loc := DefaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
 		if _, ok := localeFallback[loc]; !ok {
@@ -222,7 +222,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 	vo.Fields.RWLock{{ firstCap $field.ID }}.RLock()
 	defer vo.Fields.RWLock{{ firstCap $field.ID }}.RUnlock()
 	{{ $field.ID }} := []*EntryReference{}
-	loc := defaultLocale
+	loc := DefaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
 		if _, ok := localeFallback[loc]; !ok {
@@ -282,7 +282,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
     }
 	vo.Fields.RWLock{{ firstCap $field.ID }}.RLock()
 	defer vo.Fields.RWLock{{ firstCap $field.ID }}.RUnlock()
-	loc := defaultLocale
+	loc := DefaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
 		if _, ok := localeFallback[loc]; !ok {
@@ -342,8 +342,8 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 	vo.Fields.RWLock{{ firstCap $field.ID }}.RLock()
 	defer vo.Fields.RWLock{{ firstCap $field.ID }}.RUnlock()
 	{{ $field.ID }} := []*contentful.AssetNoLocale{}
-	loc := defaultLocale
-	reqLoc := defaultLocale
+	loc := DefaultLocale
+	reqLoc := DefaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
 		reqLoc = locale[0]
@@ -410,8 +410,8 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
     }
 	vo.Fields.RWLock{{ firstCap $field.ID }}.RLock()
 	defer vo.Fields.RWLock{{ firstCap $field.ID }}.RUnlock()
-	loc := defaultLocale
-	reqLoc := defaultLocale
+	loc := DefaultLocale
+	reqLoc := DefaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
 		reqLoc = locale[0]
@@ -474,7 +474,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) Set{{ firstCap $field.ID }}({{ $
 	if vo == nil {
 		return errors.New("Set{{ firstCap $field.ID }}({{ $field.ID }}: Value Object is nil")
 	}
-	loc := defaultLocale
+	loc := DefaultLocale
 	if len(locale) != 0 {
 		loc = locale[0]
 		if _, ok := localeFallback[loc]; !ok {

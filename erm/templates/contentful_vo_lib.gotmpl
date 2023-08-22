@@ -131,7 +131,7 @@ const (
 var SpaceLocales = []Locale{ {{ range $index , $locale := $locales }}
 "{{$locale.Code}}",{{ end }}
 }
-{{ range $index , $locale := $locales }}{{ if $locale.Default }}const defaultLocale Locale = SpaceLocale{{ onlyLetters $locale.Name }}{{ end }}
+{{ range $index , $locale := $locales }}{{ if $locale.Default }}const DefaultLocale Locale = SpaceLocale{{ onlyLetters $locale.Name }}{{ end }}
 {{ end }}var localeFallback = map[Locale]Locale{ {{ range $index, $locale := $locales }}{{if $locale.FallbackCode}} SpaceLocale{{ onlyLetters $locale.Name }}: {{ range $indexSearch, $localeSearch := $locales }}{{ if eq $localeSearch.Code $locale.FallbackCode}}SpaceLocale{{ onlyLetters $localeSearch.Name }}{{ end }}{{ end }}, {{ else }}SpaceLocale{{ onlyLetters $locale.Name }}: "", {{ end }}{{ end }}}
 
 const (
@@ -422,7 +422,7 @@ func NewAssetFromURL(id string, uploadUrl string, imageFileType string, title st
 			return nil
 		}
 	} else {
-		loc = defaultLocale
+		loc = DefaultLocale
 	}
 	asset := &contentful.Asset{
 		Sys: &contentful.Sys{
