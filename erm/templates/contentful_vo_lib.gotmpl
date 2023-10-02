@@ -615,6 +615,7 @@ func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []stri
     ctxAtWork, cancel := context.WithTimeout(ctx, time.Second*time.Duration(cc.cacheUpdateTimeout))
 	defer cancel()
 	localOffline := cc.offline
+	isSync := cc.sync
 	cc.cacheMutex.sharedDataGcLock.RUnlock()
 
 	if localOffline {
@@ -632,7 +633,7 @@ func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []stri
 			}
 		}
 	}
-	if cc.sync {
+	if isSync {
 		return cc.syncCache(ctxAtWork, contentTypes)
 	}
 	cc.cacheWorkerOnce.Do(func() {
