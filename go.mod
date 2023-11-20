@@ -7,10 +7,9 @@ require (
 	github.com/sirupsen/logrus v1.8.1
 	github.com/smartystreets/goconvey v1.6.4 // indirect
 	github.com/stretchr/testify v1.7.0
-	golang.org/x/mod v0.4.2 // indirect
-	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
-	golang.org/x/sys v0.0.0-20210403161142-5e06dd20ab57 // indirect
-	golang.org/x/tools v0.1.0
+	golang.org/x/sync v0.1.0
+	golang.org/x/text v0.14.0
+	golang.org/x/tools v0.6.0
 	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c
 	moul.io/http2curl v1.0.0 // indirect
 )

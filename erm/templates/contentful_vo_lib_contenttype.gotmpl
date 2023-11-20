@@ -863,7 +863,13 @@ func colToCf{{ firstCap $contentType.Sys.ID }}(col *contentful.Collection, cc *C
 			vo.Fields.{{ firstCap $field.ID }} = cleanUpRichTextField(vo.Fields.{{ firstCap $field.ID }}){{ end }}
 			{{ end }}
 		}
+		var typedItem RawItem
+		err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&typedItem)
+		if err != nil {
+			break
+		}
 		vo.CC = cc
+		vo.RawFields = typedItem.Fields
 		vos = append(vos, &vo)
 	}
 	return vos, err

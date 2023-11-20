@@ -28,6 +28,11 @@ type ContentfulSys struct {
 	PublishedVersion float64        `json:"publishedVersion,omitempty"`
 }
 
+type RawFields map[string]interface{}
+type RawItem struct {
+	Fields RawFields `json:"fields"`
+}
+
 type ContentfulReferencedEntry struct {
 	Entry *contentful.Entry
 	Col   *contentful.Collection

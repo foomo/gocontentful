@@ -641,7 +641,13 @@ func colToCfCategory(col *contentful.Collection, cc *ContentfulClient) (vos []*C
 			vo.Fields.CategoryDescription = cleanUpStringField(vo.Fields.CategoryDescription)
 
 		}
+		var typedItem RawItem
+		err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&typedItem)
+		if err != nil {
+			break
+		}
 		vo.CC = cc
+		vo.RawFields = typedItem.Fields
 		vos = append(vos, &vo)
 	}
 	return vos, err

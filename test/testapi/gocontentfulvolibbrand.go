@@ -885,7 +885,13 @@ func colToCfBrand(col *contentful.Collection, cc *ContentfulClient) (vos []*CfBr
 			vo.Fields.Phone = cleanUpStringSliceField(vo.Fields.Phone)
 
 		}
+		var typedItem RawItem
+		err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&typedItem)
+		if err != nil {
+			break
+		}
 		vo.CC = cc
+		vo.RawFields = typedItem.Fields
 		vos = append(vos, &vo)
 	}
 	return vos, err

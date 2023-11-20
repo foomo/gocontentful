@@ -1795,3 +1795,28 @@ func stripInvisibleUnicodeChars(dirty string) string {
 	}, dirty)
 	return clean
 }
+
+func (rawFields RawFields) GetChildIDs() (childIDs []string) {
+	for fieldKey, localizedField := range rawFields {
+		if !strings.HasSuffix(fieldKey, "_") {
+			continue
+		}
+		byt, err := json.Marshal(localizedField)
+		if err != nil {
+			return nil
+		}
+		fieldMap := map[string][]*ContentTypeSys{}
+		err = json.Unmarshal(byt, &fieldMap)
+		if err != nil {
+			return nil
+		}
+		for _, fieldValue := range fieldMap {
+			if fieldValue != nil {
+				for _, childItem := range fieldValue {
+					childIDs = append(childIDs, childItem.Sys.ID)
+				}
+			}
+		}
+	}
+	return childIDs
+}

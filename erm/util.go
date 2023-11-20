@@ -3,6 +3,9 @@ package erm
 import (
 	"regexp"
 	"strings"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 func sliceIncludes(slice []string, key string) bool {
@@ -15,7 +18,8 @@ func sliceIncludes(slice []string, key string) bool {
 }
 
 func firstCap(inputString string) (outputString string) {
-	outputString = strings.Title(inputString)
+	outputString = cases.Title(language.English, cases.Option(cases.NoLower)).String(inputString)
+	outputString = strings.ReplaceAll(outputString, "_", "")
 	return
 }
 
