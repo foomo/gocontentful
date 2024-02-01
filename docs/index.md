@@ -45,3 +45,7 @@ In addition, calling a remote API across the Internet each time a piece of conte
 Gocontentful generates a Go API that handles both issues above and can be regenerated every time the content model changes. The developer never needs to update the types by hand, or deal with the complexity of caching content locally. It all happens auytomatically in the generated client.
 
 > **NOTE** - _How much code does Gocontentful generate? In a real-world production scenario where Gocontentful is in use as of 2022, a space content model with 11 content types ranging from 3 to over 40 fields each generates around 50,000 lines of Go code._
+
+---
+
+What's Next: [Getting Started](gettingstarted.md)
