@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"html"
 	"io"
-	"os"
 	"regexp"
 	"strings"
 	"sync"
@@ -30,6 +29,7 @@ type ContentfulCache struct {
 	assets                 assetCacheMap
 	contentTypes           []string
 	entryMaps              cacheEntryMaps
+	genericEntries	 map[string]*GenericEntry
 	idContentTypeMap       map[string]string
 	parentMap              map[string][]EntryReference
 }
@@ -40,6 +40,7 @@ type ContentfulCacheMutex struct {
 	assetsGcLock           sync.RWMutex
 	idContentTypeMapGcLock sync.RWMutex
 	parentMapGcLock        sync.RWMutex
+	genericEntriesGcLock   sync.RWMutex
 	{{ range $index , $contentType := $contentTypes }}	{{ $contentType.Sys.ID }}GcLock sync.RWMutex
     {{ end }}
 }
@@ -160,19 +161,23 @@ var (
 	InfoCachedAllAssets              = "cached all assets"
 	InfoFallingBackToFile            = "gonna use a local file"
 	InfoLoadingFromFile              = "loading space from local file"
+	InfoCacheIsNil		             = "contentful cache is nil"
 	InfoCacheWorkerStart             = "contentful cache worker starting"
 	InfoCacheUpdateQueued            = "contentful cache update queued"
 	InfoCacheUpdateCanceled          = "contentful cache update canceled"
 	InfoCacheUpdateDone              = "contentful cache update returning"
 	InfoCacheUpdateSkipped           = "contentful cache update skipped, already one in the queue"
+	InfoCacheSyncOp                  = "contentful cache sync op done"
 	InfoOfflineEntitiesLoaded        = "downloaded entries and assets from offline file"
 	InfoPreservingExistingCache      = "could not connect for cache update, preserving the existing cache"
 	InfoUpdateCacheTime              = "space caching done, time recorded"
 	ErrorEnvironmentSetToMaster      = "environment was empty string, set to master"
+	ErrorEntryNotFound               = "entry not found"
 	ErrorEntryIsNil 			     = "entry is nil"
 	ErrorEntrySysIsNil 			     = "entry.Sys is nil"
 	ErrorEntrySysContentTypeIsNil    = "entry.Sys.ContentType is nil"
 	ErrorEntrySysContentTypeSysIsNil = "entry.Sys.ContentType.Sys is nil"
+	ErrorEntryCachingFailed          = "entry caching failed"
 )
 
 var spaceContentTypes = []string{ {{ range $index , $contentType := $contentTypes }}ContentType{{ firstCap $contentType.Sys.ID }}, {{ end }} }
@@ -246,7 +251,10 @@ func (cc *ContentfulClient) ClientStats() {
 			for _, parents := range cc.Cache.parentMap {
 				referenceCount += len(parents)
 			}
-			fieldsMap["cache parentMap parents"] = referenceCount		
+			fieldsMap["cache parentMap parents"] = referenceCount
+			cc.cacheMutex.genericEntriesGcLock.RLock()
+			defer cc.cacheMutex.genericEntriesGcLock.RUnlock()
+			fieldsMap["cache genericEntries"] = len(cc.Cache.genericEntries)
 		}
 		cc.logFn(fieldsMap, LogInfo, "Contentful ClientStats")
 	}
@@ -475,6 +483,7 @@ func NewContentfulClient(spaceID string, clientMode ClientMode, clientKey string
 			assets:           assetCacheMap{},
 			contentTypes :    []string{},
 			entryMaps:        cacheEntryMaps{},
+			genericEntries:	  map[string]*GenericEntry{},
 			idContentTypeMap: map[string]string{},
 			parentMap:        map[string][]EntryReference{},
 		},
@@ -484,6 +493,7 @@ func NewContentfulClient(spaceID string, clientMode ClientMode, clientKey string
             assetsGcLock:           sync.RWMutex{},
             idContentTypeMapGcLock: sync.RWMutex{},
             parentMapGcLock:        sync.RWMutex{},
+            genericEntriesGcLock:   sync.RWMutex{},
             {{ range $index , $contentType := $contentTypes }}	{{ $contentType.Sys.ID }}GcLock: sync.RWMutex{},
             {{ end }}
         },
@@ -508,8 +518,8 @@ func NewContentfulClient(spaceID string, clientMode ClientMode, clientKey string
 	return cc, nil
 }
 
-func NewOfflineContentfulClient(filename string, logFn func(fields map[string]interface{}, level int, args ...interface{}), logLevel int, cacheAssets bool, textJanitor bool) (*ContentfulClient, error) {
-	offlineTemp, err := getOfflineSpaceFromFile(filename)
+func NewOfflineContentfulClient(file []byte, logFn func(fields map[string]interface{}, level int, args ...interface{}), logLevel int, cacheAssets bool, textJanitor bool) (*ContentfulClient, error) {
+	offlineTemp, err := getOfflineSpaceFromFile(file)
 	if err != nil {
 		return nil, fmt.Errorf("NewOfflineContentfulClient could not parse space export file: %v", err)
 	}
@@ -519,6 +529,7 @@ func NewOfflineContentfulClient(filename string, logFn func(fields map[string]in
 		Cache: &ContentfulCache{
             contentTypes:     []string{},
             idContentTypeMap: map[string]string{},
+			genericEntries:	  map[string]*GenericEntry{},
             parentMap:        map[string][]EntryReference{},
             },
         cacheMutex: &ContentfulCacheMutex{
@@ -575,6 +586,22 @@ func RichTextToHtml(rt interface{}, linkResolver LinkResolverFunc, entryLinkReso
 	return out, nil
 }
 
+func (cc *ContentfulClient) GetGenericEntry(entryID string) (*GenericEntry, error) {
+	if cc.Cache == nil {
+		if cc.logFn != nil && cc.logLevel <= LogWarn {
+			cc.logFn(map[string]interface{}{"task": "GetGenericEntry", "entryId":entryID}, LogWarn, InfoCacheIsNil)
+		}
+		return nil, errors.New(InfoCacheIsNil)
+	}
+	if _, ok := cc.Cache.genericEntries[entryID]; !ok {	
+		if cc.logFn != nil && cc.logLevel <= LogWarn {
+			cc.logFn(map[string]interface{}{"task": "GetGenericEntry", "entryId":entryID}, LogWarn, ErrorEntryNotFound)
+		}
+		return nil, errors.New(ErrorEntryNotFound)
+	}
+	return cc.Cache.genericEntries[entryID], nil
+}
+
 func (cc *ContentfulClient) SetCacheUpdateTimeout(seconds int64) {
 	cc.cacheUpdateTimeout = seconds
 }
@@ -590,8 +617,8 @@ func (cc *ContentfulClient) SetEnvironment(environment string) {
 	cc.Client.Environment = environment
 }
 
-func (cc *ContentfulClient) SetOfflineFallback(filename string) error {
-	offlineTemp, err := getOfflineSpaceFromFile(filename)
+func (cc *ContentfulClient) SetOfflineFallback(file []byte) error {
+	offlineTemp, err := getOfflineSpaceFromFile(file)
 	if err != nil {
 		return err
 	}
@@ -721,29 +748,61 @@ func (cc *ContentfulClient) syncCache(ctx context.Context, contentTypes []string
 				entries = append(entries, entry)
 			}
 		}
+		syncEntryCount := map[string]int{}
 		for _, entry := range entries {
 			switch entry.Sys.Type {
 			case sysTypeEntry:
 				if !stringSliceContains(spaceContentTypes, entry.Sys.ContentType.Sys.ID) {
 					continue
 				}
-				updateCacheForContentTypeAndEntity(ctx, cc, entry.Sys.ContentType.Sys.ID, entry.Sys.ID, entry, false)
+				errUpdate := updateCacheForContentTypeAndEntity(ctx, cc, entry.Sys.ContentType.Sys.ID, entry.Sys.ID, entry, false)
+				if errUpdate != nil && cc.logFn != nil && cc.logLevel <= LogInfo {
+					cc.logFn(map[string]interface{}{"task": "syncCache", "error": errUpdate, "contentType": entry.Sys.ContentType.Sys.ID, "entryId": entry.Sys.ID}, 
+					LogWarn, ErrorEntryCachingFailed)
+				} else {
+					syncEntryCount[entry.Sys.ContentType.Sys.ID]++
+				}
 			case sysTypeDeletedEntry:
 				cc.cacheMutex.idContentTypeMapGcLock.RLock()
 				contentType := cc.Cache.idContentTypeMap[entry.Sys.ID]
 				cc.cacheMutex.idContentTypeMapGcLock.RUnlock()
-				updateCacheForContentTypeAndEntity(ctx, cc, contentType, entry.Sys.ID, entry, true)
+				errUpdate := updateCacheForContentTypeAndEntity(ctx, cc, contentType, entry.Sys.ID, entry, true)
+				if errUpdate != nil && cc.logFn != nil && cc.logLevel <= LogInfo {
+					cc.logFn(map[string]interface{}{"task": "syncCache", "error": errUpdate, "op":"delete", "contentType": entry.Sys.ContentType.Sys.ID, "entryId": entry.Sys.ID}, 
+					LogWarn, ErrorEntryCachingFailed)
+				} else {
+					syncEntryCount["deletedEntry"]++
+				}
 			default:
 			}
 		}
+		if cc.logFn != nil && len(entries) > 0 && cc.logLevel <= LogInfo {
+			cc.logFn(map[string]interface{}{"task": "syncCache", "syncEntryCount": syncEntryCount}, LogInfo, InfoCacheSyncOp)
+		}
+		var syncAssetCount int
 		for _, asset := range assets {
 			switch asset.Sys.Type {
 			case sysTypeAsset:
-				updateCacheForContentTypeAndEntity(ctx, cc, assetWorkerType, asset.Sys.ID, asset, false)
+				errUpdate := updateCacheForContentTypeAndEntity(ctx, cc, assetWorkerType, asset.Sys.ID, asset, false)
+				if errUpdate != nil && cc.logFn != nil && cc.logLevel <= LogInfo {
+					cc.logFn(map[string]interface{}{"task": "syncCache", "error": errUpdate, "assetId": asset.Sys.ID}, 
+					LogWarn, ErrorEntryCachingFailed)
+				} else {
+					syncAssetCount++
+				}
 			case sysTypeDeletedAsset:
-				updateCacheForContentTypeAndEntity(ctx, cc, assetWorkerType, asset.Sys.ID, nil, true)
+				errUpdate := updateCacheForContentTypeAndEntity(ctx, cc, assetWorkerType, asset.Sys.ID, nil, true)
+				if errUpdate != nil && cc.logFn != nil && cc.logLevel <= LogInfo {
+					cc.logFn(map[string]interface{}{"task": "syncCache", "error": errUpdate, "op":"delete", "assetId": asset.Sys.ID}, 
+					LogWarn, ErrorEntryCachingFailed)
+				} else {
+					syncAssetCount++
+				}
 			default:
 			}
+		}
+		if cc.logFn != nil && len(assets) > 0 && cc.logLevel <= LogInfo {
+			cc.logFn(map[string]interface{}{"task": "syncCache", "syncAssetCount": syncAssetCount}, LogInfo, InfoCacheSyncOp)
 		}
 	}
 }
@@ -762,6 +821,7 @@ func (cc *ContentfulClient) cacheSpace(ctx context.Context, contentTypes []strin
     tempCache := &ContentfulCache{
         contentTypes:     contentTypes,
         idContentTypeMap: map[string]string{},
+		genericEntries:	 map[string]*GenericEntry{},
         parentMap:        map[string][]EntryReference{},
     }
     if cacheAssets {
@@ -843,6 +903,7 @@ func (cc *ContentfulClient) cacheSpace(ctx context.Context, contentTypes []strin
     cc.cacheMutex.assetsGcLock.Lock()
     cc.cacheMutex.idContentTypeMapGcLock.Lock()
     cc.cacheMutex.parentMapGcLock.Lock()
+    cc.cacheMutex.genericEntriesGcLock.Lock()
     {{ range $index , $contentType := $contentTypes }}cc.cacheMutex.{{ $contentType.Sys.ID }}GcLock.Lock()
     {{ end }}
 	cc.Cache = tempCache
@@ -854,6 +915,7 @@ func (cc *ContentfulClient) cacheSpace(ctx context.Context, contentTypes []strin
 	cc.cacheMutex.assetsGcLock.Unlock()
     cc.cacheMutex.sharedDataGcLock.Unlock()
 	cc.cacheMutex.fullCacheGcLock.Unlock()
+	cc.cacheMutex.genericEntriesGcLock.Unlock()
 }
 
 func ToAssetReference(asset *contentful.Asset) (refSys ContentTypeSys) {
@@ -1014,13 +1076,9 @@ func (cc *ContentfulClient) getAllAssets(tryCacheFirst bool) (map[string]*conten
 	return assets, nil
 }
 
-func getOfflineSpaceFromFile(filename string) (*offlineTemp, error) {
-	fileBytes, err := os.ReadFile(filename)
-	if err != nil {
-		return nil, fmt.Errorf("getOfflineSpaceFromFile could not read space export file: %v", err)
-	}
+func getOfflineSpaceFromFile(file []byte) (*offlineTemp, error) {
 	offlineTemp := &offlineTemp{}
-	err = json.Unmarshal(fileBytes, offlineTemp)
+	err := json.Unmarshal(file, offlineTemp)
 	if err != nil {
 		return nil, fmt.Errorf("getOfflineSpaceFromFile could not parse space export file: %v", err)
 	}
@@ -1471,6 +1529,15 @@ func updateCacheForContentType(ctx context.Context, results chan ContentTypeResu
 			return errors.New("updateCacheForContentType failed for contentType {{ $contentType.Sys.ID }}: "+err.Error())
 		}
 		tempCache.entryMaps.{{ $contentType.Sys.ID }} = all{{ firstCap $contentType.Sys.ID }}
+		cc.cacheMutex.genericEntriesGcLock.Lock()
+		for _, {{ $contentType.Sys.ID }} := range all{{ firstCap $contentType.Sys.ID }} {
+			tempCache.genericEntries[{{ $contentType.Sys.ID }}.Sys.ID] = &GenericEntry{
+				Sys: {{ $contentType.Sys.ID }}.Sys,
+				RawFields: {{ $contentType.Sys.ID }}.RawFields,
+				CC: {{ $contentType.Sys.ID }}.CC,
+			}
+		}
+		cc.cacheMutex.genericEntriesGcLock.Unlock()
 		if cc.logFn != nil && cc.logLevel <= LogInfo {
 			cc.logFn(map[string]interface{}{"contentType":"{{ $contentType.Sys.ID }}", "method": "updateCacheForContentType", "size":len(all{{ firstCap $contentType.Sys.ID }})}, LogInfo, InfoCachedAllEntries)
 		}
@@ -1530,7 +1597,7 @@ func updateCacheForContentTypeAndEntity(ctx context.Context, cc *ContentfulClien
 	return nil
 }
 
-func commonGetParents(cc *ContentfulClient, id string, contentType []string) (parents []EntryReference, err error) {
+func commonGetParents(cc *ContentfulClient, id string, contentTypes []string) (parents []EntryReference, err error) {
 	parents = []EntryReference{}
 	cc.cacheMutex.sharedDataGcLock.RLock()
 	cacheInit := cc.cacheInit
@@ -1538,10 +1605,12 @@ func commonGetParents(cc *ContentfulClient, id string, contentType []string) (pa
 	if cacheInit {
 		cc.cacheMutex.parentMapGcLock.RLock()
 		defer cc.cacheMutex.parentMapGcLock.RUnlock()
-		if len(contentType) != 0 {
+		if len(contentTypes) != 0 {
 			for _, parent := range cc.Cache.parentMap[id] {
-				if parent.ContentType == contentType[0] {
-					parents = append(parents, parent)
+				for _, contentType := range contentTypes {
+					if parent.ContentType == contentType {
+						parents = append(parents, parent)
+					}
 				}
 			}
 			return parents, nil
@@ -1564,7 +1633,7 @@ func commonGetParents(cc *ContentfulClient, id string, contentType []string) (pa
     		if err != nil {
     			return nil, err
     		}
-    		if len(contentType) == 1 && contentType[0] != entry.Sys.ContentType.Sys.ID {
+    		if len(contentTypes) == 1 && contentTypes[0] != entry.Sys.ContentType.Sys.ID {
     			continue
     		}
     		switch entry.Sys.ContentType.Sys.ID { {{ range $index , $contentType := $contentTypes }}

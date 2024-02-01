@@ -33,6 +33,12 @@ type RawItem struct {
 	Fields RawFields  `json:"fields"`
 }
 
+type GenericEntry struct {
+	Sys       ContentfulSys     `json:"sys,omitempty"`
+	RawFields RawFields         `json:"fields,omitempty"`
+	CC        *ContentfulClient `json:"-"`
+}
+
 type ContentfulReferencedEntry struct {
 	Entry 	*contentful.Entry
 	Col 	*contentful.Collection

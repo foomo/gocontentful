@@ -735,6 +735,8 @@ func (cc *ContentfulClient) cache{{ firstCap $contentType.Sys.ID }}ByID(ctx cont
 	defer cc.cacheMutex.idContentTypeMapGcLock.Unlock()
 	cc.cacheMutex.parentMapGcLock.Lock()
 	defer cc.cacheMutex.parentMapGcLock.Unlock()
+	cc.cacheMutex.genericEntriesGcLock.Lock()
+	defer cc.cacheMutex.genericEntriesGcLock.Unlock()
 	
 	var col *contentful.Collection
 	if entryPayload != nil {
@@ -757,6 +759,7 @@ func (cc *ContentfulClient) cache{{ firstCap $contentType.Sys.ID }}ByID(ctx cont
 	}
 	// It was deleted
 	if col != nil && len(col.Items) == 0 || entryDelete {
+		delete(cc.Cache.genericEntries, id)
 		delete(cc.Cache.entryMaps.{{ $contentType.Sys.ID }}, id)
 		delete(cc.Cache.idContentTypeMap, id)
 		// delete as child
@@ -782,7 +785,12 @@ func (cc *ContentfulClient) cache{{ firstCap $contentType.Sys.ID }}ByID(ctx cont
 		cc.Cache.entryMaps.{{ $contentType.Sys.ID }} = map[string]*Cf{{ firstCap $contentType.Sys.ID }}{}
 	}
 	cc.Cache.entryMaps.{{ $contentType.Sys.ID }}[id] = {{ $contentType.Sys.ID }}
-			cc.Cache.idContentTypeMap[id] = {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID
+	cc.Cache.genericEntries[id] = &GenericEntry{
+				Sys:       {{ $contentType.Sys.ID }}.Sys,
+				RawFields: {{ $contentType.Sys.ID }}.RawFields,
+				CC:        {{ $contentType.Sys.ID }}.CC,
+	}
+	cc.Cache.idContentTypeMap[id] = {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID
 	allChildrensIds := map[string]bool{}
 	{{ range $fieldIndex, $field := $contentType.Fields }}
 	{{ if fieldIsMultipleReference $field }}

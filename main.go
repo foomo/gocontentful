@@ -14,7 +14,7 @@ import (
 	"github.com/foomo/gocontentful/erm"
 )
 
-var VERSION = "v1.0.26"
+var VERSION = "v1.1.0"
 
 type contentfulRc struct {
 	ManagementToken string `json:"managementToken"`
@@ -103,8 +103,10 @@ func main() {
 	if cmaKey == "" && *flagGenerateFromExport == "" {
 		cmaKey = getCmaKeyFromRcFile()
 	}
-	if conf.ExportFile == "" && (conf.SpaceID == "" || cmaKey == "") ||
-		conf.ExportFile != "" && (conf.SpaceID != "" || cmaKey != "") {
+	if conf.ExportFile == "" && conf.SpaceID == "" ||
+		conf.ExportFile != "" && conf.SpaceID != "" {
+		byt, _ := json.MarshalIndent(conf, "", "  ")
+		fmt.Println(string(byt))
 		usageError("Please provide either a Contentful Space ID and CMA access token or an export file name")
 	}
 	var path string
