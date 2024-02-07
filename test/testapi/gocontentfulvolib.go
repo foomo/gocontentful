@@ -696,6 +696,58 @@ func (genericEntry *GenericEntry) FieldAsFloat64(fieldName string, locale ...Loc
 
 }
 
+func (genericEntry *GenericEntry) SetField(fieldName string, fieldValue interface{}, locale ...Locale) error {
+	var loc Locale
+	if len(locale) != 0 {
+		loc = locale[0]
+		if localeFallback[loc] != "" {
+			return ErrLocaleUnsupported
+		}
+	} else {
+		loc = DefaultLocale
+	}
+	if genericEntry.RawFields == nil {
+		genericEntry.RawFields = make(RawFields)
+	}
+	if genericEntry.RawFields[fieldName] == nil {
+		genericEntry.RawFields[fieldName] = map[string]interface{}{}
+	}
+	switch genericEntry.RawFields[fieldName].(type) {
+	case map[string]interface{}:
+		genericEntry.RawFields[fieldName].(map[string]interface{})[string(loc)] = fieldValue
+		return nil
+	}
+	return ErrNotSet
+}
+
+func (genericEntry *GenericEntry) Upsert() error {
+	cfEntry := &contentful.Entry{
+		Fields: map[string]interface{}{},
+	}
+	// get the generic entry sys into the cfEntry sys
+	tmp, errMarshal := json.Marshal(genericEntry)
+	if errMarshal != nil {
+		return errors.New("can't marshal JSON from entry")
+	}
+	errUnmarshal := json.Unmarshal(tmp, &cfEntry)
+	if errUnmarshal != nil {
+		return errors.New("can't unmarshal JSON into CF entry")
+	}
+	// copy fields
+	for key, fieldValue := range genericEntry.RawFields {
+		cfEntry.Fields[key] = fieldValue
+	}
+	// upsert the entry
+	err := genericEntry.CC.Client.Entries.Upsert(genericEntry.CC.SpaceID, cfEntry)
+	if err != nil {
+		if genericEntry.CC.logFn != nil && genericEntry.CC.logLevel <= LogWarn {
+			genericEntry.CC.logFn(map[string]interface{}{"task": "UpdateCache"}, LogWarn, fmt.Errorf("CfAkeneoSettings UpsertEntry: Operation failed: %w", err))
+		}
+		return err
+	}
+	return nil
+}
+
 func (cc *ContentfulClient) SetCacheUpdateTimeout(seconds int64) {
 	cc.cacheUpdateTimeout = seconds
 }

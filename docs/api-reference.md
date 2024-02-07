@@ -267,6 +267,18 @@ Returns the specified raw field as a float64 for the given locale. If not availa
 
 > NOTE: Returning a default value (empty string or zero) follows the principle of graceful content degradation, but it might be dangerous at the application level. Make sure you don't rely on the value for anything except content presentation, othewise implement the corresponding safe methods yourself.
 
+```go
+(genericEntry *GenericEntry) SetField(fieldName string, fieldValue interface{}, locale ...Locale) error
+```
+
+Sets a generic entry's field value.
+
+```go
+(genericEntry *GenericEntry) Upsert() error
+```
+
+Upserts the generic entry to the space it came from.
+
 ### Asset functions
 
 ```go
