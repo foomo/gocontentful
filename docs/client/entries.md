@@ -74,3 +74,22 @@ In case you need a completely new entry just create it, Contentful will fill in 
 ```go
 NewCfPerson(contentfulClient ...*ContentfulClient) (cfPerson *CfPerson)
 ```
+
+## Generic entries
+
+Generic entries have raw fields in this form:
+
+```go
+type RawFields map[string]interface{}
+
+type GenericEntry struct {
+	Sys       ContentfulSys
+	RawFields RawFields
+	CC        *ContentfulClient
+}
+```
+
+While these seem to defeat the purpose of the idiomatic API, they are useful in cases where you need to pass-through entries from Contentful to any recipient without type switching. Each generic entry carries a reference to the Gocontentful client it was used to retrieve it, so that other operations can benefit from it.
+For example, get the corresponding idiomatic entry only when needed for processing.
+
+Gocontentful supports retrieving either all generic entries in the cache or single generic entries by ID. It also provides methods to get a localized field's value as a string or a float64. Take a look at [the API reference](../api-reference.md) for the method signatures.

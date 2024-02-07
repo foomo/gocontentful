@@ -241,28 +241,31 @@ Unpublishes and deletes the entry
 
 ### Generic entries
 
-Generic entries have raw fields in this form:
-
-```go
-type RawFields map[string]interface{}
-
-type GenericEntry struct {
-	Sys       ContentfulSys     `json:"sys,omitempty"`
-	RawFields RawFields         `json:"fields,omitempty"`
-	CC        *ContentfulClient `json:"-"`
-}
-```
-
-While these seem to defeat the purpose of the idiomatic API, they are useful in cases where you need to
-pass-through entries from Contentful to any recipient without type switching. Each generic entry carries
-a reference to the Gocontentful client it was used to retrieve it, so that other operations can benefit from it.
-For example, get the corresponding idiomatic entry only when needed for processing.
-
 ```go
 (cc *ContentfulClient) GetGenericEntry(entryID string) (*GenericEntry, error)
 ```
 
 Retrieves a generic entry by ID
+
+```go
+(cc *ContentfulClient) GetAllGenericEntries() (map[string]*GenericEntry, error)
+```
+
+Retrieves all generic entries and returns a map where the key is the entry ID.
+
+```go
+(genericEntry *GenericEntry) FieldAsString(fieldName string, locale ...Locale) string
+```
+
+Returns the specified raw field as a string for the given locale. If not available, it will return an empty string.
+
+```go
+(genericEntry *GenericEntry) FieldAsFloat64(fieldName string, locale ...Locale) float64
+```
+
+Returns the specified raw field as a float64 for the given locale. If not available, it will return zero.
+
+> NOTE: Returning a default value (empty string or zero) follows the principle of graceful content degradation, but it might be dangerous at the application level. Make sure you don't rely on the value for anything except content presentation, othewise implement the corresponding safe methods yourself.
 
 ### Asset functions
 
