@@ -115,3 +115,17 @@ func TestEntry(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, cfProduct.CC)
 }
+
+func TestGenericEntries(t *testing.T) {
+	contentfulClient, err := getTestClient()
+	require.NoError(t, err)
+	genericEntries, err := contentfulClient.GetAllGenericEntries()
+	require.NoError(t, err)
+	require.Equal(t, 9, len(genericEntries))
+	genericBrand, err := contentfulClient.GetGenericEntry("651CQ8rLoIYCeY6G0QG22q")
+	require.NoError(t, err)
+	require.Equal(t, "http://www.normann-copenhagen.com/", genericBrand.FieldAsString("website"))
+	genericProduct, err := contentfulClient.GetGenericEntry("6dbjWqNd9SqccegcqYq224")
+	require.NoError(t, err)
+	require.Equal(t, 89.0, genericProduct.FieldAsFloat64("quantity"))
+}
