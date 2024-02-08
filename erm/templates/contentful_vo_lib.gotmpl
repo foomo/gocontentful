@@ -634,7 +634,6 @@ func (genericEntry *GenericEntry) FieldAsString(fieldName string, locale ...Loca
 	default:
 		return ""
 	}
-
 }
 
 func (genericEntry *GenericEntry) FieldAsFloat64(fieldName string, locale ...Locale) float64 {
@@ -659,7 +658,41 @@ func (genericEntry *GenericEntry) FieldAsFloat64(fieldName string, locale ...Loc
 	default:
 		return 0
 	}
+}
 
+func (genericEntry *GenericEntry) FieldAsReference(fieldName string, locale ...Locale) *EntryReference {
+	var loc Locale
+	if len(locale) != 0 {
+		loc = locale[0]
+		if localeFallback[loc] != "" {
+			return nil
+		}
+	} else {
+		loc = DefaultLocale
+	}
+	var cts ContentTypeSys
+	switch field := genericEntry.RawFields[fieldName].(type) {
+	case map[string]interface{}:
+		byt, err := json.Marshal(field[string(loc)])
+		if err != nil {
+			return nil
+		}
+		err = json.Unmarshal(byt, &cts)
+		if err != nil {
+			return nil
+		}
+		referencedEntry, err := genericEntry.CC.GetGenericEntry(cts.Sys.ID)
+		if err != nil || referencedEntry == nil {
+			return nil
+		}
+		ref := EntryReference{
+			ID: cts.Sys.ID,
+			ContentType: referencedEntry.Sys.ContentType.Sys.ID,
+			FromField: fieldName,
+		}
+		return &ref
+	}
+	return nil
 }
 
 func (genericEntry *GenericEntry) SetField(fieldName string, fieldValue interface{}, locale ...Locale) error {

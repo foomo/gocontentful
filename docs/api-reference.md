@@ -265,7 +265,13 @@ Returns the specified raw field as a string for the given locale. If not availab
 
 Returns the specified raw field as a float64 for the given locale. If not available, it will return zero.
 
-> NOTE: Returning a default value (empty string or zero) follows the principle of graceful content degradation, but it might be dangerous at the application level. Make sure you don't rely on the value for anything except content presentation, othewise implement the corresponding safe methods yourself.
+```go
+(genericEntry *GenericEntry) FieldAsReference(fieldName string, locale ...Locale) *EntryReference
+```
+
+Returns the specified raw field as a \*EntryReference for the given locale. If not available, it will return nil.
+
+> NOTE: Returning a default value (empty string or zero or nil) follows the principle of graceful content degradation, but it might be dangerous at the application level. Make sure you don't rely on the value for anything except content presentation, othewise implement the corresponding safe methods yourself.
 
 ```go
 (genericEntry *GenericEntry) SetField(fieldName string, fieldValue interface{}, locale ...Locale) error

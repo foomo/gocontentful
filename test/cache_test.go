@@ -128,4 +128,7 @@ func TestGenericEntries(t *testing.T) {
 	genericProduct, err := contentfulClient.GetGenericEntry("6dbjWqNd9SqccegcqYq224")
 	require.NoError(t, err)
 	require.Equal(t, 89.0, genericProduct.FieldAsFloat64("quantity"))
+	productBrand := genericProduct.FieldAsReference("brand")
+	require.NotNil(t, productBrand)
+	require.Equal(t, "651CQ8rLoIYCeY6G0QG22q", productBrand.ID)
 }
