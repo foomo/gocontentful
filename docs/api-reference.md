@@ -254,24 +254,40 @@ Retrieves a generic entry by ID
 Retrieves all generic entries and returns a map where the key is the entry ID.
 
 ```go
-(genericEntry *GenericEntry) FieldAsString(fieldName string, locale ...Locale) string
+(genericEntry *GenericEntry) FieldAsString(fieldName string, locale ...Locale) (string, error)
 ```
 
-Returns the specified raw field as a string for the given locale. If not available, it will return an empty string.
+Returns the specified raw field as a string for the given locale.
 
 ```go
-(genericEntry *GenericEntry) FieldAsFloat64(fieldName string, locale ...Locale) float64
+(genericEntry *GenericEntry) InheritAsString(fieldName string, locale ...Locale) (string, error)
 ```
 
-Returns the specified raw field as a float64 for the given locale. If not available, it will return zero.
+Returns specified raw field from the entry's first parent's, if any, as a string for the given locale.
 
 ```go
-(genericEntry *GenericEntry) FieldAsReference(fieldName string, locale ...Locale) *EntryReference
+(genericEntry *GenericEntry) FieldAsFloat64(fieldName string, locale ...Locale) (float64, error)
 ```
 
-Returns the specified raw field as a \*EntryReference for the given locale. If not available, it will return nil.
+Returns the specified raw field as a float64 for the given locale.
 
-> NOTE: Returning a default value (empty string or zero or nil) follows the principle of graceful content degradation, but it might be dangerous at the application level. Make sure you don't rely on the value for anything except content presentation, othewise implement the corresponding safe methods yourself.
+```go
+(genericEntry *GenericEntry) InheritAsFloat64(fieldName string, locale ...Locale) (float64, error)
+```
+
+Returns the specified raw field from the entry's first parent's, if any, as a float64 for the given locale.
+
+```go
+(genericEntry *GenericEntry) FieldAsReference(fieldName string, locale ...Locale) (*EntryReference, error)
+```
+
+Returns the specified raw field as a \*EntryReference for the given locale.
+
+```go
+(genericEntry *GenericEntry) InheritAsReference(fieldName string, locale ...Locale) (*EntryReference, error)
+```
+
+Returns the specified raw field from the entry's first parent's, if any, as a \*EntryReference for the given locale.
 
 ```go
 (genericEntry *GenericEntry) SetField(fieldName string, fieldValue interface{}, locale ...Locale) error

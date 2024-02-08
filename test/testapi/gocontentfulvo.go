@@ -86,6 +86,8 @@ type CfProductFields struct {
 	RWLockPrice              sync.RWMutex                `json:"-"`
 	Brand                    map[string]ContentTypeSys   `json:"brand,omitempty"`
 	RWLockBrand              sync.RWMutex                `json:"-"`
+	SubProduct               map[string]ContentTypeSys   `json:"subProduct,omitempty"`
+	RWLockSubProduct         sync.RWMutex                `json:"-"`
 	Quantity                 map[string]float64          `json:"quantity,omitempty"`
 	RWLockQuantity           sync.RWMutex                `json:"-"`
 	Sku                      map[string]string           `json:"sku,omitempty"`
