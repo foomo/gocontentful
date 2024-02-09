@@ -641,26 +641,24 @@ func (genericEntry *GenericEntry) FieldAsString(fieldName string, locale ...Loca
 
 func (genericEntry *GenericEntry) InheritAsString(fieldName string, parentTypes []string, locale ...Locale) (string, error) {
 	val, err := genericEntry.FieldAsString(fieldName, locale...)
+	if err == nil {
+		return val, nil
+	}
+	parentRefs, err := commonGetParents(genericEntry.CC, genericEntry.Sys.ID, parentTypes)
 	if err != nil {
 		return "", err
 	}
-	if val == "" {
-		parentRefs, err := commonGetParents(genericEntry.CC, genericEntry.Sys.ID, parentTypes)
-		if err != nil {
-			return "", err
-		}
-		if len(parentRefs) > 0 {
-			for _, parentRef := range parentRefs {
-				genericParent, err := genericEntry.CC.GetGenericEntry(parentRef.ID)
-				if err != nil {
-					return "", err
-				}
-				parentVal, err := genericParent.FieldAsString(fieldName, locale...)
-				if err != nil {
-					return "", err
-				} else {
-					return parentVal, nil	
-				}
+	if len(parentRefs) > 0 {
+		for _, parentRef := range parentRefs {
+			genericParent, err := genericEntry.CC.GetGenericEntry(parentRef.ID)
+			if err != nil {
+				return "", err
+			}
+			parentVal, err := genericParent.FieldAsString(fieldName, locale...)
+			if err != nil {
+				return "", err
+			} else {
+				return parentVal, nil
 			}
 		}
 	}
@@ -695,27 +693,25 @@ func (genericEntry *GenericEntry) FieldAsFloat64(fieldName string, locale ...Loc
 }
 
 func (genericEntry *GenericEntry) InheritAsFloat64(fieldName string, parentTypes []string, locale ...Locale) (float64, error) {
-	val, err := genericEntry.FieldAsString(fieldName, locale...)
+	val, err := genericEntry.FieldAsFloat64(fieldName, locale...)
+	if err == nil {
+		return val, nil
+	}
+	parentRefs, err := commonGetParents(genericEntry.CC, genericEntry.Sys.ID, parentTypes)
 	if err != nil {
 		return 0, err
 	}
-	if val == "" {
-		parentRefs, err := commonGetParents(genericEntry.CC, genericEntry.Sys.ID, parentTypes)
-		if err != nil {
-			return 0, err
-		}
-		if len(parentRefs) > 0 {
-			for _, parentRef := range parentRefs {
-				genericParent, err := genericEntry.CC.GetGenericEntry(parentRef.ID)
-				if err != nil {
-					return 0, err
-				}
-				parentVal, err := genericParent.FieldAsFloat64(fieldName, locale...)
-				if err != nil {
-					return 0, err
-				} else {
-					return parentVal, nil	
-				}
+	if len(parentRefs) > 0 {
+		for _, parentRef := range parentRefs {
+			genericParent, err := genericEntry.CC.GetGenericEntry(parentRef.ID)
+			if err != nil {
+				return 0, err
+			}
+			parentVal, err := genericParent.FieldAsFloat64(fieldName, locale...)
+			if err != nil {
+				return 0, err
+			} else {
+				return parentVal, nil	
 			}
 		}
 	}
@@ -761,27 +757,25 @@ func (genericEntry *GenericEntry) FieldAsReference(fieldName string, locale ...L
 }
 
 func (genericEntry *GenericEntry) InheritAsReference(fieldName string, parentTypes []string, locale ...Locale) (*EntryReference, error) {
-	val, err := genericEntry.FieldAsString(fieldName, locale...)
+	val, err := genericEntry.FieldAsReference(fieldName, locale...)
+	if err == nil {
+		return val, nil
+	}
+	parentRefs, err := commonGetParents(genericEntry.CC, genericEntry.Sys.ID, parentTypes)
 	if err != nil {
 		return nil, err
 	}
-	if val == "" {
-		parentRefs, err := commonGetParents(genericEntry.CC, genericEntry.Sys.ID, parentTypes)
-		if err != nil {
-			return nil, err
-		}
-		if len(parentRefs) > 0 {
-			for _, parentRef := range parentRefs {
-				genericParent, err := genericEntry.CC.GetGenericEntry(parentRef.ID)
-				if err != nil {
-					return nil, err
-				}
-				parentVal, err := genericParent.FieldAsReference(fieldName, locale...)
-				if err != nil {
-					return nil, err
-				} else {
-					return parentVal, nil	
-				}
+	if len(parentRefs) > 0 {
+		for _, parentRef := range parentRefs {
+			genericParent, err := genericEntry.CC.GetGenericEntry(parentRef.ID)
+			if err != nil {
+				return nil, err
+			}
+			parentVal, err := genericParent.FieldAsReference(fieldName, locale...)
+			if err != nil {
+				return nil, err
+			} else {
+				return parentVal, nil	
 			}
 		}
 	}
