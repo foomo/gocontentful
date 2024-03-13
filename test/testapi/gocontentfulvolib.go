@@ -460,7 +460,7 @@ func NewAssetFromURL(id string, uploadUrl string, imageFileType string, title st
 	var loc Locale
 	if len(locale) != 0 {
 		loc = locale[0]
-		if localeFallback[loc] != "" {
+		if _, ok := localeFallback[loc]; !ok {
 			return nil
 		}
 	} else {
@@ -650,7 +650,7 @@ func (genericEntry *GenericEntry) FieldAsString(fieldName string, locale ...Loca
 	var loc Locale
 	if len(locale) != 0 {
 		loc = locale[0]
-		if localeFallback[loc] != "" {
+		if _, ok := localeFallback[loc]; !ok {
 			return "", ErrLocaleUnsupported
 		}
 	} else {
@@ -662,6 +662,9 @@ func (genericEntry *GenericEntry) FieldAsString(fieldName string, locale ...Loca
 	switch field := genericEntry.RawFields[fieldName].(type) {
 	case map[string]interface{}:
 		fieldLoc := field[string(loc)]
+		if fieldLoc == "" && field[string(DefaultLocale)] != "" {
+			fieldLoc = field[string(DefaultLocale)]
+		}
 		switch fieldLocStr := fieldLoc.(type) {
 		case string:
 			return fieldLocStr, nil
@@ -703,7 +706,7 @@ func (genericEntry *GenericEntry) FieldAsFloat64(fieldName string, locale ...Loc
 	var loc Locale
 	if len(locale) != 0 {
 		loc = locale[0]
-		if localeFallback[loc] != "" {
+		if _, ok := localeFallback[loc]; !ok {
 			return 0, ErrLocaleUnsupported
 		}
 	} else {
@@ -715,6 +718,9 @@ func (genericEntry *GenericEntry) FieldAsFloat64(fieldName string, locale ...Loc
 	switch field := genericEntry.RawFields[fieldName].(type) {
 	case map[string]interface{}:
 		fieldLoc := field[string(loc)]
+		if fieldLoc == 0 && field[string(DefaultLocale)] != 0 {
+			fieldLoc = field[string(DefaultLocale)]
+		}
 		switch fieldLocFloat := fieldLoc.(type) {
 		case float64:
 			return fieldLocFloat, nil
@@ -756,7 +762,7 @@ func (genericEntry *GenericEntry) FieldAsReference(fieldName string, locale ...L
 	var loc Locale
 	if len(locale) != 0 {
 		loc = locale[0]
-		if localeFallback[loc] != "" {
+		if _, ok := localeFallback[loc]; !ok {
 			return nil, ErrLocaleUnsupported
 		}
 	} else {
@@ -768,7 +774,11 @@ func (genericEntry *GenericEntry) FieldAsReference(fieldName string, locale ...L
 	}
 	switch field := genericEntry.RawFields[fieldName].(type) {
 	case map[string]interface{}:
-		byt, err := json.Marshal(field[string(loc)])
+		fieldVal := field[string(loc)]
+		if fieldVal == nil {
+			fieldVal = field[string(DefaultLocale)]
+		}
+		byt, err := json.Marshal(fieldVal)
 		if err != nil {
 			return nil, err
 		}
@@ -820,7 +830,7 @@ func (genericEntry *GenericEntry) SetField(fieldName string, fieldValue interfac
 	var loc Locale
 	if len(locale) != 0 {
 		loc = locale[0]
-		if localeFallback[loc] != "" {
+		if _, ok := localeFallback[loc]; !ok {
 			return ErrLocaleUnsupported
 		}
 	} else {
