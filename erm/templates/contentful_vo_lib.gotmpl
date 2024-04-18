@@ -994,7 +994,7 @@ func (cc *ContentfulClient) syncCache(ctx context.Context, contentTypes []string
 				cc.cacheMutex.idContentTypeMapGcLock.RUnlock()
 				errUpdate := updateCacheForContentTypeAndEntity(ctx, cc, contentType, entry.Sys.ID, entry, true)
 				if errUpdate != nil && cc.logFn != nil && cc.logLevel <= LogInfo {
-					cc.logFn(map[string]interface{}{"task": "syncCache", "error": errUpdate, "op":"delete", "contentType": entry.Sys.ContentType.Sys.ID, "entryId": entry.Sys.ID}, 
+					cc.logFn(map[string]interface{}{"task": "syncCache", "error": errUpdate, "op":"delete", "entryId": entry.Sys.ID}, 
 					LogWarn, ErrorEntryCachingFailed)
 				} else {
 					syncEntryCount["deletedEntry"]++
