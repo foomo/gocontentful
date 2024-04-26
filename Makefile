@@ -18,7 +18,7 @@ doc:
 .PHONY: install
 ## Install binary
 install:
-	@go build -o ${GOPATH}/bin/gocontenful main.go
+	go build -o ${GOPATH}/bin/gocontentful main.go
 
 .PHONY: build
 ## Build binary
