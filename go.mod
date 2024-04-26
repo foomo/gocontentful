@@ -3,7 +3,7 @@ module github.com/foomo/gocontentful
 go 1.21
 
 require (
-	github.com/foomo/contentful v0.4.6-0.20240426090016-36498310ced0
+	github.com/foomo/contentful v0.4.6-0.20240426113637-1a2238ef6a0f
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.9.0
 	golang.org/x/sync v0.7.0
@@ -13,6 +13,7 @@ require (
 )
 
 require (
+	github.com/aoliveti/curling v1.1.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/gopherjs/gopherjs v0.0.0-20181017120253-0766667cb4d1 // indirect
 	github.com/jtolds/gls v4.20.0+incompatible // indirect

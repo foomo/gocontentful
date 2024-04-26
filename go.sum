@@ -1,8 +1,12 @@
+github.com/aoliveti/curling v1.1.0 h1:/1k05HmPUEGYXNHo3aX5BWRJWvWQbiU0A7n9ugqhdLY=
+github.com/aoliveti/curling v1.1.0/go.mod h1:xoDmoUg9vX3pMTltyG/rp9tFtIlweL2QeCJVnvyAvzw=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/foomo/contentful v0.4.6-0.20240426090016-36498310ced0 h1:RrL0mO0RhA7e01Uogjz2AWEletuNUFQymyn8PJZEnoQ=
 github.com/foomo/contentful v0.4.6-0.20240426090016-36498310ced0/go.mod h1:x9QtObXj7qKw4Rpxg6kI6bi6RGXzD7o/l+XPj1cr2Og=
+github.com/foomo/contentful v0.4.6-0.20240426113637-1a2238ef6a0f h1:NbSeTpZVyIFa2tGHugJ+znP6StgwLnu/NUmuCV8LTjU=
+github.com/foomo/contentful v0.4.6-0.20240426113637-1a2238ef6a0f/go.mod h1:vdEkAQ25w3O4RjpdnIj2PDyTrErf7Snhc73HIXO5+cc=
 github.com/gopherjs/gopherjs v0.0.0-20181017120253-0766667cb4d1 h1:EGx4pi6eqNxGaHF6qqu48+N2wcFQ5qg5FXgOdqsJ5d8=
 github.com/gopherjs/gopherjs v0.0.0-20181017120253-0766667cb4d1/go.mod h1:wJfORRmW1u3UXTncJ5qlYoELFm8eSnnEO6hX4iZ3EWY=
 github.com/jtolds/gls v4.20.0+incompatible h1:xdiiI2gbIgH/gLH7ADydsJ1uDOEzR8yvV7C0MuV77Wo=
