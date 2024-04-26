@@ -716,6 +716,9 @@ func (cc *ContentfulClient) syncCache(ctx context.Context, contentTypes []string
 		cc.logFn(map[string]interface{}{"task": "syncCache"}, LogInfo, InfoCacheUpdateQueued)
 	}
 	for {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		cc.cacheMutex.sharedDataGcLock.RLock()
 		col := cc.Client.Entries.Sync(
 			ctx,
@@ -738,6 +741,9 @@ func (cc *ContentfulClient) syncCache(ctx context.Context, contentTypes []string
 		var entries []*contentful.Entry
 		var assets []*contentful.Asset
 		for _, item := range col.Items {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
 			entry := &contentful.Entry{}
 			byteArray, _ := json.Marshal(item)
 			errEntry := json.NewDecoder(bytes.NewReader(byteArray)).Decode(entry)
@@ -757,26 +763,48 @@ func (cc *ContentfulClient) syncCache(ctx context.Context, contentTypes []string
 			}
 		}
 		for _, entry := range entries {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
 			switch entry.Sys.Type {
 			case sysTypeEntry:
 				if !stringSliceContains(spaceContentTypes, entry.Sys.ContentType.Sys.ID) {
 					continue
 				}
-				updateCacheForContentTypeAndEntity(ctx, cc, entry.Sys.ContentType.Sys.ID, entry.Sys.ID, entry, false)
+				if err := updateCacheForContentTypeAndEntity(ctx, cc, entry.Sys.ContentType.Sys.ID, entry.Sys.ID, entry, false); err != nil {
+					if cc.logFn != nil && cc.logLevel <= LogWarn {
+						cc.logFn(map[string]interface{}{"id": entry.Sys.ID, "task": "syncCache", "error": err.Error()}, LogWarn, "failed to update cache for entry")
+					}
+				}
 			case sysTypeDeletedEntry:
 				cc.cacheMutex.idContentTypeMapGcLock.RLock()
 				contentType := cc.Cache.idContentTypeMap[entry.Sys.ID]
 				cc.cacheMutex.idContentTypeMapGcLock.RUnlock()
-				updateCacheForContentTypeAndEntity(ctx, cc, contentType, entry.Sys.ID, entry, true)
+				if err := updateCacheForContentTypeAndEntity(ctx, cc, contentType, entry.Sys.ID, entry, true); err != nil {
+					if cc.logFn != nil && cc.logLevel <= LogWarn {
+						cc.logFn(map[string]interface{}{"id": entry.Sys.ID, "task": "syncCache", "error": err.Error()}, LogWarn, "failed to delete cache for entry")
+					}
+				}
 			default:
 			}
 		}
 		for _, asset := range assets {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
 			switch asset.Sys.Type {
 			case sysTypeAsset:
-				updateCacheForContentTypeAndEntity(ctx, cc, assetWorkerType, asset.Sys.ID, asset, false)
+				if err := updateCacheForContentTypeAndEntity(ctx, cc, assetWorkerType, asset.Sys.ID, asset, false); err != nil {
+					if cc.logFn != nil && cc.logLevel <= LogWarn {
+						cc.logFn(map[string]interface{}{"id": asset.Sys.ID, "task": "syncCache", "error": err.Error()}, LogWarn, "failed to update cache for entry")
+					}
+				}
 			case sysTypeDeletedAsset:
-				updateCacheForContentTypeAndEntity(ctx, cc, assetWorkerType, asset.Sys.ID, nil, true)
+				if err := updateCacheForContentTypeAndEntity(ctx, cc, assetWorkerType, asset.Sys.ID, nil, true); err != nil {
+					if cc.logFn != nil && cc.logLevel <= LogWarn {
+						cc.logFn(map[string]interface{}{"id": asset.Sys.ID, "task": "syncCache", "error": err.Error()}, LogWarn, "failed to delete cache for entry")
+					}
+				}
 			default:
 			}
 		}
@@ -1663,7 +1691,10 @@ func commonGetParents(ctx context.Context, cc *ContentfulClient, id string, cont
 		switch entry.Sys.ContentType.Sys.ID {
 		case ContentTypeBrand:
 			var parentVO CfBrand
-			byteArray, _ := json.Marshal(item)
+			byteArray, err := json.Marshal(item)
+			if err != nil {
+				return nil, errors.New("GetParents: " + err.Error())
+			}
 			err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&parentVO)
 			if err != nil {
 				return nil, errors.New("GetParents: " + err.Error())
@@ -1678,7 +1709,10 @@ func commonGetParents(ctx context.Context, cc *ContentfulClient, id string, cont
 
 		case ContentTypeCategory:
 			var parentVO CfCategory
-			byteArray, _ := json.Marshal(item)
+			byteArray, err := json.Marshal(item)
+			if err != nil {
+				return nil, errors.New("GetParents: " + err.Error())
+			}
 			err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&parentVO)
 			if err != nil {
 				return nil, errors.New("GetParents: " + err.Error())
@@ -1693,7 +1727,10 @@ func commonGetParents(ctx context.Context, cc *ContentfulClient, id string, cont
 
 		case ContentTypeProduct:
 			var parentVO CfProduct
-			byteArray, _ := json.Marshal(item)
+			byteArray, err := json.Marshal(item)
+			if err != nil {
+				return nil, errors.New("GetParents: " + err.Error())
+			}
 			err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&parentVO)
 			if err != nil {
 				return nil, errors.New("GetParents: " + err.Error())
