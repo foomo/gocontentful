@@ -15,7 +15,7 @@ import (
 	"github.com/foomo/gocontentful/erm"
 )
 
-var VERSION = "v1.0.26"
+var VERSION = "latest"
 
 type contentfulRc struct {
 	ManagementToken string `json:"managementToken"`
