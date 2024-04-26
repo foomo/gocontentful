@@ -1,43 +1,59 @@
 .DEFAULT_GOAL:=help
+-include .makerc
+
+# --- Targets -----------------------------------------------------------------
+
+# This allows us to accept extra arguments
+%:
+	@:
 
 ## === Tasks ===
 
+.PHONY: doc
+## Run tests
+doc:
+	@open "http://localhost:6060/pkg/github.com/foomo/contentful/"
+	@godoc -http=localhost:6060 -play
+
 ## Install binary
 install:
-	go build -o ${GOPATH}/bin/gocontenful main.go
+	@go build -o ${GOPATH}/bin/gocontenful main.go
 
 ## Build binary
 build:
-	mkdir -p bin
-	go build -o bin/gocontenful main.go
+	@mkdir -p bin
+	@go build -o bin/gocontenful main.go
 
 .PHONY: test
 
 ## Run tests
 test:
-	go run ./main.go -exportfile ./test/test-space-export.json ./test/testapi
-	go test -count=1 ./...
+	@go run ./main.go -exportfile ./test/test-space-export.json ./test/testapi
+	@go test -p 1 -coverprofile=coverage.out -race -json ./... | gotestfmt
 
-race:
-	go run ./main.go -exportfile ./test/test-space-export.json ./test/testapi
-	go test -race -count=1 ./...
-
-cover:
-	rm cover.out cover.html
-	go run ./main.go -exportfile ./test/test-space-export.json ./test/testapi
-	go test -cover -coverprofile cover.out -coverpkg=./test/testapi ./...
-	go tool cover -html=cover.out -o cover.html; open cover.html
+## Test & view coverage
+cover: test
+	@go tool cover -html=coverage.out -o coverage.html; open coverage.html
 
 .PHONY: lint
 ## Run linter
 lint:
-	golangci-lint run
+	@golangci-lint run
 
 .PHONY: lint.fix
 ## Fix lint violations
 lint.fix:
-	golangci-lint run --fix
+	@golangci-lint run --fix
 
+.PHONY: tidy
+## Run go mod tidy
+tidy:
+	@go mod tidy
+
+.PHONY: outdated
+## Show outdated direct dependencies
+outdated:
+	@go list -u -m -json all | go-mod-outdated -update -direct
 
 ## === Utils ===
 
