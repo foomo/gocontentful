@@ -51,8 +51,8 @@ type ContentTypeField struct {
 	Type            string                 `json:"type,omitempty"`
 	Items           *ContentTypeFieldItems `json:"items,omitempty"`
 	LinkType        string                 `json:"linkType,omitempty"`
-	Omitted 		bool `json:"omitted,omitempty"`
-	ReferencedTypes []string
+	Omitted         bool                   `json:"omitted,omitempty"`
+	ReferencedTypes []string               `json:"referencedTypes,omitempty"`
 }
 
 // ContentType VO

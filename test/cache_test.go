@@ -38,7 +38,7 @@ func TestCacheHasContentType(t *testing.T) {
 func TestGetAsset(t *testing.T) {
 	contentfulClient, err := getTestClient()
 	require.NoError(t, err)
-	_, err = contentfulClient.GetAssetByID("Xc0ny7GWsMEMCeASWO2um")
+	_, err = contentfulClient.GetAssetByID(context.TODO(), "Xc0ny7GWsMEMCeASWO2um")
 	require.NoError(t, err)
 	newAsset := testapi.NewAssetFromURL("12345", "https://example.com", "PNG", "New Asset")
 	require.NotNil(t, newAsset)
@@ -60,7 +60,7 @@ func TestDeleteAssetFromCache(t *testing.T) {
 func TestGetContentTypeOfID(t *testing.T) {
 	contentfulClient, err := getTestClient()
 	require.NoError(t, err)
-	contentType, err := contentfulClient.GetContentTypeOfID("651CQ8rLoIYCeY6G0QG22q")
+	contentType, err := contentfulClient.GetContentTypeOfID(context.TODO(), "651CQ8rLoIYCeY6G0QG22q")
 	require.NoError(t, err)
 	require.Equal(t, "brand", contentType)
 }
@@ -68,9 +68,9 @@ func TestGetContentTypeOfID(t *testing.T) {
 func TestGetParents(t *testing.T) {
 	contentfulClient, err := getTestClient()
 	require.NoError(t, err)
-	product, err := contentfulClient.GetProductByID("6dbjWqNd9SqccegcqYq224")
+	product, err := contentfulClient.GetProductByID(context.TODO(), "6dbjWqNd9SqccegcqYq224")
 	require.NoError(t, err)
-	brandRef := product.Brand()
+	brandRef := product.Brand(context.TODO())
 	brandParents, err := brandRef.GetParents(contentfulClient)
 	require.NoError(t, err)
 	require.Equal(t, 2, len(brandParents))
@@ -98,7 +98,7 @@ func TestPreserveCacheIfNewer(t *testing.T) {
 	require.NoError(t, err)
 	err = contentfulClient.UpdateCache(context.TODO(), nil, false)
 	require.NoError(t, err)
-	brand, err := contentfulClient.GetBrandByID("JrePkDVYomE8AwcuCUyMi")
+	brand, err := contentfulClient.GetBrandByID(context.TODO(), "JrePkDVYomE8AwcuCUyMi")
 	require.NoError(t, err)
 	require.Equal(t, 2.0, brand.Sys.Version)
 }

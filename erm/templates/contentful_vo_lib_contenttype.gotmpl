@@ -16,7 +16,7 @@ const ContentType{{ firstCap $contentType.Sys.ID }} = "{{ $contentType.Sys.ID }}
 
 // ---{{ firstCap $contentType.Sys.ID }} public methods---
 
-func (cc *ContentfulClient) GetAll{{ firstCap $contentType.Sys.ID }}() (voMap map[string]*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
+func (cc *ContentfulClient) GetAll{{ firstCap $contentType.Sys.ID }}(ctx context.Context) (voMap map[string]*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
 	if cc == nil {
 		return nil, errors.New("GetAll{{ firstCap $contentType.Sys.ID }}: No client available")
 	}
@@ -27,7 +27,7 @@ func (cc *ContentfulClient) GetAll{{ firstCap $contentType.Sys.ID }}() (voMap ma
 	if cacheInit {
 		return cc.Cache.entryMaps.{{ $contentType.Sys.ID }}, nil
 	}
-	col, err := cc.optimisticPageSizeGetAll("{{ $contentType.Sys.ID }}", optimisticPageSize)
+	col, err := cc.optimisticPageSizeGetAll(ctx, "{{ $contentType.Sys.ID }}", optimisticPageSize)
 	if err != nil {
 		return nil, err
 	}
@@ -42,11 +42,11 @@ func (cc *ContentfulClient) GetAll{{ firstCap $contentType.Sys.ID }}() (voMap ma
 	return {{ $contentType.Sys.ID }}Map, nil
 }
 
-func (cc *ContentfulClient) GetFiltered{{ firstCap $contentType.Sys.ID }}(query *contentful.Query) (voMap map[string]*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
+func (cc *ContentfulClient) GetFiltered{{ firstCap $contentType.Sys.ID }}(ctx context.Context, query *contentful.Query) (voMap map[string]*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
 	if cc == nil || cc.Client == nil {
 		return nil, errors.New("getFiltered{{ firstCap $contentType.Sys.ID }}: No client available")
 	}
-	col := cc.Client.Entries.List(cc.SpaceID)
+	col := cc.Client.Entries.List(ctx, cc.SpaceID)
 	if query != nil {
 		col.Query = *query
 	}
@@ -66,7 +66,7 @@ func (cc *ContentfulClient) GetFiltered{{ firstCap $contentType.Sys.ID }}(query 
 	return {{ $contentType.Sys.ID }}Map, nil
 }
 
-func (cc *ContentfulClient) Get{{ firstCap $contentType.Sys.ID }}ByID(id string, forceNoCache ...bool) (vo *Cf{{ firstCap $contentType.Sys.ID }}, err error) {
+func (cc *ContentfulClient) Get{{ firstCap $contentType.Sys.ID }}ByID(ctx context.Context, id string, forceNoCache ...bool) (vo *Cf{{ firstCap $contentType.Sys.ID }}, err error) {
 	if cc == nil || cc.Client == nil {
 		return nil, errors.New("Get{{ firstCap $contentType.Sys.ID }}ByID: No client available")
 	}
@@ -79,7 +79,7 @@ func (cc *ContentfulClient) Get{{ firstCap $contentType.Sys.ID }}ByID(id string,
 		}
 		return nil, fmt.Errorf("Get{{ firstCap $contentType.Sys.ID }}ByID: entry '%s' not found in cache", id)
 	}
-	col := cc.Client.Entries.List(cc.SpaceID)
+	col := cc.Client.Entries.List(ctx, cc.SpaceID)
 	col.Query.ContentType("{{ $contentType.Sys.ID }}").Locale("*").Include(0).Equal("sys.id",id)
 	_, err = col.GetAll()
 	if err != nil {
@@ -109,14 +109,14 @@ func NewCf{{ firstCap $contentType.Sys.ID }}(contentfulClient ...*ContentfulClie
 	cf{{ firstCap $contentType.Sys.ID }}.Sys.ContentType.Sys.LinkType = "ContentType"
 	return
 }
-func (vo *Cf{{ firstCap $contentType.Sys.ID }}) GetParents(contentType ...string) (parents []EntryReference, err error) {
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) GetParents(ctx context.Context, contentType ...string) (parents []EntryReference, err error) {
 	if vo == nil {
 		return nil, errors.New("GetParents: Value Object is nil")
 	}
 	if vo.CC == nil {
         return nil, errors.New("GetParents: Value Object has no Contentful Client set")
     }
-	return commonGetParents(vo.CC, vo.Sys.ID, contentType)
+	return commonGetParents(ctx, vo.CC, vo.Sys.ID, contentType)
 }
 
 func (vo *Cf{{ firstCap $contentType.Sys.ID }}) GetPublishingStatus() string {
@@ -212,7 +212,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 }
 {{ end }}
 {{ if fieldIsMultipleReference $field }}
-func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale ...Locale) []*EntryReference {
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(ctx context.Context, locale ...Locale) []*EntryReference {
 	if vo == nil {
 		return nil
 	}
@@ -248,7 +248,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 		}
 	}
 	for _, eachLocalized{{ firstCap $field.ID }} := range vo.Fields.{{ firstCap $field.ID }}[string(loc)] {
-		contentType, err := vo.CC.GetContentTypeOfID(eachLocalized{{ firstCap $field.ID }}.Sys.ID)
+		contentType, err := vo.CC.GetContentTypeOfID(ctx, eachLocalized{{ firstCap $field.ID }}.Sys.ID)
 		if err != nil {
 			if vo.CC.logFn != nil && vo.CC.logLevel <= LogError {
 				vo.CC.logFn(map[string]interface{}{"content type":vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method":"{{ firstCap $field.ID }}()"}, LogError, ErrNoTypeOfRefEntry)
@@ -258,7 +258,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 		switch contentType {
 		{{ range $index , $contentType := $contentTypes }}
 		case ContentType{{ firstCap $contentType.Sys.ID }}:
-			referencedVO, err := vo.CC.Get{{ firstCap $contentType.Sys.ID }}ByID(eachLocalized{{ firstCap $field.ID }}.Sys.ID)
+			referencedVO, err := vo.CC.Get{{ firstCap $contentType.Sys.ID }}ByID(ctx, eachLocalized{{ firstCap $field.ID }}.Sys.ID)
 			if err != nil {
 			if vo.CC.logFn != nil && vo.CC.logLevel <= LogError {
 				vo.CC.logFn(map[string]interface{}{"content type":vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method":"{{ firstCap $field.ID }}()"}, LogError, err)
@@ -273,7 +273,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 }
 {{ end }}
 {{ if fieldIsReference $field }}
-func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale ...Locale) *EntryReference {
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(ctx context.Context, locale ...Locale) *EntryReference {
 	if vo == nil {
 		return nil
 	}
@@ -308,7 +308,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 		}
 	}
 	localized{{ firstCap $field.ID }} := vo.Fields.{{ firstCap $field.ID }}[string(loc)]
-	contentType, err := vo.CC.GetContentTypeOfID(localized{{ firstCap $field.ID }}.Sys.ID)
+	contentType, err := vo.CC.GetContentTypeOfID(ctx, localized{{ firstCap $field.ID }}.Sys.ID)
 	if err != nil {
 		if vo.CC.logFn != nil && vo.CC.logLevel <= LogError {
 			vo.CC.logFn(map[string]interface{}{"content type":vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method":"{{ firstCap $field.ID }}()"}, LogError, ErrNoTypeOfRefEntry)
@@ -318,7 +318,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 	switch contentType {
 	{{ range $index , $contentType := $contentTypes }}
 	case ContentType{{ firstCap $contentType.Sys.ID }}:
-		referencedVO, err := vo.CC.Get{{ firstCap $contentType.Sys.ID }}ByID(localized{{ firstCap $field.ID }}.Sys.ID)
+		referencedVO, err := vo.CC.Get{{ firstCap $contentType.Sys.ID }}ByID(ctx, localized{{ firstCap $field.ID }}.Sys.ID)
 		if err != nil {
 			if vo.CC.logFn != nil && vo.CC.logLevel <= LogError {
 				vo.CC.logFn(map[string]interface{}{"content type":vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method":"{{ firstCap $field.ID }}()"}, LogError, err)
@@ -332,7 +332,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 }
 {{ end }}
 {{ if fieldIsMultipleAsset $field }}
-func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale ...Locale) []*contentful.AssetNoLocale {
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(ctx context.Context, locale ...Locale) []*contentful.AssetNoLocale {
 	if vo == nil {
 		return nil
 	}
@@ -370,7 +370,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 		}
 	}
 	for _, eachLocalized{{ firstCap $field.ID }} := range vo.Fields.{{ firstCap $field.ID }}[string(loc)] {
-		asset, err := vo.CC.GetAssetByID(eachLocalized{{ firstCap $field.ID }}.Sys.ID)
+		asset, err := vo.CC.GetAssetByID(ctx, eachLocalized{{ firstCap $field.ID }}.Sys.ID)
 		if err != nil {
 			if vo.CC.logFn != nil && vo.CC.logLevel == LogDebug {
 				vo.CC.logFn(map[string]interface{}{"content type":vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method":"{{ firstCap $field.ID }}()"}, LogError, ErrNoTypeOfRefAsset)
@@ -401,7 +401,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 }
 {{ end }}
 {{ if fieldIsAsset $field }}
-func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale ...Locale) *contentful.AssetNoLocale {
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(ctx context.Context, locale ...Locale) *contentful.AssetNoLocale {
 	if vo == nil {
 		return nil
 	}
@@ -438,7 +438,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 		}
 	}
 	localized{{ firstCap $field.ID }} := vo.Fields.{{ firstCap $field.ID }}[string(loc)]
-	asset, err := vo.CC.GetAssetByID(localized{{ firstCap $field.ID }}.Sys.ID)
+	asset, err := vo.CC.GetAssetByID(ctx, localized{{ firstCap $field.ID }}.Sys.ID)
 	if err != nil {
 		if vo.CC.logFn != nil && vo.CC.logLevel == LogDebug {
 			vo.CC.logFn(map[string]interface{}{"content type":vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method":"{{ firstCap $field.ID }}()"}, LogError, ErrNoTypeOfRefAsset)
@@ -490,7 +490,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) Set{{ firstCap $field.ID }}({{ $
 	return
 }
 {{ end }}
-func (vo *Cf{{ firstCap $contentType.Sys.ID }}) UpsertEntry() (err error) {
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) UpsertEntry(ctx context.Context) (err error) {
 	if vo == nil {
 		return errors.New("UpsertEntry: Value Object is nil")
 	}
@@ -510,13 +510,13 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) UpsertEntry() (err error) {
 		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} UpsertEntry: Can't unmarshal JSON into CF entry")
 	}
 
-	err = vo.CC.Client.Entries.Upsert(vo.CC.SpaceID, cfEntry)
+	err = vo.CC.Client.Entries.Upsert(ctx, vo.CC.SpaceID, cfEntry)
 	if err != nil {
 		return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} UpsertEntry: Operation failed: %w", err)
 	}
 	return
 }
-func (vo *Cf{{ firstCap $contentType.Sys.ID }}) PublishEntry() (err error) {
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) PublishEntry(ctx context.Context) (err error) {
 	if vo == nil {
 		return errors.New("PublishEntry: Value Object is nil")
 	}
@@ -535,13 +535,13 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) PublishEntry() (err error) {
 	if errUnmarshal != nil {
 		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} PublishEntry: Can't unmarshal JSON into CF entry")
 	}
-	err = vo.CC.Client.Entries.Publish(vo.CC.SpaceID, cfEntry)
+	err = vo.CC.Client.Entries.Publish(ctx, vo.CC.SpaceID, cfEntry)
 	if err != nil {
 		return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} PublishEntry: publish operation failed: %w", err)
 	}
 	return
 }
-func (vo *Cf{{ firstCap $contentType.Sys.ID }}) UnpublishEntry() (err error) {
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) UnpublishEntry(ctx context.Context) (err error) {
 	if vo == nil {
 		return errors.New("UnpublishEntry: Value Object is nil")
 	}
@@ -560,13 +560,13 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) UnpublishEntry() (err error) {
 	if errUnmarshal != nil {
 		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} UnpublishEntry: Can't unmarshal JSON into CF entry")
 	}
-	err = vo.CC.Client.Entries.Unpublish(vo.CC.SpaceID, cfEntry)
+	err = vo.CC.Client.Entries.Unpublish(ctx, vo.CC.SpaceID, cfEntry)
 	if err != nil {
 		return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} UnpublishEntry: unpublish operation failed: %w", err)
 	}
 	return
 }
-func (vo *Cf{{ firstCap $contentType.Sys.ID }}) UpdateEntry() (err error) {
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) UpdateEntry(ctx context.Context) (err error) {
 	if vo == nil {
 		return errors.New("UpdateEntry: Value Object is nil")
 	}
@@ -586,7 +586,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) UpdateEntry() (err error) {
 		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} UpdateEntry: Can't unmarshal JSON into CF entry")
 	}
 
-	err = vo.CC.Client.Entries.Upsert(vo.CC.SpaceID, cfEntry)
+	err = vo.CC.Client.Entries.Upsert(ctx, vo.CC.SpaceID, cfEntry)
 	if err != nil {
 		return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} UpdateEntry: upsert operation failed: %w", err)
 	}
@@ -598,13 +598,13 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) UpdateEntry() (err error) {
 	if errUnmarshal != nil {
 		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} UpdateEntry: Can't unmarshal JSON back into VO")
 	}
-	err = vo.CC.Client.Entries.Publish(vo.CC.SpaceID, cfEntry)
+	err = vo.CC.Client.Entries.Publish(ctx, vo.CC.SpaceID, cfEntry)
 	if err != nil {
 		return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} UpdateEntry: publish operation failed: %w", err)
 	}
 	return
 }
-func (vo *Cf{{ firstCap $contentType.Sys.ID }}) DeleteEntry() (err error) {
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) DeleteEntry(ctx context.Context) (err error) {
 	if vo == nil {
 		return errors.New("DeleteEntry: Value Object is nil")
 	}
@@ -624,12 +624,12 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) DeleteEntry() (err error) {
 		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} DeleteEntry: Can't unmarshal JSON into CF entry")
 	}
 	if cfEntry.Sys.PublishedCounter > 0 {
-		errUnpublish := vo.CC.Client.Entries.Unpublish(vo.CC.SpaceID, cfEntry)
+		errUnpublish := vo.CC.Client.Entries.Unpublish(ctx, vo.CC.SpaceID, cfEntry)
 		if errUnpublish != nil && !strings.Contains(errUnpublish.Error(), "Not published")  {
 			return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} DeleteEntry: Unpublish entry failed: %w", errUnpublish)
 		}
 	}
-	errDelete := vo.CC.Client.Entries.Delete(vo.CC.SpaceID, cfEntry.Sys.ID)
+	errDelete := vo.CC.Client.Entries.Delete(ctx, vo.CC.SpaceID, cfEntry.Sys.ID)
 	if errDelete != nil {
 		return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} DeleteEntry: Delete entry failed: %w", errDelete)
 	}
@@ -662,7 +662,7 @@ func (cc *ContentfulClient) cacheAll{{ firstCap $contentType.Sys.ID }}(ctx conte
 			}
 		}
 	} else {
-		col, err = cc.optimisticPageSizeGetAll("{{ $contentType.Sys.ID }}", cc.optimisticPageSize)
+		col, err = cc.optimisticPageSizeGetAll(ctx, "{{ $contentType.Sys.ID }}", cc.optimisticPageSize)
 		if err != nil {
 			return nil, errors.New("optimisticPageSizeGetAll for {{ firstCap $contentType.Sys.ID }} failed: "+err.Error())
 		}
@@ -674,7 +674,7 @@ func (cc *ContentfulClient) cacheAll{{ firstCap $contentType.Sys.ID }}(ctx conte
 	{{ $contentType.Sys.ID }}Map := map[string]*Cf{{ firstCap $contentType.Sys.ID }}{}
 	for _, {{ $contentType.Sys.ID }} := range all{{ firstCap $contentType.Sys.ID }} {
 		if cc.cacheInit {
-            existing{{ firstCap $contentType.Sys.ID }}, err := cc.Get{{ firstCap $contentType.Sys.ID }}ByID({{ $contentType.Sys.ID }}.Sys.ID)
+            existing{{ firstCap $contentType.Sys.ID }}, err := cc.Get{{ firstCap $contentType.Sys.ID }}ByID(ctx, {{ $contentType.Sys.ID }}.Sys.ID)
             if err == nil && existing{{ firstCap $contentType.Sys.ID }} != nil && existing{{ firstCap $contentType.Sys.ID }}.Sys.Version > {{ $contentType.Sys.ID }}.Sys.Version {
                 return nil, fmt.Errorf("cache update canceled because {{ firstCap $contentType.Sys.ID }} entry %s is newer in cache", {{ $contentType.Sys.ID }}.Sys.ID)
             }
@@ -735,7 +735,7 @@ func (cc *ContentfulClient) cache{{ firstCap $contentType.Sys.ID }}ByID(ctx cont
 	defer cc.cacheMutex.idContentTypeMapGcLock.Unlock()
 	cc.cacheMutex.parentMapGcLock.Lock()
 	defer cc.cacheMutex.parentMapGcLock.Unlock()
-	
+
 	var col *contentful.Collection
 	if entryPayload != nil {
 		col = &contentful.Collection{
@@ -747,13 +747,13 @@ func (cc *ContentfulClient) cache{{ firstCap $contentType.Sys.ID }}ByID(ctx cont
 			return errors.New("cache{{ firstCap $contentType.Sys.ID }}ByID: No client available")
 		}
 		if !entryDelete {
-			col = cc.Client.Entries.List(cc.SpaceID)
+			col = cc.Client.Entries.List(ctx, cc.SpaceID)
 			col.Query.ContentType("{{ $contentType.Sys.ID }}").Locale("*").Include(0).Equal("sys.id", id)
 			_, err := col.GetAll()
 			if err != nil {
 				return err
 			}
-		}	
+		}
 	}
 	// It was deleted
 	if col != nil && len(col.Items) == 0 || entryDelete {
@@ -833,7 +833,7 @@ func (cc *ContentfulClient) cache{{ firstCap $contentType.Sys.ID }}ByID(ctx cont
 	for childID, parents := range cc.Cache.parentMap {
 		if _, isCollectedChildID := allChildrensIds[childID]; isCollectedChildID {
 			continue
-		} 
+		}
 		newParents := []EntryReference{}
 		for _, parent := range parents {
 			if parent.ID != id {
@@ -855,11 +855,11 @@ func colToCf{{ firstCap $contentType.Sys.ID }}(col *contentful.Collection, cc *C
 		}
 		if cc.textJanitor {
 			{{ range $fieldIndex, $field := $contentType.Fields }}
-			{{ if or (fieldIsSymbol $field) (fieldIsText $field) }} 
+			{{ if or (fieldIsSymbol $field) (fieldIsText $field) }}
 			vo.Fields.{{ firstCap $field.ID }} = cleanUpStringField(vo.Fields.{{ firstCap $field.ID }}){{ end }}
-			{{ if fieldIsSymbolList $field }} 
+			{{ if fieldIsSymbolList $field }}
 			vo.Fields.{{ firstCap $field.ID }} = cleanUpStringSliceField(vo.Fields.{{ firstCap $field.ID }}){{ end }}
-			{{ if fieldIsRichText $field }} 
+			{{ if fieldIsRichText $field }}
 			vo.Fields.{{ firstCap $field.ID }} = cleanUpRichTextField(vo.Fields.{{ firstCap $field.ID }}){{ end }}
 			{{ end }}
 		}

@@ -273,18 +273,18 @@ func (ref ContentfulReferencedEntry) ContentType() (contentType string) {
 	return ref.Entry.Sys.ContentType.Sys.ID
 }
 
-func (cc *ContentfulClient) DeleteAsset(asset *contentful.Asset) error {
+func (cc *ContentfulClient) DeleteAsset(ctx context.Context, asset *contentful.Asset) error {
 	if cc == nil || cc.Client == nil {
 		return errors.New("DeleteAsset: No client available")
 	}
 	if cc.clientMode != ClientModeCMA {
 		return errors.New("DeleteAsset: Only available in ClientModeCMA")
 	}
-	errUnpublish := cc.Client.Assets.Unpublish(cc.SpaceID, asset)
+	errUnpublish := cc.Client.Assets.Unpublish(ctx, cc.SpaceID, asset)
 	if errUnpublish != nil && !strings.Contains(errUnpublish.Error(), "Not published") {
 		return errUnpublish
 	}
-	errDelete := cc.Client.Assets.Delete(cc.SpaceID, asset)
+	errDelete := cc.Client.Assets.Delete(ctx, cc.SpaceID, asset)
 	if errDelete != nil {
 		return errDelete
 	}
@@ -303,11 +303,11 @@ func (cc *ContentfulClient) EnableTextJanitor() {
 	cc.textJanitor = true
 }
 
-func (cc *ContentfulClient) GetAllAssets() (map[string]*contentful.Asset, error) {
-	return cc.getAllAssets(true)
+func (cc *ContentfulClient) GetAllAssets(ctx context.Context) (map[string]*contentful.Asset, error) {
+	return cc.getAllAssets(ctx, true)
 }
 
-func (cc *ContentfulClient) GetAssetByID(id string, forceNoCache ...bool) (*contentful.Asset, error) {
+func (cc *ContentfulClient) GetAssetByID(ctx context.Context, id string, forceNoCache ...bool) (*contentful.Asset, error) {
 	if cc == nil || cc.Client == nil {
 		return nil, errors.New("GetAssetByID: No client available")
 	}
@@ -324,7 +324,7 @@ func (cc *ContentfulClient) GetAssetByID(id string, forceNoCache ...bool) (*cont
 			return nil, errors.New("GetAssetByID: not found")
 		}
 	}
-	col := cc.Client.Assets.List(cc.SpaceID)
+	col := cc.Client.Assets.List(ctx, cc.SpaceID)
 	col.Query.Locale("*").Equal("sys.id", id)
 	_, err := col.Next()
 	if err != nil {
@@ -351,7 +351,7 @@ func (cc *ContentfulClient) GetAssetByID(id string, forceNoCache ...bool) (*cont
 	return &asset, nil
 }
 
-func (cc *ContentfulClient) GetContentTypeOfID(id string) (string, error) {
+func (cc *ContentfulClient) GetContentTypeOfID(ctx context.Context, id string) (string, error) {
 	if cc == nil || cc.Client == nil {
 		return "", errors.New("GetContentTypeOfID: No client available")
 	}
@@ -384,7 +384,7 @@ func (cc *ContentfulClient) GetContentTypeOfID(id string) (string, error) {
 
 		return "", fmt.Errorf("GetContentTypeOfID: %s Not found in cache", id)
 	}
-	col := cc.Client.Entries.List(cc.SpaceID)
+	col := cc.Client.Entries.List(ctx, cc.SpaceID)
 	col.Query.Include(0).Equal("sys.id", id)
 	_, err := col.GetAll()
 	if err != nil {
@@ -478,7 +478,7 @@ func NewAssetFromURL(id string, uploadUrl string, imageFileType string, title st
 	return asset
 }
 
-func NewContentfulClient(spaceID string, clientMode ClientMode, clientKey string, optimisticPageSize uint16, logFn func(fields map[string]interface{}, level int, args ...interface{}), logLevel int, debug bool) (*ContentfulClient, error) {
+func NewContentfulClient(ctx context.Context, spaceID string, clientMode ClientMode, clientKey string, optimisticPageSize uint16, logFn func(fields map[string]interface{}, level int, args ...interface{}), logLevel int, debug bool) (*ContentfulClient, error) {
 	if spaceID == "" {
 		return nil, errors.New("NewContentfulClient: SpaceID cannot be empty")
 	}
@@ -529,7 +529,7 @@ func NewContentfulClient(spaceID string, clientMode ClientMode, clientKey string
 		SpaceID:            spaceID,
 		sync:               clientMode == ClientModeCDA,
 	}
-	_, err = cc.Client.Spaces.Get(spaceID)
+	_, err = cc.Client.Spaces.Get(ctx, spaceID)
 	if err != nil {
 		_, ok := err.(contentful.NotFoundError)
 		if ok {
@@ -718,6 +718,7 @@ func (cc *ContentfulClient) syncCache(ctx context.Context, contentTypes []string
 	for {
 		cc.cacheMutex.sharedDataGcLock.RLock()
 		col := cc.Client.Entries.Sync(
+			ctx,
 			cc.SpaceID,
 			cc.syncToken == "",
 			cc.syncToken,
@@ -801,7 +802,7 @@ func (cc *ContentfulClient) cacheSpace(ctx context.Context, contentTypes []strin
 	if cacheAssets {
 		contentTypes = append([]string{assetWorkerType}, contentTypes...)
 	}
-	_, errCanWeEvenConnect := cc.Client.Spaces.Get(cc.SpaceID)
+	_, errCanWeEvenConnect := cc.Client.Spaces.Get(ctx, cc.SpaceID)
 	cc.cacheMutex.sharedDataGcLock.RLock()
 	offlinePreviousState := cc.offline
 	cc.cacheMutex.sharedDataGcLock.RUnlock()
@@ -931,7 +932,7 @@ func (cc *ContentfulClient) cacheGcAssetByID(ctx context.Context, id string, ass
 		if cc.Client == nil {
 			return errors.New("cacheGcAssetByID: No client available")
 		}
-		col := cc.Client.Assets.List(cc.SpaceID)
+		col := cc.Client.Assets.List(ctx, cc.SpaceID)
 		col.Query.Locale("*").Equal("sys.id", id)
 		_, err := col.Next()
 		if err != nil {
@@ -1010,7 +1011,7 @@ func getContentfulAPIClient(clientMode ClientMode, clientKey string) (*contentfu
 	}
 }
 
-func (cc *ContentfulClient) getAllAssets(tryCacheFirst bool) (map[string]*contentful.Asset, error) {
+func (cc *ContentfulClient) getAllAssets(ctx context.Context, tryCacheFirst bool) (map[string]*contentful.Asset, error) {
 	if cc == nil || cc.Client == nil {
 		return nil, errors.New("getAllAssets: No client available")
 	}
@@ -1029,7 +1030,7 @@ func (cc *ContentfulClient) getAllAssets(tryCacheFirst bool) (map[string]*conten
 			allItems = append(allItems, asset)
 		}
 	} else {
-		col := cc.Client.Assets.List(cc.SpaceID)
+		col := cc.Client.Assets.List(ctx, cc.SpaceID)
 		col.Query.Locale("*").Limit(assetPageSize)
 		for {
 			_, err := col.Next()
@@ -1075,8 +1076,8 @@ func getOfflineSpaceFromFile(filename string) (*offlineTemp, error) {
 	return offlineTemp, nil
 }
 
-func (cc *ContentfulClient) optimisticPageSizeGetAll(contentType string, limit uint16) (*contentful.Collection, error) {
-	col := cc.Client.Entries.List(cc.SpaceID)
+func (cc *ContentfulClient) optimisticPageSizeGetAll(ctx context.Context, contentType string, limit uint16) (*contentful.Collection, error) {
+	col := cc.Client.Entries.List(ctx, cc.SpaceID)
 	col.Query.ContentType(contentType).Locale("*").Include(0).Limit(limit)
 	allItems := []interface{}{}
 	var err error
@@ -1095,7 +1096,7 @@ func (cc *ContentfulClient) optimisticPageSizeGetAll(contentType string, limit u
 	case contentful.ErrorResponse:
 		msg := errTyped.Message
 		if strings.Contains(msg, "Response size too big") && limit >= 20 {
-			smallerPageCol, err := cc.optimisticPageSizeGetAll(contentType, limit/2)
+			smallerPageCol, err := cc.optimisticPageSizeGetAll(ctx, contentType, limit/2)
 			return smallerPageCol, err
 		}
 		return nil, err
@@ -1544,7 +1545,7 @@ func updateCacheForContentType(ctx context.Context, results chan ContentTypeResu
 		}
 
 	case assetWorkerType:
-		allAssets, err := cc.getAllAssets(false)
+		allAssets, err := cc.getAllAssets(ctx, false)
 		if err != nil {
 			return errors.New("updateCacheForContentType failed for assets")
 		}
@@ -1622,7 +1623,7 @@ func updateCacheForContentTypeAndEntity(ctx context.Context, cc *ContentfulClien
 	return nil
 }
 
-func commonGetParents(cc *ContentfulClient, id string, contentType []string) (parents []EntryReference, err error) {
+func commonGetParents(ctx context.Context, cc *ContentfulClient, id string, contentType []string) (parents []EntryReference, err error) {
 	parents = []EntryReference{}
 	cc.cacheMutex.sharedDataGcLock.RLock()
 	cacheInit := cc.cacheInit
@@ -1640,7 +1641,7 @@ func commonGetParents(cc *ContentfulClient, id string, contentType []string) (pa
 		}
 		return cc.Cache.parentMap[id], nil
 	}
-	col := cc.Client.Entries.List(cc.SpaceID)
+	col := cc.Client.Entries.List(ctx, cc.SpaceID)
 	col.Query.Equal("links_to_entry", id).Locale("*")
 	_, err = col.GetAll()
 	if err != nil {

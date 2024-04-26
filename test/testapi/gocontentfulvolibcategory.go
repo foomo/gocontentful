@@ -18,7 +18,7 @@ const ContentTypeCategory = "category"
 
 // ---Category public methods---
 
-func (cc *ContentfulClient) GetAllCategory() (voMap map[string]*CfCategory, err error) {
+func (cc *ContentfulClient) GetAllCategory(ctx context.Context) (voMap map[string]*CfCategory, err error) {
 	if cc == nil {
 		return nil, errors.New("GetAllCategory: No client available")
 	}
@@ -29,7 +29,7 @@ func (cc *ContentfulClient) GetAllCategory() (voMap map[string]*CfCategory, err 
 	if cacheInit {
 		return cc.Cache.entryMaps.category, nil
 	}
-	col, err := cc.optimisticPageSizeGetAll("category", optimisticPageSize)
+	col, err := cc.optimisticPageSizeGetAll(ctx, "category", optimisticPageSize)
 	if err != nil {
 		return nil, err
 	}
@@ -44,11 +44,11 @@ func (cc *ContentfulClient) GetAllCategory() (voMap map[string]*CfCategory, err 
 	return categoryMap, nil
 }
 
-func (cc *ContentfulClient) GetFilteredCategory(query *contentful.Query) (voMap map[string]*CfCategory, err error) {
+func (cc *ContentfulClient) GetFilteredCategory(ctx context.Context, query *contentful.Query) (voMap map[string]*CfCategory, err error) {
 	if cc == nil || cc.Client == nil {
 		return nil, errors.New("getFilteredCategory: No client available")
 	}
-	col := cc.Client.Entries.List(cc.SpaceID)
+	col := cc.Client.Entries.List(ctx, cc.SpaceID)
 	if query != nil {
 		col.Query = *query
 	}
@@ -68,7 +68,7 @@ func (cc *ContentfulClient) GetFilteredCategory(query *contentful.Query) (voMap 
 	return categoryMap, nil
 }
 
-func (cc *ContentfulClient) GetCategoryByID(id string, forceNoCache ...bool) (vo *CfCategory, err error) {
+func (cc *ContentfulClient) GetCategoryByID(ctx context.Context, id string, forceNoCache ...bool) (vo *CfCategory, err error) {
 	if cc == nil || cc.Client == nil {
 		return nil, errors.New("GetCategoryByID: No client available")
 	}
@@ -81,7 +81,7 @@ func (cc *ContentfulClient) GetCategoryByID(id string, forceNoCache ...bool) (vo
 		}
 		return nil, fmt.Errorf("GetCategoryByID: entry '%s' not found in cache", id)
 	}
-	col := cc.Client.Entries.List(cc.SpaceID)
+	col := cc.Client.Entries.List(ctx, cc.SpaceID)
 	col.Query.ContentType("category").Locale("*").Include(0).Equal("sys.id", id)
 	_, err = col.GetAll()
 	if err != nil {
@@ -115,14 +115,14 @@ func NewCfCategory(contentfulClient ...*ContentfulClient) (cfCategory *CfCategor
 	cfCategory.Sys.ContentType.Sys.LinkType = "ContentType"
 	return
 }
-func (vo *CfCategory) GetParents(contentType ...string) (parents []EntryReference, err error) {
+func (vo *CfCategory) GetParents(ctx context.Context, contentType ...string) (parents []EntryReference, err error) {
 	if vo == nil {
 		return nil, errors.New("GetParents: Value Object is nil")
 	}
 	if vo.CC == nil {
 		return nil, errors.New("GetParents: Value Object has no Contentful Client set")
 	}
-	return commonGetParents(vo.CC, vo.Sys.ID, contentType)
+	return commonGetParents(ctx, vo.CC, vo.Sys.ID, contentType)
 }
 
 func (vo *CfCategory) GetPublishingStatus() string {
@@ -177,7 +177,7 @@ func (vo *CfCategory) Title(locale ...Locale) string {
 	return vo.Fields.Title[string(loc)]
 }
 
-func (vo *CfCategory) Icon(locale ...Locale) *contentful.AssetNoLocale {
+func (vo *CfCategory) Icon(ctx context.Context, locale ...Locale) *contentful.AssetNoLocale {
 	if vo == nil {
 		return nil
 	}
@@ -214,7 +214,7 @@ func (vo *CfCategory) Icon(locale ...Locale) *contentful.AssetNoLocale {
 		}
 	}
 	localizedIcon := vo.Fields.Icon[string(loc)]
-	asset, err := vo.CC.GetAssetByID(localizedIcon.Sys.ID)
+	asset, err := vo.CC.GetAssetByID(ctx, localizedIcon.Sys.ID)
 	if err != nil {
 		if vo.CC.logFn != nil && vo.CC.logLevel == LogDebug {
 			vo.CC.logFn(map[string]interface{}{"content type": vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method": "Icon()"}, LogError, ErrNoTypeOfRefAsset)
@@ -341,7 +341,7 @@ func (vo *CfCategory) SetCategoryDescription(categoryDescription string, locale 
 	return
 }
 
-func (vo *CfCategory) UpsertEntry() (err error) {
+func (vo *CfCategory) UpsertEntry(ctx context.Context) (err error) {
 	if vo == nil {
 		return errors.New("UpsertEntry: Value Object is nil")
 	}
@@ -361,13 +361,13 @@ func (vo *CfCategory) UpsertEntry() (err error) {
 		return errors.New("CfCategory UpsertEntry: Can't unmarshal JSON into CF entry")
 	}
 
-	err = vo.CC.Client.Entries.Upsert(vo.CC.SpaceID, cfEntry)
+	err = vo.CC.Client.Entries.Upsert(ctx, vo.CC.SpaceID, cfEntry)
 	if err != nil {
 		return fmt.Errorf("CfCategory UpsertEntry: Operation failed: %w", err)
 	}
 	return
 }
-func (vo *CfCategory) PublishEntry() (err error) {
+func (vo *CfCategory) PublishEntry(ctx context.Context) (err error) {
 	if vo == nil {
 		return errors.New("PublishEntry: Value Object is nil")
 	}
@@ -386,13 +386,13 @@ func (vo *CfCategory) PublishEntry() (err error) {
 	if errUnmarshal != nil {
 		return errors.New("CfCategory PublishEntry: Can't unmarshal JSON into CF entry")
 	}
-	err = vo.CC.Client.Entries.Publish(vo.CC.SpaceID, cfEntry)
+	err = vo.CC.Client.Entries.Publish(ctx, vo.CC.SpaceID, cfEntry)
 	if err != nil {
 		return fmt.Errorf("CfCategory PublishEntry: publish operation failed: %w", err)
 	}
 	return
 }
-func (vo *CfCategory) UnpublishEntry() (err error) {
+func (vo *CfCategory) UnpublishEntry(ctx context.Context) (err error) {
 	if vo == nil {
 		return errors.New("UnpublishEntry: Value Object is nil")
 	}
@@ -411,13 +411,13 @@ func (vo *CfCategory) UnpublishEntry() (err error) {
 	if errUnmarshal != nil {
 		return errors.New("CfCategory UnpublishEntry: Can't unmarshal JSON into CF entry")
 	}
-	err = vo.CC.Client.Entries.Unpublish(vo.CC.SpaceID, cfEntry)
+	err = vo.CC.Client.Entries.Unpublish(ctx, vo.CC.SpaceID, cfEntry)
 	if err != nil {
 		return fmt.Errorf("CfCategory UnpublishEntry: unpublish operation failed: %w", err)
 	}
 	return
 }
-func (vo *CfCategory) UpdateEntry() (err error) {
+func (vo *CfCategory) UpdateEntry(ctx context.Context) (err error) {
 	if vo == nil {
 		return errors.New("UpdateEntry: Value Object is nil")
 	}
@@ -437,7 +437,7 @@ func (vo *CfCategory) UpdateEntry() (err error) {
 		return errors.New("CfCategory UpdateEntry: Can't unmarshal JSON into CF entry")
 	}
 
-	err = vo.CC.Client.Entries.Upsert(vo.CC.SpaceID, cfEntry)
+	err = vo.CC.Client.Entries.Upsert(ctx, vo.CC.SpaceID, cfEntry)
 	if err != nil {
 		return fmt.Errorf("CfCategory UpdateEntry: upsert operation failed: %w", err)
 	}
@@ -449,13 +449,13 @@ func (vo *CfCategory) UpdateEntry() (err error) {
 	if errUnmarshal != nil {
 		return errors.New("CfCategory UpdateEntry: Can't unmarshal JSON back into VO")
 	}
-	err = vo.CC.Client.Entries.Publish(vo.CC.SpaceID, cfEntry)
+	err = vo.CC.Client.Entries.Publish(ctx, vo.CC.SpaceID, cfEntry)
 	if err != nil {
 		return fmt.Errorf("CfCategory UpdateEntry: publish operation failed: %w", err)
 	}
 	return
 }
-func (vo *CfCategory) DeleteEntry() (err error) {
+func (vo *CfCategory) DeleteEntry(ctx context.Context) (err error) {
 	if vo == nil {
 		return errors.New("DeleteEntry: Value Object is nil")
 	}
@@ -475,12 +475,12 @@ func (vo *CfCategory) DeleteEntry() (err error) {
 		return errors.New("CfCategory DeleteEntry: Can't unmarshal JSON into CF entry")
 	}
 	if cfEntry.Sys.PublishedCounter > 0 {
-		errUnpublish := vo.CC.Client.Entries.Unpublish(vo.CC.SpaceID, cfEntry)
+		errUnpublish := vo.CC.Client.Entries.Unpublish(ctx, vo.CC.SpaceID, cfEntry)
 		if errUnpublish != nil && !strings.Contains(errUnpublish.Error(), "Not published") {
 			return fmt.Errorf("CfCategory DeleteEntry: Unpublish entry failed: %w", errUnpublish)
 		}
 	}
-	errDelete := vo.CC.Client.Entries.Delete(vo.CC.SpaceID, cfEntry.Sys.ID)
+	errDelete := vo.CC.Client.Entries.Delete(ctx, vo.CC.SpaceID, cfEntry.Sys.ID)
 	if errDelete != nil {
 		return fmt.Errorf("CfCategory DeleteEntry: Delete entry failed: %w", errDelete)
 	}
@@ -513,7 +513,7 @@ func (cc *ContentfulClient) cacheAllCategory(ctx context.Context, resultChan cha
 			}
 		}
 	} else {
-		col, err = cc.optimisticPageSizeGetAll("category", cc.optimisticPageSize)
+		col, err = cc.optimisticPageSizeGetAll(ctx, "category", cc.optimisticPageSize)
 		if err != nil {
 			return nil, errors.New("optimisticPageSizeGetAll for Category failed: " + err.Error())
 		}
@@ -525,7 +525,7 @@ func (cc *ContentfulClient) cacheAllCategory(ctx context.Context, resultChan cha
 	categoryMap := map[string]*CfCategory{}
 	for _, category := range allCategory {
 		if cc.cacheInit {
-			existingCategory, err := cc.GetCategoryByID(category.Sys.ID)
+			existingCategory, err := cc.GetCategoryByID(ctx, category.Sys.ID)
 			if err == nil && existingCategory != nil && existingCategory.Sys.Version > category.Sys.Version {
 				return nil, fmt.Errorf("cache update canceled because Category entry %s is newer in cache", category.Sys.ID)
 			}
@@ -571,7 +571,7 @@ func (cc *ContentfulClient) cacheCategoryByID(ctx context.Context, id string, en
 			return errors.New("cacheCategoryByID: No client available")
 		}
 		if !entryDelete {
-			col = cc.Client.Entries.List(cc.SpaceID)
+			col = cc.Client.Entries.List(ctx, cc.SpaceID)
 			col.Query.ContentType("category").Locale("*").Include(0).Equal("sys.id", id)
 			_, err := col.GetAll()
 			if err != nil {

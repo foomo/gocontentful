@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -134,7 +135,7 @@ func main() {
 		}
 	}
 
-	err = erm.GenerateAPI(filepath.Dir(path), packageName, conf.SpaceID, cmaKey, conf.Environment, conf.ExportFile, cleanContentTypes, VERSION)
+	err = erm.GenerateAPI(context.Background(), filepath.Dir(path), packageName, conf.SpaceID, cmaKey, conf.Environment, conf.ExportFile, cleanContentTypes, VERSION)
 	if err != nil {
 		fatal("Something went horribly wrong...", err)
 	}

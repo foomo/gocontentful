@@ -2,9 +2,9 @@ package erm
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -26,15 +26,17 @@ type spaceConf struct {
 }
 
 // GetLocales retrieves locale definition from Contentful
-func getLocales(CMA *contentful.Contentful, spaceID string) (locales []Locale, err error) {
-
-	col, err := CMA.Locales.List(spaceID).GetAll()
+func getLocales(ctx context.Context, CMA *contentful.Contentful, spaceID string) (locales []Locale, err error) {
+	col, err := CMA.Locales.List(ctx, spaceID).GetAll()
 	if err != nil {
 		log.Fatal("Couldn't get locales")
 	}
 	for _, item := range col.Items {
 		var locale Locale
-		byteArray, _ := json.Marshal(item)
+		byteArray, err := json.Marshal(item)
+		if err != nil {
+			break
+		}
 		err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&locale)
 		if err != nil {
 			break
@@ -45,16 +47,19 @@ func getLocales(CMA *contentful.Contentful, spaceID string) (locales []Locale, e
 }
 
 // GetContentTypes retrieves content type definition from Contentful
-func getContentTypes(CMA *contentful.Contentful, spaceID string) (contentTypes []ContentType, err error) {
+func getContentTypes(ctx context.Context, CMA *contentful.Contentful, spaceID string) (contentTypes []ContentType, err error) {
 
-	col := CMA.ContentTypes.List(spaceID)
+	col := CMA.ContentTypes.List(ctx, spaceID)
 	_, err = col.GetAll()
 	if err != nil {
 		log.Fatal("Couldn't get content types")
 	}
 	for _, item := range col.Items {
 		var contentType ContentType
-		byteArray, _ := json.Marshal(item)
+		byteArray, err := json.Marshal(item)
+		if err != nil {
+			break
+		}
 		err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&contentType)
 		if err != nil {
 			break
@@ -76,12 +81,12 @@ func getContentTypes(CMA *contentful.Contentful, spaceID string) (contentTypes [
 	return
 }
 
-func getData(spaceID, cmaKey, environment, exportFile string, flagContentTypes []string) (
+func getData(ctx context.Context, spaceID, cmaKey, environment, exportFile string, flagContentTypes []string) (
 	finalContentTypes []ContentType, locales []Locale, err error,
 ) {
 	var contentTypes []ContentType
 	if exportFile != "" {
-		fileBytes, err := ioutil.ReadFile(exportFile)
+		fileBytes, err := os.ReadFile(exportFile)
 		if err != nil {
 			return nil, nil, fmt.Errorf("error reading export file: %v", err)
 		}
@@ -101,14 +106,14 @@ func getData(spaceID, cmaKey, environment, exportFile string, flagContentTypes [
 		}
 
 		// Get space locales
-		locales, err = getLocales(CMA, spaceID)
+		locales, err = getLocales(ctx, CMA, spaceID)
 		if err != nil {
 			return nil, nil, fmt.Errorf("could not get locales: %v", err)
 		}
 		fmt.Println("Locales found:", locales)
 
 		// Get content types
-		contentTypes, err = getContentTypes(CMA, spaceID)
+		contentTypes, err = getContentTypes(ctx, CMA, spaceID)
 		if err != nil {
 			return nil, nil, fmt.Errorf("could not get content types: %v", err)
 		}
@@ -135,8 +140,8 @@ func getData(spaceID, cmaKey, environment, exportFile string, flagContentTypes [
 }
 
 // GenerateAPI calls the generators
-func GenerateAPI(dir, packageName, spaceID, cmaKey, environment, exportFile string, flagContentTypes []string, version string) (err error) {
-	contentTypes, locales, errGetData := getData(spaceID, cmaKey, environment, exportFile, flagContentTypes)
+func GenerateAPI(ctx context.Context, dir, packageName, spaceID, cmaKey, environment, exportFile string, flagContentTypes []string, version string) (err error) {
+	contentTypes, locales, errGetData := getData(ctx, spaceID, cmaKey, environment, exportFile, flagContentTypes)
 	if errGetData != nil {
 		return errGetData
 	}

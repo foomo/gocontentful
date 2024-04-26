@@ -2,8 +2,9 @@ package erm
 
 import (
 	"regexp"
-	"strings"
 )
+
+var onlyLettersRegex = regexp.MustCompile("[^A-Za-z]")
 
 func sliceIncludes(slice []string, key string) bool {
 	for _, val := range slice {
@@ -14,12 +15,6 @@ func sliceIncludes(slice []string, key string) bool {
 	return false
 }
 
-func firstCap(inputString string) (outputString string) {
-	outputString = strings.Title(inputString)
-	return
-}
-
 func onlyLetters(inputString string) (outputString string) {
-	re := regexp.MustCompile("[^A-Za-z]")
-	return re.ReplaceAllString(inputString, "")
+	return onlyLettersRegex.ReplaceAllString(inputString, "")
 }

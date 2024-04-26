@@ -1,13 +1,15 @@
 package erm
 
 import (
-	"strings"
 	"text/template"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 func getFuncMap() template.FuncMap {
 	return template.FuncMap{
-		"firstCap":                 strings.Title,
+		"firstCap":                 cases.Title(language.Und, cases.NoLower).String,
 		"fieldIsBasic":             fieldIsBasic,
 		"fieldIsComplex":           fieldIsComplex,
 		"fieldIsAsset":             fieldIsAsset,

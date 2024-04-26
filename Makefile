@@ -15,21 +15,26 @@ doc:
 	@open "http://localhost:6060/pkg/github.com/foomo/contentful/"
 	@godoc -http=localhost:6060 -play
 
+.PHONY: install
 ## Install binary
 install:
 	@go build -o ${GOPATH}/bin/gocontenful main.go
 
+.PHONY: build
 ## Build binary
 build:
 	@mkdir -p bin
 	@go build -o bin/gocontenful main.go
 
 .PHONY: test
-
 ## Run tests
-test:
-	@go run ./main.go -exportfile ./test/test-space-export.json ./test/testapi
+test: testapi
 	@go test -p 1 -coverprofile=coverage.out -race -json ./... | gotestfmt
+
+.PHONY: test
+## Run tests
+testapi:
+	@go run ./main.go -exportfile ./test/test-space-export.json ./test/testapi
 
 ## Test & view coverage
 cover: test
@@ -37,7 +42,7 @@ cover: test
 
 .PHONY: lint
 ## Run linter
-lint:
+lint: testapi
 	@golangci-lint run
 
 .PHONY: lint.fix
