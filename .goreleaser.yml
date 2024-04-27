@@ -1,12 +1,13 @@
-# .goreleaser.yml
-# Build customization
+project_name: gocontentful
+
+release:
+  github:
+    owner: foomo
+    name: gocontentful
+  prerelease: auto
+
 builds:
   - binary: gocontentful
-    main: ./main.go
-    env:
-      - CGO_ENABLED=0
-    ldflags:
-      - -s -w -X main.VERSION={{.Version}}
     goos:
       - windows
       - darwin
@@ -14,22 +15,34 @@ builds:
     goarch:
       - amd64
       - arm64
-    ignore:
-      - goos: windows
-        goarch: arm64
+    goarm:
+      - '7'
+    env:
+      - CGO_ENABLED=0
+    main: ./main.go
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.VERSION={{.Version}}
 
-# .goreleaser.yml
 archives:
   - format: tar.gz
     format_overrides:
       - goos: windows
         format: zip
+    files:
+      - LICENSE
+      - README.md
+
+changelog:
+  use: github-native
 
 brews:
-  # Reporitory to push the tap to.
-  - tap:
+  - repository:
       owner: foomo
-      name: homebrew-gocontentful
+      name: homebrew-tap
     caveats: "gocontentful -h"
     homepage: "https://github.com/foomo/gocontentful"
     description: "An Contentful Entry-Reference Mapper for Go"
+    test: |
+      system "#{bin}/gocontentful --version"

@@ -1,20 +1,12 @@
-# Binaries for programs and plugins
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
-
-# Test binary, built with `go test -c`
-*.test
-
-# Output of the go coverage tool, specifically when used with LiteIDE
+.*
+*.log
 *.out
-
-bin
-.history*
-*.idea
-/.vscode/*
-/untracked_*.go
-cover.html
-cover.out
+!.github/
+!.husky/
+!.editorconfig
+!.gitignore
+!.golangci.yml
+!.goreleaser.yml
+!.husky.yaml
+/bin/
+/tmp/
