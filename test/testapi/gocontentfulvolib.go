@@ -727,7 +727,9 @@ func (cc *ContentfulClient) syncCache(ctx context.Context, contentTypes []string
 			cc.syncToken,
 		)
 		cc.cacheMutex.sharedDataGcLock.RUnlock()
-		col.GetAll()
+		if _, err := col.GetAll(); err != nil {
+			return err
+		}
 		cc.cacheMutex.sharedDataGcLock.Lock()
 		cc.syncToken = col.SyncToken
 		cc.cacheInit = true
