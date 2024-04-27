@@ -9,6 +9,7 @@ import (
 	"text/template"
 
 	"github.com/foomo/gocontentful/erm/templates"
+	"github.com/pkg/errors"
 	"golang.org/x/tools/imports"
 )
 
@@ -32,19 +33,19 @@ func generate(filename string, tpl []byte, conf spaceConf) error {
 	fmt.Println("Processing", filename)
 	tmpl, err := template.New("generate-" + filename).Funcs(conf.FuncMap).Parse(string(tpl))
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to parse template")
 	}
 	f, err := os.Create(filename)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to create file")
 	}
 	err = tmpl.Execute(f, conf)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to execute template")
 	}
 	errFormatAndFix := formatAndFixImports(filename)
 	if errFormatAndFix != nil {
-		return errFormatAndFix
+		return errors.Wrap(errFormatAndFix, "failed to format and fix imports")
 	}
 
 	return nil
@@ -59,7 +60,7 @@ func generateCode(conf spaceConf) (err error) {
 	} {
 		errGenerate := generate(file, tpl, conf)
 		if errGenerate != nil {
-			return errGenerate
+			return errors.Wrapf(errGenerate, "failed to generate code (%s)", file)
 		}
 	}
 	for _, contentType := range conf.ContentTypes {
@@ -70,7 +71,7 @@ func generateCode(conf spaceConf) (err error) {
 			conf,
 		)
 		if errGenerate != nil {
-			return errGenerate
+			return errors.Wrapf(errGenerate, "failed to generate code for content type (%s)", contentType.Name)
 		}
 	}
 	return

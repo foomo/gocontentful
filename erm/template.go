@@ -1,6 +1,7 @@
 package erm
 
 import (
+	"strings"
 	"text/template"
 
 	"golang.org/x/text/cases"
@@ -30,6 +31,7 @@ func getFuncMap() template.FuncMap {
 		"mapFieldType":             mapFieldType,
 		"mapFieldTypeLiteral":      mapFieldTypeLiteral,
 		"onlyLetters":              onlyLetters,
+		"oneLine":                  oneLine,
 	}
 }
 
@@ -152,4 +154,8 @@ func fieldIsBasic(field ContentTypeField) bool {
 }
 func fieldIsComplex(field ContentTypeField) bool {
 	return field.Type == fieldTypeJSON || field.Type == fieldTypeLocation || field.Type == fieldTypeRichText
+}
+
+func oneLine(v string) string {
+	return strings.ReplaceAll(v, "\n", " ")
 }

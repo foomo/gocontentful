@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/foomo/contentful"
+	"github.com/pkg/errors"
 )
 
 // spaceConf is the space config object passed to the template
@@ -140,16 +141,16 @@ func getData(ctx context.Context, spaceID, cmaKey, environment, exportFile strin
 }
 
 // GenerateAPI calls the generators
-func GenerateAPI(ctx context.Context, dir, packageName, spaceID, cmaKey, environment, exportFile string, flagContentTypes []string, version string) (err error) {
+func GenerateAPI(ctx context.Context, dir, packageName, spaceID, cmaKey, environment, exportFile string, flagContentTypes []string, version string) error {
 	contentTypes, locales, errGetData := getData(ctx, spaceID, cmaKey, environment, exportFile, flagContentTypes)
 	if errGetData != nil {
-		return errGetData
+		return errors.Wrap(errGetData, "could not get data")
 	}
 
 	packageDir := filepath.Join(dir, packageName)
 	errMkdir := os.MkdirAll(packageDir, 0766)
 	if errMkdir != nil {
-		return errMkdir
+		return errors.Wrap(errMkdir, "could not create target folder")
 	}
 	funcMap := getFuncMap()
 	conf := spaceConf{
