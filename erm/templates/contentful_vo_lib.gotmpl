@@ -180,7 +180,7 @@ var SpaceContentTypeInfoMap = ContentTypeInfoMap{ {{ range $index , $contentType
     "{{ $contentType.Sys.ID }}": ContentTypeInfo{
             ContentType: "{{ $contentType.Sys.ID }}",
             Title:       "{{ $contentType.Name }}",
-            Description: "{{ $contentType.Description }}",
+            Description: "{{ oneLine $contentType.Description }}",
         },{{ end }}
 }
 func (cc *ContentfulClient) BrokenReferences() (brokenReferences []BrokenReference) {
