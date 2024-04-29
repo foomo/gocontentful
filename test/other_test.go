@@ -28,7 +28,9 @@ func TestPublishingStatus(t *testing.T) {
 
 func TestCleanUpUnicode(t *testing.T) {
 	testLogger := logrus.StandardLogger()
-	cc, errClient := testapi.NewOfflineContentfulClient("./test-space-export.json",
+	testFile, err := GetTestFile("./test-space-export.json")
+	require.NoError(t, err)
+	cc, errClient := testapi.NewOfflineContentfulClient(testFile,
 		GetContenfulLogger(testLogger),
 		LogDebug,
 		true,

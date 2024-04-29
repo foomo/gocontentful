@@ -7,6 +7,7 @@ import "github.com/foomo/contentful"
 type Cf{{ firstCap $contentType.Sys.ID }} struct {
 	Sys    ContentfulSys          `json:"sys,omitempty"`
 	Fields Cf{{ firstCap $contentType.Sys.ID }}Fields `json:"fields,omitempty"`
+	RawFields RawFields `json:"-"`
 	CC     *ContentfulClient `json:"-"`
 }
 

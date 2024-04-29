@@ -122,6 +122,8 @@ func NewCfProduct(contentfulClient ...*ContentfulClient) (cfProduct *CfProduct) 
 
 	cfProduct.Fields.Brand = map[string]ContentTypeSys{}
 
+	cfProduct.Fields.SubProduct = map[string]ContentTypeSys{}
+
 	cfProduct.Fields.Quantity = map[string]float64{}
 
 	cfProduct.Fields.Sku = map[string]string{}
@@ -610,6 +612,84 @@ func (vo *CfProduct) Brand(ctx context.Context, locale ...Locale) *EntryReferenc
 	return nil
 }
 
+func (vo *CfProduct) SubProduct(locale ...Locale) *EntryReference {
+	if vo == nil {
+		return nil
+	}
+	if vo.CC == nil {
+		return nil
+	}
+	vo.Fields.RWLockSubProduct.RLock()
+	defer vo.Fields.RWLockSubProduct.RUnlock()
+	loc := DefaultLocale
+	if len(locale) != 0 {
+		loc = locale[0]
+		if _, ok := localeFallback[loc]; !ok {
+			if vo.CC.logFn != nil && vo.CC.logLevel <= LogError {
+				vo.CC.logFn(map[string]interface{}{"content type": vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method": "SubProduct()"}, LogError, ErrLocaleUnsupported)
+			}
+			return nil
+		}
+	}
+	if _, ok := vo.Fields.SubProduct[string(loc)]; !ok {
+		if _, ok := localeFallback[loc]; !ok {
+			if vo.CC.logFn != nil && vo.CC.logLevel == LogDebug {
+				vo.CC.logFn(map[string]interface{}{"content type": vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method": "SubProduct()"}, LogWarn, ErrNotSet)
+			}
+			return nil
+		}
+		loc = localeFallback[loc]
+		if _, ok := vo.Fields.SubProduct[string(loc)]; !ok {
+			if vo.CC.logFn != nil && vo.CC.logLevel == LogDebug {
+				vo.CC.logFn(map[string]interface{}{"content type": vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method": "SubProduct()"}, LogWarn, ErrNotSetNoFallback)
+			}
+			return nil
+		}
+	}
+	localizedSubProduct := vo.Fields.SubProduct[string(loc)]
+	contentType, err := vo.CC.GetContentTypeOfID(localizedSubProduct.Sys.ID)
+	if err != nil {
+		if vo.CC.logFn != nil && vo.CC.logLevel <= LogError {
+			vo.CC.logFn(map[string]interface{}{"content type": vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method": "SubProduct()"}, LogError, ErrNoTypeOfRefEntry)
+		}
+		return nil
+	}
+	switch contentType {
+
+	case ContentTypeBrand:
+		referencedVO, err := vo.CC.GetBrandByID(localizedSubProduct.Sys.ID)
+		if err != nil {
+			if vo.CC.logFn != nil && vo.CC.logLevel <= LogError {
+				vo.CC.logFn(map[string]interface{}{"content type": vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method": "SubProduct()"}, LogError, err)
+			}
+			return nil
+		}
+		return &EntryReference{ContentType: contentType, ID: localizedSubProduct.Sys.ID, VO: referencedVO}
+
+	case ContentTypeCategory:
+		referencedVO, err := vo.CC.GetCategoryByID(localizedSubProduct.Sys.ID)
+		if err != nil {
+			if vo.CC.logFn != nil && vo.CC.logLevel <= LogError {
+				vo.CC.logFn(map[string]interface{}{"content type": vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method": "SubProduct()"}, LogError, err)
+			}
+			return nil
+		}
+		return &EntryReference{ContentType: contentType, ID: localizedSubProduct.Sys.ID, VO: referencedVO}
+
+	case ContentTypeProduct:
+		referencedVO, err := vo.CC.GetProductByID(localizedSubProduct.Sys.ID)
+		if err != nil {
+			if vo.CC.logFn != nil && vo.CC.logLevel <= LogError {
+				vo.CC.logFn(map[string]interface{}{"content type": vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method": "SubProduct()"}, LogError, err)
+			}
+			return nil
+		}
+		return &EntryReference{ContentType: contentType, ID: localizedSubProduct.Sys.ID, VO: referencedVO}
+
+	}
+	return nil
+}
+
 func (vo *CfProduct) Quantity(locale ...Locale) float64 {
 	if vo == nil {
 		return 0
@@ -979,6 +1059,26 @@ func (vo *CfProduct) SetBrand(brand ContentTypeSys, locale ...Locale) (err error
 	return
 }
 
+func (vo *CfProduct) SetSubProduct(subProduct ContentTypeSys, locale ...Locale) (err error) {
+	if vo == nil {
+		return errors.New("SetSubProduct(subProduct: Value Object is nil")
+	}
+	loc := DefaultLocale
+	if len(locale) != 0 {
+		loc = locale[0]
+		if _, ok := localeFallback[loc]; !ok {
+			return ErrLocaleUnsupported
+		}
+	}
+	vo.Fields.RWLockSubProduct.Lock()
+	defer vo.Fields.RWLockSubProduct.Unlock()
+	if vo.Fields.SubProduct == nil {
+		vo.Fields.SubProduct = make(map[string]ContentTypeSys)
+	}
+	vo.Fields.SubProduct[string(loc)] = subProduct
+	return
+}
+
 func (vo *CfProduct) SetQuantity(quantity float64, locale ...Locale) (err error) {
 	if vo == nil {
 		return errors.New("SetQuantity(quantity: Value Object is nil")
@@ -1306,6 +1406,17 @@ func (cc *ContentfulClient) cacheAllProduct(ctx context.Context, resultChan chan
 			}
 		}
 
+		for _, loc := range cc.locales {
+			child, okChild := product.Fields.SubProduct[string(loc)]
+			if okChild {
+				addEntry(child.Sys.ID, EntryReference{ContentType: product.Sys.ContentType.Sys.ID,
+					ID:        product.Sys.ID,
+					VO:        product,
+					FromField: "subProduct",
+				})
+			}
+		}
+
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
@@ -1321,6 +1432,8 @@ func (cc *ContentfulClient) cacheProductByID(ctx context.Context, id string, ent
 	defer cc.cacheMutex.idContentTypeMapGcLock.Unlock()
 	cc.cacheMutex.parentMapGcLock.Lock()
 	defer cc.cacheMutex.parentMapGcLock.Unlock()
+	cc.cacheMutex.genericEntriesGcLock.Lock()
+	defer cc.cacheMutex.genericEntriesGcLock.Unlock()
 
 	var col *contentful.Collection
 	if entryPayload != nil {
@@ -1343,6 +1456,7 @@ func (cc *ContentfulClient) cacheProductByID(ctx context.Context, id string, ent
 	}
 	// It was deleted
 	if col != nil && len(col.Items) == 0 || entryDelete {
+		delete(cc.Cache.genericEntries, id)
 		delete(cc.Cache.entryMaps.product, id)
 		delete(cc.Cache.idContentTypeMap, id)
 		// delete as child
@@ -1368,6 +1482,11 @@ func (cc *ContentfulClient) cacheProductByID(ctx context.Context, id string, ent
 		cc.Cache.entryMaps.product = map[string]*CfProduct{}
 	}
 	cc.Cache.entryMaps.product[id] = product
+	cc.Cache.genericEntries[id] = &GenericEntry{
+		Sys:       product.Sys,
+		RawFields: product.RawFields,
+		CC:        product.CC,
+	}
 	cc.Cache.idContentTypeMap[id] = product.Sys.ContentType.Sys.ID
 	allChildrensIds := map[string]bool{}
 
@@ -1400,6 +1519,25 @@ func (cc *ContentfulClient) cacheProductByID(ctx context.Context, id string, ent
 				cc.Cache.parentMap[child.Sys.ID] = []EntryReference{}
 			}
 			newParentRef := EntryReference{ContentType: product.Sys.ContentType.Sys.ID, ID: product.Sys.ID, VO: product, FromField: "brand"}
+			newParentSlice := []EntryReference{}
+			for _, parent := range cc.Cache.parentMap[child.Sys.ID] {
+				if parent.ID != id {
+					newParentSlice = append(newParentSlice, parent)
+				}
+			}
+			newParentSlice = append(newParentSlice, newParentRef)
+			cc.Cache.parentMap[child.Sys.ID] = newParentSlice
+		}
+	}
+
+	for _, loc := range cc.locales {
+		child, okChild := product.Fields.SubProduct[string(loc)]
+		if okChild {
+			allChildrensIds[child.Sys.ID] = true
+			if cc.Cache.parentMap[child.Sys.ID] == nil {
+				cc.Cache.parentMap[child.Sys.ID] = []EntryReference{}
+			}
+			newParentRef := EntryReference{ContentType: product.Sys.ContentType.Sys.ID, ID: product.Sys.ID, VO: product, FromField: "subProduct"}
 			newParentSlice := []EntryReference{}
 			for _, parent := range cc.Cache.parentMap[child.Sys.ID] {
 				if parent.ID != id {
@@ -1455,7 +1593,13 @@ func colToCfProduct(col *contentful.Collection, cc *ContentfulClient) (vos []*Cf
 			vo.Fields.SeoText = cleanUpRichTextField(vo.Fields.SeoText)
 
 		}
+		var typedItem RawItem
+		err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&typedItem)
+		if err != nil {
+			break
+		}
 		vo.CC = cc
+		vo.RawFields = typedItem.Fields
 		vos = append(vos, &vo)
 	}
 	return vos, err

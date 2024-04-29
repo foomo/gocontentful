@@ -28,6 +28,17 @@ type ContentfulSys struct {
 	PublishedVersion float64        `json:"publishedVersion,omitempty"`
 }
 
+type RawFields map[string]interface{}
+type RawItem struct {
+	Fields RawFields `json:"fields"`
+}
+
+type GenericEntry struct {
+	Sys       ContentfulSys     `json:"sys,omitempty"`
+	RawFields RawFields         `json:"fields,omitempty"`
+	CC        *ContentfulClient `json:"-"`
+}
+
 type ContentfulReferencedEntry struct {
 	Entry *contentful.Entry
 	Col   *contentful.Collection
@@ -64,10 +75,10 @@ type RichTextData struct {
 
 type RichTextGenericNode struct {
 	NodeType string                 `json:"nodeType"`
-	Content  []*RichTextGenericNode `json:"content,omitempty"`
-	Data     map[string]interface{} `json:"data,omitempty"`
+	Content  []*RichTextGenericNode `json:"content"`
+	Data     map[string]interface{} `json:"data"`
 	Value    string                 `json:"value"`
-	Marks    []RichTextMark         `json:"marks,omitempty"`
+	Marks    []RichTextMark         `json:"marks"`
 }
 
 type richTextHtmlTag struct {

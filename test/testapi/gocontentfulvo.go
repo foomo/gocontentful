@@ -8,9 +8,10 @@ import (
 )
 
 type CfBrand struct {
-	Sys    ContentfulSys     `json:"sys,omitempty"`
-	Fields CfBrandFields     `json:"fields,omitempty"`
-	CC     *ContentfulClient `json:"-"`
+	Sys       ContentfulSys     `json:"sys,omitempty"`
+	Fields    CfBrandFields     `json:"fields,omitempty"`
+	RawFields RawFields         `json:"-"`
+	CC        *ContentfulClient `json:"-"`
 }
 
 // CfBrandFields is a CfNameFields VO
@@ -37,9 +38,10 @@ type CfBrandFieldsLogo struct {
 }
 
 type CfCategory struct {
-	Sys    ContentfulSys     `json:"sys,omitempty"`
-	Fields CfCategoryFields  `json:"fields,omitempty"`
-	CC     *ContentfulClient `json:"-"`
+	Sys       ContentfulSys     `json:"sys,omitempty"`
+	Fields    CfCategoryFields  `json:"fields,omitempty"`
+	RawFields RawFields         `json:"-"`
+	CC        *ContentfulClient `json:"-"`
 }
 
 // CfCategoryFields is a CfNameFields VO
@@ -58,9 +60,10 @@ type CfCategoryFieldsIcon struct {
 }
 
 type CfProduct struct {
-	Sys    ContentfulSys     `json:"sys,omitempty"`
-	Fields CfProductFields   `json:"fields,omitempty"`
-	CC     *ContentfulClient `json:"-"`
+	Sys       ContentfulSys     `json:"sys,omitempty"`
+	Fields    CfProductFields   `json:"fields,omitempty"`
+	RawFields RawFields         `json:"-"`
+	CC        *ContentfulClient `json:"-"`
 }
 
 // CfProductFields is a CfNameFields VO
@@ -83,6 +86,8 @@ type CfProductFields struct {
 	RWLockPrice              sync.RWMutex                `json:"-"`
 	Brand                    map[string]ContentTypeSys   `json:"brand,omitempty"`
 	RWLockBrand              sync.RWMutex                `json:"-"`
+	SubProduct               map[string]ContentTypeSys   `json:"subProduct,omitempty"`
+	RWLockSubProduct         sync.RWMutex                `json:"-"`
 	Quantity                 map[string]float64          `json:"quantity,omitempty"`
 	RWLockQuantity           sync.RWMutex                `json:"-"`
 	Sku                      map[string]string           `json:"sku,omitempty"`

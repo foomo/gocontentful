@@ -1,7 +1,6 @@
 package erm
 
 import (
-	"strings"
 	"text/template"
 
 	"golang.org/x/text/cases"
@@ -121,6 +120,7 @@ func fieldIsLocation(field ContentTypeField) bool {
 func fieldIsMultipleAsset(field ContentTypeField) bool {
 	return field.Type == fieldTypeArray && field.Items.Type == fieldItemsTypeLink && field.Items.LinkType == fieldLinkTypeAsset
 }
+
 func fieldIsMultipleReference(field ContentTypeField) bool {
 	return field.Type == fieldTypeArray && field.Items.Type == fieldItemsTypeLink && field.Items.LinkType == fieldLinkTypeEntry
 }
@@ -152,6 +152,7 @@ func fieldIsText(field ContentTypeField) bool {
 func fieldIsBasic(field ContentTypeField) bool {
 	return fieldIsSymbolList(field) || fieldIsBoolean(field) || fieldIsInteger(field) || fieldIsNumber(field) || fieldIsSymbol(field) || fieldIsText(field) || fieldIsDate(field)
 }
+
 func fieldIsComplex(field ContentTypeField) bool {
 	return field.Type == fieldTypeJSON || field.Type == fieldTypeLocation || field.Type == fieldTypeRichText
 }

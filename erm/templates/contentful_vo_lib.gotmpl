@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"html"
 	"io"
-	"os"
 	"regexp"
 	"strings"
 	"sync"
@@ -30,6 +29,7 @@ type ContentfulCache struct {
 	assets                 assetCacheMap
 	contentTypes           []string
 	entryMaps              cacheEntryMaps
+	genericEntries	 map[string]*GenericEntry
 	idContentTypeMap       map[string]string
 	parentMap              map[string][]EntryReference
 }
@@ -40,6 +40,7 @@ type ContentfulCacheMutex struct {
 	assetsGcLock           sync.RWMutex
 	idContentTypeMapGcLock sync.RWMutex
 	parentMapGcLock        sync.RWMutex
+	genericEntriesGcLock   sync.RWMutex
 	{{ range $index , $contentType := $contentTypes }}	{{ $contentType.Sys.ID }}GcLock sync.RWMutex
     {{ end }}
 }
@@ -160,19 +161,23 @@ var (
 	InfoCachedAllAssets              = "cached all assets"
 	InfoFallingBackToFile            = "gonna use a local file"
 	InfoLoadingFromFile              = "loading space from local file"
+	InfoCacheIsNil		             = "contentful cache is nil"
 	InfoCacheWorkerStart             = "contentful cache worker starting"
 	InfoCacheUpdateQueued            = "contentful cache update queued"
 	InfoCacheUpdateCanceled          = "contentful cache update canceled"
 	InfoCacheUpdateDone              = "contentful cache update returning"
 	InfoCacheUpdateSkipped           = "contentful cache update skipped, already one in the queue"
+	InfoCacheSyncOp                  = "contentful cache sync op done"
 	InfoOfflineEntitiesLoaded        = "downloaded entries and assets from offline file"
 	InfoPreservingExistingCache      = "could not connect for cache update, preserving the existing cache"
 	InfoUpdateCacheTime              = "space caching done, time recorded"
 	ErrorEnvironmentSetToMaster      = "environment was empty string, set to master"
 	ErrorEntryIsNil 			     			 = "entry is nil"
 	ErrorEntrySysIsNil 			     		 = "entry.Sys is nil"
+	ErrorEntryNotFound               = "entry not found"
 	ErrorEntrySysContentTypeIsNil    = "entry.Sys.ContentType is nil"
 	ErrorEntrySysContentTypeSysIsNil = "entry.Sys.ContentType.Sys is nil"
+	ErrorEntryCachingFailed          = "entry caching failed"
 )
 
 var spaceContentTypes = []string{ {{ range $index , $contentType := $contentTypes }}ContentType{{ firstCap $contentType.Sys.ID }}, {{ end }} }
@@ -247,6 +252,9 @@ func (cc *ContentfulClient) ClientStats() {
 				referenceCount += len(parents)
 			}
 			fieldsMap["cache parentMap parents"] = referenceCount
+			cc.cacheMutex.genericEntriesGcLock.RLock()
+			defer cc.cacheMutex.genericEntriesGcLock.RUnlock()
+			fieldsMap["cache genericEntries"] = len(cc.Cache.genericEntries)
 		}
 		cc.logFn(fieldsMap, LogInfo, "Contentful ClientStats")
 	}
@@ -421,7 +429,7 @@ func NewAssetFromURL(id string, uploadUrl string, imageFileType string, title st
 	var loc Locale
 	if len(locale) != 0 {
 		loc = locale[0]
-		if localeFallback[loc]!="" {
+		if _, ok := localeFallback[loc]; !ok {
 			return nil
 		}
 	} else {
@@ -475,18 +483,11 @@ func NewContentfulClient(ctx context.Context, spaceID string, clientMode ClientM
 			assets:           assetCacheMap{},
 			contentTypes :    []string{},
 			entryMaps:        cacheEntryMaps{},
+			genericEntries:	  map[string]*GenericEntry{},
 			idContentTypeMap: map[string]string{},
 			parentMap:        map[string][]EntryReference{},
 		},
-        cacheMutex: &ContentfulCacheMutex{
-            fullCacheGcLock:        sync.RWMutex{},
-            sharedDataGcLock:       sync.RWMutex{},
-            assetsGcLock:           sync.RWMutex{},
-            idContentTypeMapGcLock: sync.RWMutex{},
-            parentMapGcLock:        sync.RWMutex{},
-            {{ range $index , $contentType := $contentTypes }}	{{ $contentType.Sys.ID }}GcLock: sync.RWMutex{},
-            {{ end }}
-        },
+        cacheMutex: &ContentfulCacheMutex{},
         cacheQueue:         make(chan struct{}, 1),
         cacheDone:          make(chan struct{}, 1),
         cacheUpdateTimeout: 120,
@@ -508,8 +509,8 @@ func NewContentfulClient(ctx context.Context, spaceID string, clientMode ClientM
 	return cc, nil
 }
 
-func NewOfflineContentfulClient(filename string, logFn func(fields map[string]interface{}, level int, args ...interface{}), logLevel int, cacheAssets bool, textJanitor bool) (*ContentfulClient, error) {
-	offlineTemp, err := getOfflineSpaceFromFile(filename)
+func NewOfflineContentfulClient(file []byte, logFn func(fields map[string]interface{}, level int, args ...interface{}), logLevel int, cacheAssets bool, textJanitor bool) (*ContentfulClient, error) {
+	offlineTemp, err := getOfflineSpaceFromFile(file)
 	if err != nil {
 		return nil, fmt.Errorf("NewOfflineContentfulClient could not parse space export file: %v", err)
 	}
@@ -519,17 +520,10 @@ func NewOfflineContentfulClient(filename string, logFn func(fields map[string]in
 		Cache: &ContentfulCache{
             contentTypes:     []string{},
             idContentTypeMap: map[string]string{},
+			genericEntries:	  map[string]*GenericEntry{},
             parentMap:        map[string][]EntryReference{},
             },
-        cacheMutex: &ContentfulCacheMutex{
-            fullCacheGcLock:        sync.RWMutex{},
-            sharedDataGcLock:       sync.RWMutex{},
-            assetsGcLock:           sync.RWMutex{},
-            idContentTypeMapGcLock: sync.RWMutex{},
-            parentMapGcLock:        sync.RWMutex{},
-            {{ range $index , $contentType := $contentTypes }}	{{ $contentType.Sys.ID }}GcLock: sync.RWMutex{},
-            {{ end }}
-        },
+        cacheMutex: &ContentfulCacheMutex{},
 		cacheQueue: make(chan struct{}, 1),
 		cacheDone: make(chan struct{}, 1),
 		cacheUpdateTimeout: 120,
@@ -575,6 +569,265 @@ func RichTextToHtml(rt interface{}, linkResolver LinkResolverFunc, entryLinkReso
 	return out, nil
 }
 
+func (cc *ContentfulClient) GetGenericEntry(entryID string) (*GenericEntry, error) {
+	if cc.Cache == nil {
+		if cc.logFn != nil && cc.logLevel <= LogWarn {
+			cc.logFn(map[string]interface{}{"task": "GetGenericEntry", "entryId":entryID}, LogWarn, InfoCacheIsNil)
+		}
+		return nil, errors.New(InfoCacheIsNil)
+	}
+	if _, ok := cc.Cache.genericEntries[entryID]; !ok {	
+		if cc.logFn != nil && cc.logLevel <= LogWarn {
+			cc.logFn(map[string]interface{}{"task": "GetGenericEntry", "entryId":entryID}, LogWarn, ErrorEntryNotFound)
+		}
+		return nil, errors.New(ErrorEntryNotFound)
+	}
+	return cc.Cache.genericEntries[entryID], nil
+}
+
+func (cc *ContentfulClient) GetAllGenericEntries() (map[string]*GenericEntry, error) {
+	if cc.Cache == nil {
+		if cc.logFn != nil && cc.logLevel <= LogWarn {
+			cc.logFn(map[string]interface{}{"task": "GetAllGenericEntries"}, LogWarn, InfoCacheIsNil)
+		}
+		return nil, errors.New(InfoCacheIsNil)
+	}
+	return cc.Cache.genericEntries, nil
+}
+
+func (genericEntry *GenericEntry) FieldAsString(fieldName string, locale ...Locale) (string, error) {
+	var loc Locale
+	if len(locale) != 0 {
+		loc = locale[0]
+		if _, ok := localeFallback[loc]; !ok {
+			return "", ErrLocaleUnsupported
+		}
+	} else {
+		loc = DefaultLocale
+	}
+	if _, ok := genericEntry.RawFields[fieldName]; !ok {
+		return "", ErrNotSet
+	}
+	switch field := genericEntry.RawFields[fieldName].(type) {
+	case map[string]interface{}:
+		fieldLoc := field[string(loc)]
+		if fieldLoc == "" && field[string(DefaultLocale)] != "" {
+			fieldLoc = field[string(DefaultLocale)]
+		}
+		switch fieldLocStr := fieldLoc.(type) {
+		case string:
+			return fieldLocStr, nil
+		default:
+			return "", ErrNotSet
+		}
+	default:
+		return "", ErrNotSet
+	}
+}
+
+func (genericEntry *GenericEntry) InheritAsString(fieldName string, parentTypes []string, locale ...Locale) (string, error) {
+	val, err := genericEntry.FieldAsString(fieldName, locale...)
+	if err == nil {
+		return val, nil
+	}
+	parentRefs, err := commonGetParents(genericEntry.CC, genericEntry.Sys.ID, parentTypes)
+	if err != nil {
+		return "", err
+	}
+	if len(parentRefs) > 0 {
+		for _, parentRef := range parentRefs {
+			genericParent, err := genericEntry.CC.GetGenericEntry(parentRef.ID)
+			if err != nil {
+				return "", err
+			}
+			parentVal, err := genericParent.FieldAsString(fieldName, locale...)
+			if err != nil {
+				return "", err
+			} else {
+				return parentVal, nil
+			}
+		}
+	}
+	return "", ErrNotSet
+}
+
+func (genericEntry *GenericEntry) FieldAsFloat64(fieldName string, locale ...Locale) (float64, error) {
+	var loc Locale
+	if len(locale) != 0 {
+		loc = locale[0]
+		if _, ok := localeFallback[loc]; !ok {
+			return 0, ErrLocaleUnsupported
+		}
+	} else {
+		loc = DefaultLocale
+	}
+	if _, ok := genericEntry.RawFields[fieldName]; !ok {
+		return 0, ErrNotSet
+	}
+	switch field := genericEntry.RawFields[fieldName].(type) {
+	case map[string]interface{}:
+		fieldLoc := field[string(loc)]
+		if fieldLoc == 0 && field[string(DefaultLocale)] != 0 {
+			fieldLoc = field[string(DefaultLocale)]
+		}
+		switch fieldLocFloat := fieldLoc.(type) {
+		case float64:
+			return fieldLocFloat, nil
+		default:
+			return 0, ErrNotSet
+		}
+	default:
+		return 0, ErrNotSet
+	}
+}
+
+func (genericEntry *GenericEntry) InheritAsFloat64(fieldName string, parentTypes []string, locale ...Locale) (float64, error) {
+	val, err := genericEntry.FieldAsFloat64(fieldName, locale...)
+	if err == nil {
+		return val, nil
+	}
+	parentRefs, err := commonGetParents(genericEntry.CC, genericEntry.Sys.ID, parentTypes)
+	if err != nil {
+		return 0, err
+	}
+	if len(parentRefs) > 0 {
+		for _, parentRef := range parentRefs {
+			genericParent, err := genericEntry.CC.GetGenericEntry(parentRef.ID)
+			if err != nil {
+				return 0, err
+			}
+			parentVal, err := genericParent.FieldAsFloat64(fieldName, locale...)
+			if err != nil {
+				return 0, err
+			} else {
+				return parentVal, nil	
+			}
+		}
+	}
+	return 0, ErrNotSet
+}
+
+func (genericEntry *GenericEntry) FieldAsReference(fieldName string, locale ...Locale) (*EntryReference, error) {
+	var loc Locale
+	if len(locale) != 0 {
+		loc = locale[0]
+		if _, ok := localeFallback[loc]; !ok {
+			return nil, ErrLocaleUnsupported
+		}
+	} else {
+		loc = DefaultLocale
+	}
+	var cts ContentTypeSys
+	if _, ok := genericEntry.RawFields[fieldName]; !ok {
+		return nil, ErrNotSet
+	}
+	switch field := genericEntry.RawFields[fieldName].(type) {
+	case map[string]interface{}:
+		fieldVal := field[string(loc)]
+		if fieldVal == nil {
+			fieldVal = field[string(DefaultLocale)]
+		}
+		byt, err := json.Marshal(fieldVal)
+		if err != nil {
+			return nil, err
+		}
+		err = json.Unmarshal(byt, &cts)
+		if err != nil {
+			return nil, err
+		}
+		referencedEntry, err := genericEntry.CC.GetGenericEntry(cts.Sys.ID)
+		if err != nil || referencedEntry == nil {
+			return nil, err
+		}
+		ref := EntryReference{
+			ID:          cts.Sys.ID,
+			ContentType: referencedEntry.Sys.ContentType.Sys.ID,
+			FromField:   fieldName,
+		}
+		return &ref, nil
+	}
+	return nil, ErrNotSet
+}
+
+func (genericEntry *GenericEntry) InheritAsReference(fieldName string, parentTypes []string, locale ...Locale) (*EntryReference, error) {
+	val, err := genericEntry.FieldAsReference(fieldName, locale...)
+	if err == nil {
+		return val, nil
+	}
+	parentRefs, err := commonGetParents(genericEntry.CC, genericEntry.Sys.ID, parentTypes)
+	if err != nil {
+		return nil, err
+	}
+	if len(parentRefs) > 0 {
+		for _, parentRef := range parentRefs {
+			genericParent, err := genericEntry.CC.GetGenericEntry(parentRef.ID)
+			if err != nil {
+				return nil, err
+			}
+			parentVal, err := genericParent.FieldAsReference(fieldName, locale...)
+			if err != nil {
+				return nil, err
+			} else {
+				return parentVal, nil	
+			}
+		}
+	}
+	return nil, ErrNotSet
+}
+
+func (genericEntry *GenericEntry) SetField(fieldName string, fieldValue interface{}, locale ...Locale) error {
+	var loc Locale
+	if len(locale) != 0 {
+		loc = locale[0]
+		if _, ok := localeFallback[loc]; !ok {
+			return ErrLocaleUnsupported
+		}
+	} else {
+		loc = DefaultLocale
+	}
+	if genericEntry.RawFields == nil {
+		genericEntry.RawFields = make(RawFields)
+	}
+	if genericEntry.RawFields[fieldName] == nil {
+		genericEntry.RawFields[fieldName] = map[string]interface{}{}
+	}
+	switch genericEntry.RawFields[fieldName].(type) {
+	case map[string]interface{}:
+		genericEntry.RawFields[fieldName].(map[string]interface{})[string(loc)] = fieldValue
+		return nil
+	}
+	return ErrNotSet
+}
+
+
+func (genericEntry *GenericEntry) Upsert() error {
+	cfEntry := &contentful.Entry{
+		Fields: map[string]interface{}{},
+	}
+	// get the generic entry sys into the cfEntry sys
+	tmp, errMarshal := json.Marshal(genericEntry)
+	if errMarshal != nil {
+		return errors.New("can't marshal JSON from entry")
+	}
+	errUnmarshal := json.Unmarshal(tmp, &cfEntry)
+	if errUnmarshal != nil {
+		return errors.New("can't unmarshal JSON into CF entry")
+	}
+	// copy fields
+	for key, fieldValue := range genericEntry.RawFields {
+		cfEntry.Fields[key] = fieldValue
+	}
+	// upsert the entry
+	err := genericEntry.CC.Client.Entries.Upsert(genericEntry.CC.SpaceID, cfEntry)
+	if err != nil {
+		if genericEntry.CC.logFn != nil && genericEntry.CC.logLevel <= LogWarn {
+			genericEntry.CC.logFn(map[string]interface{}{"task": "UpdateCache"}, LogWarn, fmt.Errorf("CfAkeneoSettings UpsertEntry: Operation failed: %w", err))
+		}
+		return err
+	}		
+	return nil
+}
+
 func (cc *ContentfulClient) SetCacheUpdateTimeout(seconds int64) {
 	cc.cacheUpdateTimeout = seconds
 }
@@ -590,8 +843,8 @@ func (cc *ContentfulClient) SetEnvironment(environment string) {
 	cc.Client.Environment = environment
 }
 
-func (cc *ContentfulClient) SetOfflineFallback(filename string) error {
-	offlineTemp, err := getOfflineSpaceFromFile(filename)
+func (cc *ContentfulClient) SetOfflineFallback(file []byte) error {
+	offlineTemp, err := getOfflineSpaceFromFile(file)
 	if err != nil {
 		return err
 	}
@@ -730,6 +983,7 @@ func (cc *ContentfulClient) syncCache(ctx context.Context, contentTypes []string
 				entries = append(entries, entry)
 			}
 		}
+		syncEntryCount := map[string]int{}
 		for _, entry := range entries {
 			if ctx.Err() != nil {
 				return ctx.Err()
@@ -742,7 +996,8 @@ func (cc *ContentfulClient) syncCache(ctx context.Context, contentTypes []string
 				if err := updateCacheForContentTypeAndEntity(ctx, cc, entry.Sys.ContentType.Sys.ID, entry.Sys.ID, entry, false); err != nil {
 					if cc.logFn != nil && cc.logLevel <= LogWarn {
 						cc.logFn(map[string]interface{}{"id": entry.Sys.ID, "task": "syncCache", "error": err.Error()}, LogWarn, "failed to update cache for entry")
-					}
+				} else {
+					syncEntryCount[entry.Sys.ContentType.Sys.ID]++
 				}
 			case sysTypeDeletedEntry:
 				cc.cacheMutex.idContentTypeMapGcLock.RLock()
@@ -751,11 +1006,16 @@ func (cc *ContentfulClient) syncCache(ctx context.Context, contentTypes []string
 				if err := updateCacheForContentTypeAndEntity(ctx, cc, contentType, entry.Sys.ID, entry, true); err != nil {
 					if cc.logFn != nil && cc.logLevel <= LogWarn {
 						cc.logFn(map[string]interface{}{"id": entry.Sys.ID, "task": "syncCache", "error": err.Error()}, LogWarn, "failed to delete cache for entry")
-					}
+				} else {
+					syncEntryCount["deletedEntry"]++
 				}
 			default:
 			}
 		}
+		if cc.logFn != nil && len(entries) > 0 && cc.logLevel <= LogInfo {
+			cc.logFn(map[string]interface{}{"task": "syncCache", "syncEntryCount": syncEntryCount}, LogInfo, InfoCacheSyncOp)
+		}
+		var syncAssetCount int
 		for _, asset := range assets {
 			if ctx.Err() != nil {
 				return ctx.Err()
@@ -766,15 +1026,22 @@ func (cc *ContentfulClient) syncCache(ctx context.Context, contentTypes []string
 					if cc.logFn != nil && cc.logLevel <= LogWarn {
 						cc.logFn(map[string]interface{}{"id": asset.Sys.ID, "task": "syncCache", "error": err.Error()}, LogWarn, "failed to update cache for entry")
 					}
+				} else {
+					syncAssetCount++
 				}
 			case sysTypeDeletedAsset:
 				if err := updateCacheForContentTypeAndEntity(ctx, cc, assetWorkerType, asset.Sys.ID, nil, true); err != nil {
 					if cc.logFn != nil && cc.logLevel <= LogWarn {
 						cc.logFn(map[string]interface{}{"id": asset.Sys.ID, "task": "syncCache", "error": err.Error()}, LogWarn, "failed to delete cache for entry")
 					}
+				} else {
+					syncAssetCount++
 				}
 			default:
 			}
+		}
+		if cc.logFn != nil && len(assets) > 0 && cc.logLevel <= LogInfo {
+			cc.logFn(map[string]interface{}{"task": "syncCache", "syncAssetCount": syncAssetCount}, LogInfo, InfoCacheSyncOp)
 		}
 	}
 }
@@ -793,6 +1060,7 @@ func (cc *ContentfulClient) cacheSpace(ctx context.Context, contentTypes []strin
     tempCache := &ContentfulCache{
         contentTypes:     contentTypes,
         idContentTypeMap: map[string]string{},
+		genericEntries:	 map[string]*GenericEntry{},
         parentMap:        map[string][]EntryReference{},
     }
     if cacheAssets {
@@ -874,6 +1142,7 @@ func (cc *ContentfulClient) cacheSpace(ctx context.Context, contentTypes []strin
     cc.cacheMutex.assetsGcLock.Lock()
     cc.cacheMutex.idContentTypeMapGcLock.Lock()
     cc.cacheMutex.parentMapGcLock.Lock()
+    cc.cacheMutex.genericEntriesGcLock.Lock()
     {{ range $index , $contentType := $contentTypes }}cc.cacheMutex.{{ $contentType.Sys.ID }}GcLock.Lock()
     {{ end }}
 	cc.Cache = tempCache
@@ -885,6 +1154,7 @@ func (cc *ContentfulClient) cacheSpace(ctx context.Context, contentTypes []strin
 	cc.cacheMutex.assetsGcLock.Unlock()
     cc.cacheMutex.sharedDataGcLock.Unlock()
 	cc.cacheMutex.fullCacheGcLock.Unlock()
+	cc.cacheMutex.genericEntriesGcLock.Unlock()
 }
 
 func ToAssetReference(asset *contentful.Asset) (refSys ContentTypeSys) {
@@ -1045,13 +1315,9 @@ func (cc *ContentfulClient) getAllAssets(ctx context.Context, tryCacheFirst bool
 	return assets, nil
 }
 
-func getOfflineSpaceFromFile(filename string) (*offlineTemp, error) {
-	fileBytes, err := os.ReadFile(filename)
-	if err != nil {
-		return nil, fmt.Errorf("getOfflineSpaceFromFile could not read space export file: %v", err)
-	}
+func getOfflineSpaceFromFile(file []byte) (*offlineTemp, error) {
 	offlineTemp := &offlineTemp{}
-	err = json.Unmarshal(fileBytes, offlineTemp)
+	err := json.Unmarshal(file, offlineTemp)
 	if err != nil {
 		return nil, fmt.Errorf("getOfflineSpaceFromFile could not parse space export file: %v", err)
 	}
@@ -1502,6 +1768,15 @@ func updateCacheForContentType(ctx context.Context, results chan ContentTypeResu
 			return errors.New("updateCacheForContentType failed for contentType {{ $contentType.Sys.ID }}: "+err.Error())
 		}
 		tempCache.entryMaps.{{ $contentType.Sys.ID }} = all{{ firstCap $contentType.Sys.ID }}
+		cc.cacheMutex.genericEntriesGcLock.Lock()
+		for _, {{ $contentType.Sys.ID }} := range all{{ firstCap $contentType.Sys.ID }} {
+			tempCache.genericEntries[{{ $contentType.Sys.ID }}.Sys.ID] = &GenericEntry{
+				Sys: {{ $contentType.Sys.ID }}.Sys,
+				RawFields: {{ $contentType.Sys.ID }}.RawFields,
+				CC: {{ $contentType.Sys.ID }}.CC,
+			}
+		}
+		cc.cacheMutex.genericEntriesGcLock.Unlock()
 		if cc.logFn != nil && cc.logLevel <= LogInfo {
 			cc.logFn(map[string]interface{}{"contentType":"{{ $contentType.Sys.ID }}", "method": "updateCacheForContentType", "size":len(all{{ firstCap $contentType.Sys.ID }})}, LogInfo, InfoCachedAllEntries)
 		}
@@ -1569,10 +1844,12 @@ func commonGetParents(ctx context.Context, cc *ContentfulClient, id string, cont
 	if cacheInit {
 		cc.cacheMutex.parentMapGcLock.RLock()
 		defer cc.cacheMutex.parentMapGcLock.RUnlock()
-		if len(contentType) != 0 {
+		if len(contentTypes) != 0 {
 			for _, parent := range cc.Cache.parentMap[id] {
-				if parent.ContentType == contentType[0] {
-					parents = append(parents, parent)
+				for _, contentType := range contentTypes {
+					if parent.ContentType == contentType {
+						parents = append(parents, parent)
+					}
 				}
 			}
 			return parents, nil
@@ -1595,7 +1872,7 @@ func commonGetParents(ctx context.Context, cc *ContentfulClient, id string, cont
     		if err != nil {
     			return nil, err
     		}
-    		if len(contentType) == 1 && contentType[0] != entry.Sys.ContentType.Sys.ID {
+    		if len(contentTypes) == 1 && contentTypes[0] != entry.Sys.ContentType.Sys.ID {
     			continue
     		}
     		switch entry.Sys.ContentType.Sys.ID { {{ range $index , $contentType := $contentTypes }}
@@ -1706,4 +1983,29 @@ func stripInvisibleUnicodeChars(dirty string) string {
 		return -1
 	}, dirty)
 	return clean
+}
+
+func (rawFields RawFields) GetChildIDs() (childIDs []string) {
+	for fieldKey, localizedField := range rawFields {
+		if !strings.HasSuffix(fieldKey, "_") {
+			continue
+		}
+		byt, err := json.Marshal(localizedField)
+		if err != nil {
+			return nil
+		}
+		fieldMap := map[string][]*ContentTypeSys{}
+		err = json.Unmarshal(byt, &fieldMap)
+		if err != nil {
+			return nil
+		}
+		for _, fieldValue := range fieldMap {
+			if fieldValue != nil {
+				for _, childItem := range fieldValue {
+					childIDs = append(childIDs, childItem.Sys.ID)
+				}
+			}
+		}
+	}
+	return childIDs
 }

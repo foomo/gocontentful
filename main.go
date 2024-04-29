@@ -104,8 +104,10 @@ func main() {
 	if cmaKey == "" && *flagGenerateFromExport == "" {
 		cmaKey = getCmaKeyFromRcFile()
 	}
-	if conf.ExportFile == "" && (conf.SpaceID == "" || cmaKey == "") ||
-		conf.ExportFile != "" && (conf.SpaceID != "" || cmaKey != "") {
+	if conf.ExportFile == "" && conf.SpaceID == "" ||
+		conf.ExportFile != "" && conf.SpaceID != "" {
+		byt, _ := json.MarshalIndent(conf, "", "  ")
+		fmt.Println(string(byt))
 		usageError("Please provide either a Contentful Space ID and CMA access token or an export file name")
 	}
 	var path string

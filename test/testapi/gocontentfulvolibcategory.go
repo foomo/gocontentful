@@ -559,6 +559,8 @@ func (cc *ContentfulClient) cacheCategoryByID(ctx context.Context, id string, en
 	defer cc.cacheMutex.idContentTypeMapGcLock.Unlock()
 	cc.cacheMutex.parentMapGcLock.Lock()
 	defer cc.cacheMutex.parentMapGcLock.Unlock()
+	cc.cacheMutex.genericEntriesGcLock.Lock()
+	defer cc.cacheMutex.genericEntriesGcLock.Unlock()
 
 	var col *contentful.Collection
 	if entryPayload != nil {
@@ -581,6 +583,7 @@ func (cc *ContentfulClient) cacheCategoryByID(ctx context.Context, id string, en
 	}
 	// It was deleted
 	if col != nil && len(col.Items) == 0 || entryDelete {
+		delete(cc.Cache.genericEntries, id)
 		delete(cc.Cache.entryMaps.category, id)
 		delete(cc.Cache.idContentTypeMap, id)
 		// delete as child
@@ -606,6 +609,11 @@ func (cc *ContentfulClient) cacheCategoryByID(ctx context.Context, id string, en
 		cc.Cache.entryMaps.category = map[string]*CfCategory{}
 	}
 	cc.Cache.entryMaps.category[id] = category
+	cc.Cache.genericEntries[id] = &GenericEntry{
+		Sys:       category.Sys,
+		RawFields: category.RawFields,
+		CC:        category.CC,
+	}
 	cc.Cache.idContentTypeMap[id] = category.Sys.ContentType.Sys.ID
 	allChildrensIds := map[string]bool{}
 
@@ -641,7 +649,13 @@ func colToCfCategory(col *contentful.Collection, cc *ContentfulClient) (vos []*C
 			vo.Fields.CategoryDescription = cleanUpStringField(vo.Fields.CategoryDescription)
 
 		}
+		var typedItem RawItem
+		err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&typedItem)
+		if err != nil {
+			break
+		}
 		vo.CC = cc
+		vo.RawFields = typedItem.Fields
 		vos = append(vos, &vo)
 	}
 	return vos, err
