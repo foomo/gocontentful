@@ -106,7 +106,10 @@ func main() {
 	}
 	if conf.ExportFile == "" && conf.SpaceID == "" ||
 		conf.ExportFile != "" && conf.SpaceID != "" {
-		byt, _ := json.MarshalIndent(conf, "", "  ")
+		byt, errMarshal := json.MarshalIndent(conf, "", "  ")
+		if errMarshal != nil {
+			fatal(errMarshal)
+		}
 		fmt.Println(string(byt))
 		usageError("Please provide either a Contentful Space ID and CMA access token or an export file name")
 	}
