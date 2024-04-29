@@ -15,7 +15,19 @@ in your IDE.
 The repository includes an offline representation of a Contentful space that can is used for testing gocontentful
 without depending on an online connection and an existing Contentful space.
 
-Create a file in the repository home directory and name it `untracked_test.go`. This ensures it's not tracked by git.
+First, open a terminal and install
+
+```bash
+go install github.com/gotesttools/gotestfmt/v2/cmd/gotestfmt@latest
+```
+
+Then `cd` to the repository folder and make sure tests run fine on your machine
+
+```bash
+make test
+```
+
+Create a test file in the repository home directory (`api_test.go` might be a good choice).
 Paste the following into the file:
 
 ```go

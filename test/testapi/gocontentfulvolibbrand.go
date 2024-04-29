@@ -797,7 +797,6 @@ func (cc *ContentfulClient) cacheBrandByID(ctx context.Context, id string, entry
 	defer cc.cacheMutex.parentMapGcLock.Unlock()
 	cc.cacheMutex.genericEntriesGcLock.Lock()
 	defer cc.cacheMutex.genericEntriesGcLock.Unlock()
-
 	var col *contentful.Collection
 	if entryPayload != nil {
 		col = &contentful.Collection{

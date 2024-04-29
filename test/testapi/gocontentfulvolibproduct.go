@@ -612,7 +612,7 @@ func (vo *CfProduct) Brand(ctx context.Context, locale ...Locale) *EntryReferenc
 	return nil
 }
 
-func (vo *CfProduct) SubProduct(locale ...Locale) *EntryReference {
+func (vo *CfProduct) SubProduct(ctx context.Context, locale ...Locale) *EntryReference {
 	if vo == nil {
 		return nil
 	}
@@ -647,7 +647,7 @@ func (vo *CfProduct) SubProduct(locale ...Locale) *EntryReference {
 		}
 	}
 	localizedSubProduct := vo.Fields.SubProduct[string(loc)]
-	contentType, err := vo.CC.GetContentTypeOfID(localizedSubProduct.Sys.ID)
+	contentType, err := vo.CC.GetContentTypeOfID(ctx, localizedSubProduct.Sys.ID)
 	if err != nil {
 		if vo.CC.logFn != nil && vo.CC.logLevel <= LogError {
 			vo.CC.logFn(map[string]interface{}{"content type": vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method": "SubProduct()"}, LogError, ErrNoTypeOfRefEntry)
@@ -657,7 +657,7 @@ func (vo *CfProduct) SubProduct(locale ...Locale) *EntryReference {
 	switch contentType {
 
 	case ContentTypeBrand:
-		referencedVO, err := vo.CC.GetBrandByID(localizedSubProduct.Sys.ID)
+		referencedVO, err := vo.CC.GetBrandByID(ctx, localizedSubProduct.Sys.ID)
 		if err != nil {
 			if vo.CC.logFn != nil && vo.CC.logLevel <= LogError {
 				vo.CC.logFn(map[string]interface{}{"content type": vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method": "SubProduct()"}, LogError, err)
@@ -667,7 +667,7 @@ func (vo *CfProduct) SubProduct(locale ...Locale) *EntryReference {
 		return &EntryReference{ContentType: contentType, ID: localizedSubProduct.Sys.ID, VO: referencedVO}
 
 	case ContentTypeCategory:
-		referencedVO, err := vo.CC.GetCategoryByID(localizedSubProduct.Sys.ID)
+		referencedVO, err := vo.CC.GetCategoryByID(ctx, localizedSubProduct.Sys.ID)
 		if err != nil {
 			if vo.CC.logFn != nil && vo.CC.logLevel <= LogError {
 				vo.CC.logFn(map[string]interface{}{"content type": vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method": "SubProduct()"}, LogError, err)
@@ -677,7 +677,7 @@ func (vo *CfProduct) SubProduct(locale ...Locale) *EntryReference {
 		return &EntryReference{ContentType: contentType, ID: localizedSubProduct.Sys.ID, VO: referencedVO}
 
 	case ContentTypeProduct:
-		referencedVO, err := vo.CC.GetProductByID(localizedSubProduct.Sys.ID)
+		referencedVO, err := vo.CC.GetProductByID(ctx, localizedSubProduct.Sys.ID)
 		if err != nil {
 			if vo.CC.logFn != nil && vo.CC.logLevel <= LogError {
 				vo.CC.logFn(map[string]interface{}{"content type": vo.Sys.ContentType.Sys.ID, "entry ID": vo.Sys.ID, "method": "SubProduct()"}, LogError, err)
@@ -1434,7 +1434,6 @@ func (cc *ContentfulClient) cacheProductByID(ctx context.Context, id string, ent
 	defer cc.cacheMutex.parentMapGcLock.Unlock()
 	cc.cacheMutex.genericEntriesGcLock.Lock()
 	defer cc.cacheMutex.genericEntriesGcLock.Unlock()
-
 	var col *contentful.Collection
 	if entryPayload != nil {
 		col = &contentful.Collection{

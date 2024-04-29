@@ -561,7 +561,6 @@ func (cc *ContentfulClient) cacheCategoryByID(ctx context.Context, id string, en
 	defer cc.cacheMutex.parentMapGcLock.Unlock()
 	cc.cacheMutex.genericEntriesGcLock.Lock()
 	defer cc.cacheMutex.genericEntriesGcLock.Unlock()
-
 	var col *contentful.Collection
 	if entryPayload != nil {
 		col = &contentful.Collection{

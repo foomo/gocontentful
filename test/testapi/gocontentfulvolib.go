@@ -178,9 +178,9 @@ var (
 	InfoPreservingExistingCache      = "could not connect for cache update, preserving the existing cache"
 	InfoUpdateCacheTime              = "space caching done, time recorded"
 	ErrorEnvironmentSetToMaster      = "environment was empty string, set to master"
-	ErrorEntryNotFound               = "entry not found"
 	ErrorEntryIsNil                  = "entry is nil"
 	ErrorEntrySysIsNil               = "entry.Sys is nil"
+	ErrorEntryNotFound               = "entry not found"
 	ErrorEntrySysContentTypeIsNil    = "entry.Sys.ContentType is nil"
 	ErrorEntrySysContentTypeSysIsNil = "entry.Sys.ContentType.Sys is nil"
 	ErrorEntryCachingFailed          = "entry caching failed"
@@ -657,12 +657,12 @@ func (genericEntry *GenericEntry) FieldAsString(fieldName string, locale ...Loca
 	}
 }
 
-func (genericEntry *GenericEntry) InheritAsString(fieldName string, parentTypes []string, locale ...Locale) (string, error) {
+func (genericEntry *GenericEntry) InheritAsString(ctx context.Context, fieldName string, parentTypes []string, locale ...Locale) (string, error) {
 	val, err := genericEntry.FieldAsString(fieldName, locale...)
 	if err == nil {
 		return val, nil
 	}
-	parentRefs, err := commonGetParents(genericEntry.CC, genericEntry.Sys.ID, parentTypes)
+	parentRefs, err := commonGetParents(ctx, genericEntry.CC, genericEntry.Sys.ID, parentTypes)
 	if err != nil {
 		return "", err
 	}
@@ -713,12 +713,12 @@ func (genericEntry *GenericEntry) FieldAsFloat64(fieldName string, locale ...Loc
 	}
 }
 
-func (genericEntry *GenericEntry) InheritAsFloat64(fieldName string, parentTypes []string, locale ...Locale) (float64, error) {
+func (genericEntry *GenericEntry) InheritAsFloat64(ctx context.Context, fieldName string, parentTypes []string, locale ...Locale) (float64, error) {
 	val, err := genericEntry.FieldAsFloat64(fieldName, locale...)
 	if err == nil {
 		return val, nil
 	}
-	parentRefs, err := commonGetParents(genericEntry.CC, genericEntry.Sys.ID, parentTypes)
+	parentRefs, err := commonGetParents(ctx, genericEntry.CC, genericEntry.Sys.ID, parentTypes)
 	if err != nil {
 		return 0, err
 	}
@@ -781,12 +781,12 @@ func (genericEntry *GenericEntry) FieldAsReference(fieldName string, locale ...L
 	return nil, ErrNotSet
 }
 
-func (genericEntry *GenericEntry) InheritAsReference(fieldName string, parentTypes []string, locale ...Locale) (*EntryReference, error) {
+func (genericEntry *GenericEntry) InheritAsReference(ctx context.Context, fieldName string, parentTypes []string, locale ...Locale) (*EntryReference, error) {
 	val, err := genericEntry.FieldAsReference(fieldName, locale...)
 	if err == nil {
 		return val, nil
 	}
-	parentRefs, err := commonGetParents(genericEntry.CC, genericEntry.Sys.ID, parentTypes)
+	parentRefs, err := commonGetParents(ctx, genericEntry.CC, genericEntry.Sys.ID, parentTypes)
 	if err != nil {
 		return nil, err
 	}
@@ -831,7 +831,7 @@ func (genericEntry *GenericEntry) SetField(fieldName string, fieldValue interfac
 	return ErrNotSet
 }
 
-func (genericEntry *GenericEntry) Upsert() error {
+func (genericEntry *GenericEntry) Upsert(ctx context.Context) error {
 	cfEntry := &contentful.Entry{
 		Fields: map[string]interface{}{},
 	}
@@ -849,7 +849,7 @@ func (genericEntry *GenericEntry) Upsert() error {
 		cfEntry.Fields[key] = fieldValue
 	}
 	// upsert the entry
-	err := genericEntry.CC.Client.Entries.Upsert(genericEntry.CC.SpaceID, cfEntry)
+	err := genericEntry.CC.Client.Entries.Upsert(ctx, genericEntry.CC.SpaceID, cfEntry)
 	if err != nil {
 		if genericEntry.CC.logFn != nil && genericEntry.CC.logLevel <= LogWarn {
 			genericEntry.CC.logFn(map[string]interface{}{"task": "UpdateCache"}, LogWarn, fmt.Errorf("CfAkeneoSettings UpsertEntry: Operation failed: %w", err))
@@ -1059,6 +1059,8 @@ func (cc *ContentfulClient) syncCache(ctx context.Context, contentTypes []string
 					if cc.logFn != nil && cc.logLevel <= LogWarn {
 						cc.logFn(map[string]interface{}{"id": asset.Sys.ID, "task": "syncCache", "error": err.Error()}, LogWarn, "failed to update cache for entry")
 					}
+				} else {
+					syncAssetCount++
 				}
 			case sysTypeDeletedAsset:
 				if err := updateCacheForContentTypeAndEntity(ctx, cc, assetWorkerType, asset.Sys.ID, nil, true); err != nil {
@@ -1943,7 +1945,7 @@ func updateCacheForContentTypeAndEntity(ctx context.Context, cc *ContentfulClien
 	return nil
 }
 
-func commonGetParents(ctx context.Context, cc *ContentfulClient, id string, contentType []string) (parents []EntryReference, err error) {
+func commonGetParents(ctx context.Context, cc *ContentfulClient, id string, contentTypes []string) (parents []EntryReference, err error) {
 	parents = []EntryReference{}
 	cc.cacheMutex.sharedDataGcLock.RLock()
 	cacheInit := cc.cacheInit

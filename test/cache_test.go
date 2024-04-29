@@ -140,7 +140,8 @@ func TestGenericEntries(t *testing.T) {
 	sku, err := genericProduct.FieldAsString("sku")
 	require.Error(t, err)
 	require.Equal(t, "", sku)
-	inheritedSKU, err := genericProduct.InheritAsString("sku", nil)
+	ctx := context.Background()
+	inheritedSKU, err := genericProduct.InheritAsString(ctx, "sku", nil)
 	require.NoError(t, err)
 	require.Equal(t, "B00MG4ULK2", inheritedSKU)
 }
