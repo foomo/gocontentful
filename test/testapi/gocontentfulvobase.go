@@ -75,10 +75,10 @@ type RichTextData struct {
 
 type RichTextGenericNode struct {
 	NodeType string                 `json:"nodeType"`
-	Content  []*RichTextGenericNode `json:"content,omitempty"`
-	Data     map[string]interface{} `json:"data,omitempty"`
+	Content  []*RichTextGenericNode `json:"content"`
+	Data     map[string]interface{} `json:"data"`
 	Value    string                 `json:"value"`
-	Marks    []RichTextMark         `json:"marks,omitempty"`
+	Marks    []RichTextMark         `json:"marks"`
 }
 
 type richTextHtmlTag struct {
