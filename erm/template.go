@@ -1,6 +1,7 @@
 package erm
 
 import (
+	"strings"
 	"text/template"
 
 	"golang.org/x/text/cases"
