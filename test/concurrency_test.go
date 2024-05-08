@@ -94,7 +94,7 @@ func TestConcurrentReadWrites(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			testLogger.Infof("testConcurrentReadWrites: caching run %d", i)
-			err := contentfulClient.UpdateCache(context.TODO(), nil, false)
+			_, _, err := contentfulClient.UpdateCache(context.TODO(), nil, false)
 			if err != nil {
 				testLogger.Errorf("testConcurrentReadWrites: %v", err)
 			}

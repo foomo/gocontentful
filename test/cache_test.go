@@ -10,8 +10,9 @@ import (
 
 func TestCache(t *testing.T) {
 	contentfulClient, err := getTestClient()
-	contentfulClient.ClientStats()
+	require.NotNil(t, contentfulClient)
 	require.NoError(t, err)
+	contentfulClient.ClientStats()
 	stats, err := contentfulClient.GetCacheStats()
 	require.NoError(t, err)
 	require.Equal(t, 3, len(stats.ContentTypes))
@@ -86,7 +87,7 @@ func TestCacheIfNewEntry(t *testing.T) {
 	require.NoError(t, err)
 	err = contentfulClient.SetOfflineFallback(testFile)
 	require.NoError(t, err)
-	err = contentfulClient.UpdateCache(context.Background(), nil, false)
+	_, _, err = contentfulClient.UpdateCache(context.Background(), nil, false)
 	require.NoError(t, err)
 	stats, err = contentfulClient.GetCacheStats()
 	require.NoError(t, err)
@@ -100,7 +101,7 @@ func TestPreserveCacheIfNewer(t *testing.T) {
 	require.NoError(t, err)
 	err = contentfulClient.SetOfflineFallback(testFile)
 	require.NoError(t, err)
-	err = contentfulClient.UpdateCache(context.TODO(), nil, false)
+	_, _, err = contentfulClient.UpdateCache(context.TODO(), nil, false)
 	require.NoError(t, err)
 	brand, err := contentfulClient.GetBrandByID(context.TODO(), "JrePkDVYomE8AwcuCUyMi")
 	require.NoError(t, err)

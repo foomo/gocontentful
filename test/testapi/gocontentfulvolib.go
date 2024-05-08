@@ -572,7 +572,7 @@ func NewOfflineContentfulClient(file []byte, logFn func(fields map[string]interf
 	if cc.logFn != nil && cc.logLevel <= LogInfo {
 		cc.logFn(map[string]interface{}{"entries": len(offlineTemp.Entries), "assets": len(offlineTemp.Assets)}, LogInfo, InfoLoadingFromFile)
 	}
-	err = cc.UpdateCache(context.TODO(), spaceContentTypes, cacheAssets)
+	_, _, err = cc.UpdateCache(context.TODO(), spaceContentTypes, cacheAssets)
 	if err != nil {
 		return nil, fmt.Errorf("NewOfflineContentfulClient could not cache offline space: %v", err)
 	}
@@ -899,7 +899,7 @@ func (cc *ContentfulClient) ResetSync() {
 	cc.syncToken = ""
 }
 
-func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []string, cacheAssets bool) error {
+func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []string, cacheAssets bool) (map[string][]string, []string, error) {
 	cc.cacheMutex.sharedDataGcLock.RLock()
 	ctxAtWork, cancel := context.WithTimeout(ctx, time.Second*time.Duration(cc.cacheUpdateTimeout))
 	defer cancel()
@@ -918,7 +918,7 @@ func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []stri
 	} else {
 		for _, contentType := range contentTypes {
 			if !stringSliceContains(spaceContentTypes, contentType) {
-				return fmt.Errorf("UpdateCache: Content Type %q not available in this space", contentType)
+				return nil, nil, fmt.Errorf("UpdateCache: Content Type %q not available in this space", contentType)
 			}
 		}
 	}
@@ -949,15 +949,15 @@ func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []stri
 		if cc.logFn != nil && cc.logLevel <= LogInfo {
 			cc.logFn(map[string]interface{}{"task": "UpdateCache"}, LogInfo, InfoCacheUpdateDone)
 		}
-		return nil
+		return nil, nil, nil
 	}
 	if cc.logFn != nil && cc.logLevel <= LogInfo {
 		cc.logFn(map[string]interface{}{"task": "UpdateCache"}, LogInfo, InfoCacheUpdateSkipped)
 	}
-	return nil
+	return nil, nil, nil
 }
 
-func (cc *ContentfulClient) syncCache(ctx context.Context, contentTypes []string) error {
+func (cc *ContentfulClient) syncCache(ctx context.Context, contentTypes []string) (map[string][]string, []string, error) {
 	start := time.Now()
 	cc.cacheMutex.sharedDataGcLock.Lock()
 	cc.Cache.contentTypes = contentTypes
@@ -965,9 +965,11 @@ func (cc *ContentfulClient) syncCache(ctx context.Context, contentTypes []string
 	if cc.logFn != nil && cc.logLevel <= LogInfo {
 		cc.logFn(map[string]interface{}{"task": "syncCache"}, LogInfo, InfoCacheUpdateQueued)
 	}
+	syncdEntries := map[string][]string{}
+	syncdAssets := []string{}
 	for {
 		if ctx.Err() != nil {
-			return ctx.Err()
+			return nil, nil, ctx.Err()
 		}
 		cc.cacheMutex.sharedDataGcLock.RLock()
 		col := cc.Client.Entries.Sync(
@@ -978,7 +980,7 @@ func (cc *ContentfulClient) syncCache(ctx context.Context, contentTypes []string
 		)
 		cc.cacheMutex.sharedDataGcLock.RUnlock()
 		if _, err := col.GetAll(); err != nil {
-			return err
+			return nil, nil, err
 		}
 		cc.cacheMutex.sharedDataGcLock.Lock()
 		cc.syncToken = col.SyncToken
@@ -988,13 +990,13 @@ func (cc *ContentfulClient) syncCache(ctx context.Context, contentTypes []string
 			if cc.logFn != nil && cc.logLevel <= LogInfo {
 				cc.logFn(map[string]interface{}{"time elapsed": fmt.Sprint(time.Since(start)), "task": "syncCache"}, LogInfo, InfoUpdateCacheTime)
 			}
-			return nil
+			return syncdEntries, syncdAssets, nil
 		}
 		var entries []*contentful.Entry
 		var assets []*contentful.Asset
 		for _, item := range col.Items {
 			if ctx.Err() != nil {
-				return ctx.Err()
+				return nil, nil, ctx.Err()
 			}
 			entry := &contentful.Entry{}
 			byteArray, _ := json.Marshal(item)
@@ -1014,10 +1016,9 @@ func (cc *ContentfulClient) syncCache(ctx context.Context, contentTypes []string
 				entries = append(entries, entry)
 			}
 		}
-		syncEntryCount := map[string]int{}
 		for _, entry := range entries {
 			if ctx.Err() != nil {
-				return ctx.Err()
+				return nil, nil, ctx.Err()
 			}
 			switch entry.Sys.Type {
 			case sysTypeEntry:
@@ -1029,7 +1030,10 @@ func (cc *ContentfulClient) syncCache(ctx context.Context, contentTypes []string
 						cc.logFn(map[string]interface{}{"id": entry.Sys.ID, "task": "syncCache", "error": err.Error()}, LogWarn, "failed to update cache for entry")
 					}
 				} else {
-					syncEntryCount[entry.Sys.ContentType.Sys.ID]++
+					if _, ok := syncdEntries[entry.Sys.ContentType.Sys.ID]; !ok {
+						syncdEntries[entry.Sys.ContentType.Sys.ID] = []string{}
+					}
+					syncdEntries[entry.Sys.ContentType.Sys.ID] = append(syncdEntries[entry.Sys.ContentType.Sys.ID], entry.Sys.ID)
 				}
 			case sysTypeDeletedEntry:
 				cc.cacheMutex.idContentTypeMapGcLock.RLock()
@@ -1040,18 +1044,22 @@ func (cc *ContentfulClient) syncCache(ctx context.Context, contentTypes []string
 						cc.logFn(map[string]interface{}{"id": entry.Sys.ID, "task": "syncCache", "error": err.Error()}, LogWarn, "failed to delete cache for entry")
 					}
 				} else {
-					syncEntryCount["deletedEntry"]++
+					if _, ok := syncdEntries[entry.Sys.ContentType.Sys.ID]; !ok {
+						syncdEntries[entry.Sys.ContentType.Sys.ID] = []string{}
+					}
+					syncdEntries[entry.Sys.ContentType.Sys.ID] = append(syncdEntries[entry.Sys.ContentType.Sys.ID], entry.Sys.ID)
 				}
 			default:
 			}
 		}
 		if cc.logFn != nil && len(entries) > 0 && cc.logLevel <= LogInfo {
-			cc.logFn(map[string]interface{}{"task": "syncCache", "syncEntryCount": syncEntryCount}, LogInfo, InfoCacheSyncOp)
+			for contentType, ids := range syncdEntries {
+				cc.logFn(map[string]interface{}{"task": "syncCache", "contentType": contentType, "syncEntryCount": len(ids)}, LogInfo, InfoCacheSyncOp)
+			}
 		}
-		var syncAssetCount int
 		for _, asset := range assets {
 			if ctx.Err() != nil {
-				return ctx.Err()
+				return nil, nil, ctx.Err()
 			}
 			switch asset.Sys.Type {
 			case sysTypeAsset:
@@ -1060,7 +1068,7 @@ func (cc *ContentfulClient) syncCache(ctx context.Context, contentTypes []string
 						cc.logFn(map[string]interface{}{"id": asset.Sys.ID, "task": "syncCache", "error": err.Error()}, LogWarn, "failed to update cache for entry")
 					}
 				} else {
-					syncAssetCount++
+					syncdAssets = append(syncdAssets, asset.Sys.ID)
 				}
 			case sysTypeDeletedAsset:
 				if err := updateCacheForContentTypeAndEntity(ctx, cc, assetWorkerType, asset.Sys.ID, nil, true); err != nil {
@@ -1068,15 +1076,16 @@ func (cc *ContentfulClient) syncCache(ctx context.Context, contentTypes []string
 						cc.logFn(map[string]interface{}{"id": asset.Sys.ID, "task": "syncCache", "error": err.Error()}, LogWarn, "failed to delete cache for entry")
 					}
 				} else {
-					syncAssetCount++
+					syncdAssets = append(syncdAssets, asset.Sys.ID)
 				}
 			default:
 			}
 		}
 		if cc.logFn != nil && len(assets) > 0 && cc.logLevel <= LogInfo {
-			cc.logFn(map[string]interface{}{"task": "syncCache", "syncAssetCount": syncAssetCount}, LogInfo, InfoCacheSyncOp)
+			cc.logFn(map[string]interface{}{"task": "syncCache", "syncAssetCount": len(syncdAssets)}, LogInfo, InfoCacheSyncOp)
 		}
 	}
+	return syncdEntries, syncdAssets, nil
 }
 
 func (cc *ContentfulClient) cacheWorker(ctx context.Context, contentTypes []string, cacheAssets bool) {
