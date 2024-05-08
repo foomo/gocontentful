@@ -1,9 +1,4 @@
----
-sidebar_label: Richtext
-sidebar_position: 4
----
-
-# RichText support
+# RichText
 
 Contentful supports Rich Text fields. Behind the scenes, these are JSON objects that represent
 the content through a Contentful-specific data model. Sooner or later you might want to convert such values to and from HTML.

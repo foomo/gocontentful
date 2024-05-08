@@ -1,8 +1,3 @@
----
-sidebar_label: Setup
-sidebar_position: 1
----
-
 # Gocontentful Setup
 
 ## Installation
