@@ -965,8 +965,8 @@ func (cc *ContentfulClient) syncCache(ctx context.Context, contentTypes []string
 	if cc.logFn != nil && cc.logLevel <= LogInfo {
 		cc.logFn(map[string]interface{}{"task": "syncCache"}, LogInfo, InfoCacheUpdateQueued)
 	}
-	syncdEntries := map[string][]string{}
-	syncdAssets := []string{}
+	var syncdEntries map[string][]string
+	var syncdAssets []string
 	for {
 		if ctx.Err() != nil {
 			return nil, nil, ctx.Err()
@@ -1030,6 +1030,9 @@ func (cc *ContentfulClient) syncCache(ctx context.Context, contentTypes []string
 						cc.logFn(map[string]interface{}{"id": entry.Sys.ID, "task": "syncCache", "error": err.Error()}, LogWarn, "failed to update cache for entry")
 					}
 				} else {
+					if syncdEntries == nil {
+						syncdEntries = map[string][]string{}
+					}
 					if _, ok := syncdEntries[entry.Sys.ContentType.Sys.ID]; !ok {
 						syncdEntries[entry.Sys.ContentType.Sys.ID] = []string{}
 					}
@@ -1044,6 +1047,9 @@ func (cc *ContentfulClient) syncCache(ctx context.Context, contentTypes []string
 						cc.logFn(map[string]interface{}{"id": entry.Sys.ID, "task": "syncCache", "error": err.Error()}, LogWarn, "failed to delete cache for entry")
 					}
 				} else {
+					if syncdEntries == nil {
+						syncdEntries = map[string][]string{}
+					}
 					if _, ok := syncdEntries[entry.Sys.ContentType.Sys.ID]; !ok {
 						syncdEntries[entry.Sys.ContentType.Sys.ID] = []string{}
 					}
