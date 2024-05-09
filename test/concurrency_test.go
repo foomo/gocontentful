@@ -66,9 +66,27 @@ func writeWorker(ctx context.Context, contentfulClient *testapi.ContentfulClient
 	}
 	contentfulClient.SetProductInCache(product)
 	testLogger.Infof("Write worker %d set price: %d", i, i)
-	_ = product.SetBrand(testapi.ContentTypeSys{})
-	_ = product.SetCategories([]testapi.ContentTypeSys{})
-	_ = product.SetImage([]testapi.ContentTypeSys{})
+	_ = product.SetBrand(testapi.ContentTypeSys{
+		Sys: testapi.ContentTypeSysAttributes{
+			ID:       "651CQ8rLoIYCeY6G0QG22q",
+			Type:     "Link",
+			LinkType: "Entry",
+		},
+	})
+	_ = product.SetCategories([]testapi.ContentTypeSys{
+		{Sys: testapi.ContentTypeSysAttributes{
+			ID:       "7LAnCobuuWYSqks6wAwY2a",
+			Type:     "Link",
+			LinkType: "Entry",
+		}},
+	})
+	_ = product.SetImage([]testapi.ContentTypeSys{
+		{Sys: testapi.ContentTypeSysAttributes{
+			ID:       "10TkaLheGeQG6qQGqWYqUI",
+			Type:     "Link",
+			LinkType: "Asset",
+		}},
+	})
 	_ = product.SetNodes(nil)
 	_ = product.SetProductDescription("")
 	_ = product.SetProductName("")
