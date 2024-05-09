@@ -45,4 +45,4 @@ Gocontentful generates a Go API that handles both issues above and can be regene
 
 ---
 
-Read the documentation: [Getting Started](docs/00-gettingstarted)
+Read the documentation: [Getting Started](docs/00-gettingstarted.md)
