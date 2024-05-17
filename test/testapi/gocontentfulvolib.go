@@ -572,7 +572,7 @@ func NewOfflineContentfulClient(file []byte, logFn func(fields map[string]interf
 	if cc.logFn != nil && cc.logLevel <= LogInfo {
 		cc.logFn(map[string]interface{}{"entries": len(offlineTemp.Entries), "assets": len(offlineTemp.Assets)}, LogInfo, InfoLoadingFromFile)
 	}
-	_, _, err = cc.UpdateCache(context.TODO(), spaceContentTypes, cacheAssets)
+	_, _, err = cc.UpdateCache(context.Background(), spaceContentTypes, cacheAssets)
 	if err != nil {
 		return nil, fmt.Errorf("NewOfflineContentfulClient could not cache offline space: %v", err)
 	}
@@ -642,8 +642,10 @@ func (genericEntry *GenericEntry) FieldAsString(fieldName string, locale ...Loca
 	}
 	switch field := genericEntry.RawFields[fieldName].(type) {
 	case map[string]interface{}:
-		fieldLoc := field[string(loc)]
-		if fieldLoc == "" && field[string(DefaultLocale)] != "" {
+		var fieldLoc any
+		if _, ok := field[string(loc)]; ok {
+			fieldLoc = field[string(loc)]
+		} else {
 			fieldLoc = field[string(DefaultLocale)]
 		}
 		switch fieldLocStr := fieldLoc.(type) {
@@ -681,6 +683,70 @@ func (genericEntry *GenericEntry) InheritAsString(ctx context.Context, fieldName
 		}
 	}
 	return "", ErrNotSet
+}
+
+func (genericEntry *GenericEntry) FieldAsStringSlice(fieldName string, locale ...Locale) ([]string, error) {
+	var loc Locale
+	if len(locale) != 0 {
+		loc = locale[0]
+		if _, ok := localeFallback[loc]; !ok {
+			return nil, ErrLocaleUnsupported
+		}
+	} else {
+		loc = DefaultLocale
+	}
+	if _, ok := genericEntry.RawFields[fieldName]; !ok {
+		return nil, ErrNotSet
+	}
+	switch field := genericEntry.RawFields[fieldName].(type) {
+	case map[string]any:
+		var fieldLoc any
+		if _, ok := field[string(loc)]; ok {
+			fieldLoc = field[string(loc)]
+		} else {
+			fieldLoc = field[string(DefaultLocale)]
+		}
+		if fieldLoc != nil {
+			switch fieldLoc.(type) {
+			case []any:
+				var out []string
+				for _, v := range fieldLoc.([]any) {
+					switch v.(type) {
+					case string:
+						out = append(out, v.(string))
+					}
+				}
+				return out, nil
+			}
+		}
+	}
+	return nil, ErrNotSet
+}
+
+func (genericEntry *GenericEntry) InheritAsStringSlice(ctx context.Context, fieldName string, parentTypes []string, locale ...Locale) ([]string, error) {
+	val, err := genericEntry.FieldAsStringSlice(fieldName, locale...)
+	if err == nil {
+		return val, nil
+	}
+	parentRefs, err := commonGetParents(ctx, genericEntry.CC, genericEntry.Sys.ID, parentTypes)
+	if err != nil {
+		return nil, err
+	}
+	if len(parentRefs) > 0 {
+		for _, parentRef := range parentRefs {
+			genericParent, err := genericEntry.CC.GetGenericEntry(parentRef.ID)
+			if err != nil {
+				return nil, err
+			}
+			parentVal, err := genericParent.FieldAsStringSlice(fieldName, locale...)
+			if err != nil {
+				return nil, err
+			} else {
+				return parentVal, nil
+			}
+		}
+	}
+	return nil, ErrNotSet
 }
 
 func (genericEntry *GenericEntry) FieldAsFloat64(fieldName string, locale ...Locale) (float64, error) {
@@ -797,6 +863,249 @@ func (genericEntry *GenericEntry) InheritAsReference(ctx context.Context, fieldN
 				return nil, err
 			}
 			parentVal, err := genericParent.FieldAsReference(fieldName, locale...)
+			if err != nil {
+				return nil, err
+			} else {
+				return parentVal, nil
+			}
+		}
+	}
+	return nil, ErrNotSet
+}
+
+func (genericEntry *GenericEntry) FieldAsAsset(ctx context.Context, fieldName string, locale ...Locale) (*contentful.AssetNoLocale, error) {
+	var loc Locale
+	reqLoc := DefaultLocale
+	if len(locale) != 0 {
+		loc = locale[0]
+		reqLoc = locale[0]
+		if _, ok := localeFallback[loc]; !ok {
+			return nil, ErrLocaleUnsupported
+		}
+	} else {
+		loc = DefaultLocale
+	}
+	var cts ContentTypeSys
+	if _, ok := genericEntry.RawFields[fieldName]; !ok {
+		return nil, ErrNotSet
+	}
+	switch field := genericEntry.RawFields[fieldName].(type) {
+	case map[string]interface{}:
+		fieldVal := field[string(loc)]
+		if fieldVal == nil {
+			fieldVal = field[string(DefaultLocale)]
+		}
+		byt, err := json.Marshal(fieldVal)
+		if err != nil {
+			return nil, err
+		}
+		err = json.Unmarshal(byt, &cts)
+		if err != nil {
+			return nil, err
+		}
+		asset, err := genericEntry.CC.GetAssetByID(ctx, cts.Sys.ID)
+		if err != nil {
+			if genericEntry.CC.logFn != nil && genericEntry.CC.logLevel == LogDebug {
+				genericEntry.CC.logFn(map[string]interface{}{"content type": genericEntry.Sys.ContentType.Sys.ID, "entry ID": genericEntry.Sys.ID, "method": "HeaderImage()"}, LogError, ErrNoTypeOfRefAsset)
+			}
+			return nil, ErrNotSet
+		}
+		tempAsset := &contentful.AssetNoLocale{}
+		tempAsset.Sys = asset.Sys
+		tempAsset.Fields = &contentful.FileFieldsNoLocale{}
+		if _, ok := asset.Fields.Title[string(reqLoc)]; ok {
+			tempAsset.Fields.Title = asset.Fields.Title[string(reqLoc)]
+		} else {
+			tempAsset.Fields.Title = asset.Fields.Title[string(loc)]
+		}
+		if _, ok := asset.Fields.Description[string(reqLoc)]; ok {
+			tempAsset.Fields.Description = asset.Fields.Description[string(reqLoc)]
+		} else {
+			tempAsset.Fields.Description = asset.Fields.Description[string(loc)]
+		}
+		if _, ok := asset.Fields.File[string(reqLoc)]; ok {
+			tempAsset.Fields.File = asset.Fields.File[string(reqLoc)]
+		} else {
+			tempAsset.Fields.File = asset.Fields.File[string(loc)]
+		}
+		return tempAsset, nil
+	}
+	return nil, ErrNotSet
+}
+
+func (genericEntry *GenericEntry) FieldAsMultipleReference(fieldName string, locale ...Locale) ([]*EntryReference, error) {
+	var loc Locale
+	if len(locale) != 0 {
+		loc = locale[0]
+		if _, ok := localeFallback[loc]; !ok {
+			return nil, ErrLocaleUnsupported
+		}
+	} else {
+		loc = DefaultLocale
+	}
+	var ctss []ContentTypeSys
+	if _, ok := genericEntry.RawFields[fieldName]; !ok {
+		return nil, ErrNotSet
+	}
+	switch field := genericEntry.RawFields[fieldName].(type) {
+	case map[string]interface{}:
+		fieldVal := field[string(loc)]
+		if fieldVal == nil {
+			fieldVal = field[string(DefaultLocale)]
+		}
+		byt, err := json.Marshal(fieldVal)
+		if err != nil {
+			return nil, err
+		}
+		err = json.Unmarshal(byt, &ctss)
+		if err != nil {
+			return nil, err
+		}
+		var refs []*EntryReference
+		for _, cts := range ctss {
+			referencedEntry, err := genericEntry.CC.GetGenericEntry(cts.Sys.ID)
+			if err != nil || referencedEntry == nil {
+				return nil, err
+			}
+			refs = append(refs, &EntryReference{
+				ID:          cts.Sys.ID,
+				ContentType: referencedEntry.Sys.ContentType.Sys.ID,
+				FromField:   fieldName,
+			})
+		}
+		return refs, nil
+	}
+	return nil, ErrNotSet
+}
+
+func (genericEntry *GenericEntry) InheritAsMultipleReference(ctx context.Context, fieldName string, parentTypes []string, locale ...Locale) ([]*EntryReference, error) {
+	val, err := genericEntry.FieldAsMultipleReference(fieldName, locale...)
+	if err == nil {
+		return val, nil
+	}
+	parentRefs, err := commonGetParents(ctx, genericEntry.CC, genericEntry.Sys.ID, parentTypes)
+	if err != nil {
+		return nil, err
+	}
+	if len(parentRefs) > 0 {
+		for _, parentRef := range parentRefs {
+			genericParent, err := genericEntry.CC.GetGenericEntry(parentRef.ID)
+			if err != nil {
+				return nil, err
+			}
+			parentVal, err := genericParent.FieldAsMultipleReference(fieldName, locale...)
+			if err != nil {
+				return nil, err
+			} else {
+				return parentVal, nil
+			}
+		}
+	}
+	return nil, ErrNotSet
+}
+
+func (genericEntry *GenericEntry) FieldAsBool(fieldName string, locale ...Locale) (bool, error) {
+	var loc Locale
+	if len(locale) != 0 {
+		loc = locale[0]
+		if _, ok := localeFallback[loc]; !ok {
+			return false, ErrLocaleUnsupported
+		}
+	} else {
+		loc = DefaultLocale
+	}
+	if _, ok := genericEntry.RawFields[fieldName]; !ok {
+		return false, ErrNotSet
+	}
+	switch field := genericEntry.RawFields[fieldName].(type) {
+	case map[string]interface{}:
+		var fieldLoc any
+		if _, ok := field[string(loc)]; ok {
+			fieldLoc = field[string(loc)]
+		} else {
+			fieldLoc = field[string(DefaultLocale)]
+		}
+		switch fieldLocStr := fieldLoc.(type) {
+		case bool:
+			return fieldLocStr, nil
+		default:
+			return false, ErrNotSet
+		}
+	default:
+		return false, ErrNotSet
+	}
+}
+
+func (genericEntry *GenericEntry) InheritAsBool(ctx context.Context, fieldName string, parentTypes []string, locale ...Locale) (bool, error) {
+	val, err := genericEntry.FieldAsBool(fieldName, locale...)
+	if err == nil {
+		return val, nil
+	}
+	parentRefs, err := commonGetParents(ctx, genericEntry.CC, genericEntry.Sys.ID, parentTypes)
+	if err != nil {
+		return false, err
+	}
+	if len(parentRefs) > 0 {
+		for _, parentRef := range parentRefs {
+			genericParent, err := genericEntry.CC.GetGenericEntry(parentRef.ID)
+			if err != nil {
+				return false, err
+			}
+			parentVal, err := genericParent.FieldAsBool(fieldName, locale...)
+			if err != nil {
+				return false, err
+			} else {
+				return parentVal, nil
+			}
+		}
+	}
+	return false, ErrNotSet
+}
+
+func (genericEntry *GenericEntry) FieldAsAny(fieldName string, locale ...Locale) (any, error) {
+	var loc Locale
+	if len(locale) != 0 {
+		loc = locale[0]
+		if _, ok := localeFallback[loc]; !ok {
+			return nil, ErrLocaleUnsupported
+		}
+	} else {
+		loc = DefaultLocale
+	}
+	if _, ok := genericEntry.RawFields[fieldName]; !ok {
+		return nil, ErrNotSet
+	}
+	switch field := genericEntry.RawFields[fieldName].(type) {
+	case map[string]interface{}:
+		var fieldLoc any
+		if _, ok := field[string(loc)]; ok {
+			fieldLoc = field[string(loc)]
+		} else {
+			fieldLoc = field[string(DefaultLocale)]
+		}
+		if fieldLoc != nil {
+			return fieldLoc, nil
+		}
+	}
+	return nil, ErrNotSet
+}
+
+func (genericEntry *GenericEntry) InheritAsAny(ctx context.Context, fieldName string, parentTypes []string, locale ...Locale) (any, error) {
+	val, err := genericEntry.FieldAsAny(fieldName, locale...)
+	if err == nil {
+		return val, nil
+	}
+	parentRefs, err := commonGetParents(ctx, genericEntry.CC, genericEntry.Sys.ID, parentTypes)
+	if err != nil {
+		return nil, err
+	}
+	if len(parentRefs) > 0 {
+		for _, parentRef := range parentRefs {
+			genericParent, err := genericEntry.CC.GetGenericEntry(parentRef.ID)
+			if err != nil {
+				return nil, err
+			}
+			parentVal, err := genericParent.FieldAsAny(fieldName, locale...)
 			if err != nil {
 				return nil, err
 			} else {
