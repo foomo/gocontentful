@@ -1328,10 +1328,10 @@ func (cc *ContentfulClient) syncCache(ctx context.Context, contentTypes []string
 					if syncdEntries == nil {
 						syncdEntries = map[string][]string{}
 					}
-					if _, ok := syncdEntries[entry.Sys.ContentType.Sys.ID]; !ok {
-						syncdEntries[entry.Sys.ContentType.Sys.ID] = []string{}
+					if _, ok := syncdEntries[contentType]; !ok {
+						syncdEntries[contentType] = []string{}
 					}
-					syncdEntries[entry.Sys.ContentType.Sys.ID] = append(syncdEntries[entry.Sys.ContentType.Sys.ID],entry.Sys.ID)
+					syncdEntries[contentType] = append(syncdEntries[contentType],entry.Sys.ID)
 				}
 			default:
 			}
