@@ -23,4 +23,10 @@ The conversion works the other way around too, when you need to source data from
 myRichText := HtmlToRichText(htmlSrc)
 ```
 
+You can also convert RichText to plain text with
+
+```go
+txt, err := RichTextToPlainText(rt interface{}, locale Locale)
+```
+
 See the [API Reference](./api-reference) for more details about these functions.

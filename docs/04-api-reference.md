@@ -368,7 +368,7 @@ bold tags, horizontal rules, blockquote, ordered and unordered lists, code. Unkn
 doesn't return any error as it converts the input text into something as good as possible, without validation.
 
 ```go
-RichTextToHtml(rt interface{}, linkResolver LinkResolverFunc, entryLinkResolver EntryLinkResolverFunc, imageResolver ImageResolverFunc, locale Locale) (string, error) {
+RichTextToHtml(rt interface{}, linkResolver LinkResolverFunc, entryLinkResolver EntryLinkResolverFunc, imageResolver ImageResolverFunc, locale Locale) (string, error)
 ```
 
 Converts an interface representing a Contentful RichText value (usually from a field getter) into HTML.
@@ -390,6 +390,12 @@ type EmbeddedEntryResolverFunc func(entryID string, locale Locale) (html string,
 ```
 
 All the three functions above can be passed as nil with different levels of graceful degrading.
+
+```go
+RichTextToPlainText(rt interface{}, locale Locale) (string, error)
+
+Converts the RichText to plain text.
+```
 
 ### Constants and global variables
 
