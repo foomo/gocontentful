@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"html"
 	"io"
 	"regexp"
 	"strings"
@@ -16,6 +15,7 @@ import (
 	"unicode"
 
 	"github.com/foomo/contentful"
+	"golang.org/x/net/html"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -599,6 +599,29 @@ func RichTextToHtml(rt interface{}, linkResolver LinkResolverFunc, entryLinkReso
 		return "", nil
 	}
 	return out, nil
+}
+
+func RichTextToPlainText(rt interface{}, locale Locale) (string, error) {
+	htmlStr, err := RichTextToHtml(rt, nil, nil, nil, nil, locale)
+	if err != nil {
+		return "", err
+	}
+	doc, err := html.Parse(strings.NewReader(htmlStr))
+	if err != nil {
+		return "", err
+	}
+	var f func(*html.Node)
+	text := ""
+	f = func(n *html.Node) {
+		if n.Type == html.TextNode {
+			text += n.Data
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			f(c)
+		}
+	}
+	f(doc)
+	return strings.TrimSpace(text), nil
 }
 
 func (cc *ContentfulClient) GetGenericEntry(entryID string) (*GenericEntry, error) {
@@ -1359,10 +1382,10 @@ func (cc *ContentfulClient) syncCache(ctx context.Context, contentTypes []string
 					if syncdEntries == nil {
 						syncdEntries = map[string][]string{}
 					}
-					if _, ok := syncdEntries[entry.Sys.ContentType.Sys.ID]; !ok {
-						syncdEntries[entry.Sys.ContentType.Sys.ID] = []string{}
+					if _, ok := syncdEntries[contentType]; !ok {
+						syncdEntries[contentType] = []string{}
 					}
-					syncdEntries[entry.Sys.ContentType.Sys.ID] = append(syncdEntries[entry.Sys.ContentType.Sys.ID], entry.Sys.ID)
+					syncdEntries[contentType] = append(syncdEntries[contentType], entry.Sys.ID)
 				}
 			default:
 			}
@@ -1968,6 +1991,11 @@ func (n *RichTextGenericNode) richTextRenderHTML(w io.Writer, linkResolver LinkR
 	if embeddedEntryResolver == nil {
 		embeddedEntryResolver = func(entryID string, locale Locale) (htmlSnippet string, err error) {
 			return "", nil
+		}
+	}
+	if imageResolver == nil {
+		imageResolver = func(assetID string, locale Locale) (attrs map[string]string, customHTML string, resolveError error) {
+			return map[string]string{}, "", nil
 		}
 	}
 	tags := richTextHtmlTags{}
