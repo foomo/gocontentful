@@ -1,20 +1,16 @@
----
-sidebar_label: Entries
-sidebar_position: 2
----
-
 # Working with entries
 
-Refer to the [Getting started section](../gettingstarted) for an introduction on entry operations.
+Refer to the [Getting started section](../00-gettingstarted) for an introduction on entry operations.
 With your newly created client you can do things like:
 
 ```go
+ctx := context.Background()
 // Load all persons
-persons, err := cc.GetAllPerson()
+persons, err := cc.GetAllPerson(ctx)
 // Load a specific person
-person, err := cc.GetPersonByID(THE_PERSON_ID)
+person, err := cc.GetPersonByID(ctx, THE_PERSON_ID)
 // or pass a query
-person, err := GetFilteredPerson(&contentful.Query{
+person, err := GetFilteredPerson(ctx, &contentful.Query{
 	"contentType":"person",
     "exists": []string{"fields.resume"}
 })
@@ -25,7 +21,7 @@ name := person.Name()
 // the getter functions will return that if the value is not set for locale passed to the function.
 name := person.Title(people.SpaceLocaleItalian)
 // Get references to the person's pets
-petRefs := person.Pets()
+petRefs := person.Pets(ctx)
 // Deal with pets
 for _, pet := range petRefs {
 switch pet.ContentType {
@@ -48,13 +44,13 @@ To save the entry to Contentful you need to explicitly call one of these methods
 
 ```go
 // Upsert (save) an entry
-err := dog.UpsertEntry()
+err := dog.UpsertEntry(ctx)
 // Publish it (after it's been upserted)
-err := dog.PublishEntry() // change your mind with err := dog.UnpublishEntry()
+err := dog.PublishEntry(ctx) // change your mind with err := dog.UnpublishEntry()
 // Or do it in one step
-err := dog.UpdateEntry() // upserts and publishes
+err := dog.UpdateEntry(ctx) // upserts and publishes
 // And delete it
-err := dog.DeleteEntry()
+err := dog.DeleteEntry(ctx)
 ```
 
 If you want to know the publication status of an entry as represented in Contentful's UI you
@@ -92,4 +88,4 @@ type GenericEntry struct {
 While these seem to defeat the purpose of the idiomatic API, they are useful in cases where you need to pass-through entries from Contentful to any recipient without type switching. Each generic entry carries a reference to the Gocontentful client it was used to retrieve it, so that other operations can benefit from it.
 For example, get the corresponding idiomatic entry only when needed for processing.
 
-Gocontentful supports retrieving either all generic entries in the cache or single generic entries by ID. It also provides methods to get a localized field's value as a string or a float64, set a field's value and upsert the generic entry. Take a look at [the API reference](../api-reference.md) for the method signatures.
+Gocontentful supports retrieving either all generic entries in the cache or single generic entries by ID. It also provides methods to get a localized field's value as a string or a float64, set a field's value and upsert the generic entry. Take a look at [the API reference](../04-api-reference) for the method signatures.

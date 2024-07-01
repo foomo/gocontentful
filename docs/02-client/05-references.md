@@ -1,8 +1,3 @@
----
-sidebar_label: References
-sidebar_position: 5
----
-
 # More on references
 
 When working with references it's often useful to know if there are any broken ones in the space.
@@ -28,6 +23,6 @@ Finally, you can get the parents (AKA referring) entries of either an entry or
 an EntryReference with the _GetParents()_ method. This returns a slice of `[]EntryReference`:
 
 ```go
-(vo *CfPerson) GetParents() (parents []EntryReference, err error)
+(vo *CfPerson) GetParents(ctx) (parents []EntryReference, err error)
 (ref *EntryReference) GetParents(cc *ContentfulClient) (parents []EntryReference, err error)
 ```

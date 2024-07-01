@@ -1,9 +1,10 @@
 package test
 
 import (
+	"testing"
+
 	"github.com/foomo/gocontentful/test/testapi"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 var targetRichText = &testapi.RichTextNode{

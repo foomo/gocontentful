@@ -1,8 +1,3 @@
----
-sidebar_label: API Reference
-sidebar_position: 4
----
-
 # API Reference
 
 ## Client and cache
@@ -19,7 +14,7 @@ NewContentfulClient(
 	) (*ContentfulClient, error)
 ```
 
-Creates a Contentful client, [read this](client/basicclientoperations) for an explanation of all parameters.
+Creates a Contentful client, [read this](02-client/01-basicclientoperations) for an explanation of all parameters.
 
 ```go
 SetOfflineFallback(filename string) error
