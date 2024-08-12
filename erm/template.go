@@ -1,10 +1,11 @@
 package erm
 
 import (
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
 	"strings"
 	"text/template"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 func getFuncMap() template.FuncMap {
