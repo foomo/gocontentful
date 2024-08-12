@@ -82,6 +82,20 @@ Builds or re-builds the entire client cache.
 
 Updates a single entry or asset (the sysType can take const sysTypeEntry or sysTypeAsset values) in the cache.
 
+```go
+(cc *ContentfulClient) ClientMode() ClientMode
+```
+
+Returns the internal client mode. There are three constants defined in the generated API:
+
+```go
+const (
+	ClientModeCDA ClientMode = "CDA"
+	ClientModeCPA ClientMode = "CPA"
+	ClientModeCMA ClientMode = "CMA"
+)
+```
+
 ## Content functions and methods
 
 _For these we're assuming a content type named "Person"._

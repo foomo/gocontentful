@@ -1191,6 +1191,10 @@ func (genericEntry *GenericEntry) Upsert(ctx context.Context) error {
 	return nil
 }
 
+func (cc *ContentfulClient) ClientMode() ClientMode {
+	return cc.clientMode
+}
+
 func (cc *ContentfulClient) SetCacheUpdateTimeout(seconds int64) {
 	cc.cacheUpdateTimeout = seconds
 }
