@@ -1,8 +1,3 @@
----
-sidebar_label: Caching
-sidebar_position: 3
----
-
 # Caching
 
 Caching is a fundamental part of working with remote data across the Internet,
@@ -86,7 +81,7 @@ Note that the Sync API is not officially supported by Contentful on the Preview 
 Cache update operations time out by default after 120 seconds. This makes sure that no
 routine is left hanging, blocking subsequent updates in case the main application or service
 recovers from a panic. If you need to increase this limit because you have a huge space with
-a lot of entries you can use the _SetCacheUpdateTimeout_ method. See the [API Reference](./api-reference) for details.
+a lot of entries you can use the _SetCacheUpdateTimeout_ method. See the [API Reference](./04-api-reference) for details.
 
 ## Asset caching
 

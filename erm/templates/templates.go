@@ -2,6 +2,9 @@ package templates
 
 import _ "embed"
 
+//go:embed "meta.gotmpl"
+var TemplateMeta []byte
+
 //go:embed "contentful_vo.gotmpl"
 var TemplateVo []byte
 

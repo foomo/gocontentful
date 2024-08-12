@@ -1,8 +1,3 @@
----
-sidebar_label: Getting started
-sidebar_position: 0
----
-
 # Getting Started
 
 Before you install Gocontentful as a command-line tool to use it in your projects, we suggest you get a taste of how it works by playing with the test API from the Gocontentful repository. This doesn't yet require you to have access to Contentful.
@@ -15,14 +10,27 @@ in your IDE.
 The repository includes an offline representation of a Contentful space that can is used for testing gocontentful
 without depending on an online connection and an existing Contentful space.
 
-Create a file in the repository home directory and name it `untracked_test.go`. This ensures it's not tracked by git.
+First, open a terminal and install
+
+```bash
+go install github.com/gotesttools/gotestfmt/v2/cmd/gotestfmt@latest
+```
+
+Then `cd` to the repository folder and make sure tests run fine on your machine
+
+```bash
+make test
+```
+
+Create a test file in the repository home directory (`api_test.go` might be a good choice).
 Paste the following into the file:
 
 ```go
 package main
 
 import (
-	"testing"
+	"context"
+    "testing"
 
 	"github.com/foomo/gocontentful/test"
 	"github.com/foomo/gocontentful/test/testapi"
@@ -31,15 +39,17 @@ import (
 )
 
 func TestTheAPI(t *testing.T) {
-	testLogger := logrus.StandardLogger()
-	cc, errClient := testapi.NewOfflineContentfulClient("./test/test-space-export.json",
+  testLogger := logrus.StandardLogger()
+  testFile, err := test.GetTestFile("./test/test-space-export.json")
+  require.NoError(t, err)
+  cc, errClient := testapi.NewOfflineContentfulClient(testFile,
 		test.GetContenfulLogger(testLogger),
 		test.LogDebug,
-		true)
-	require.NoError(t, errClient)
-	prods, errProds := cc.GetAllProduct()
-	require.NoError(t, errProds)
-	testLogger.WithField("prods", len(prods)).Info("Loaded products")
+		true, false)
+  require.NoError(t, errClient)
+  prods, errProds := cc.GetAllProduct(context.TODO())
+  require.NoError(t, errProds)
+  testLogger.WithField("prods", len(prods)).Info("Loaded products")
 }
 ```
 
@@ -55,7 +65,10 @@ value object defined for all content types and functions to convert from/to thos
 by gocontentful all you need to do to load all the products is one single line:
 
 ```go
-	prods, errProds := cc.GetAllProduct()
+// First get a context, this is needed for all operations
+// that potentially require a network connection to Contentful
+ctx := context.TODO()
+prods, errProds := cc.GetAllProduct(ctx)
 ```
 
 Open a terminal and from the repository home directory run the test. Your output should looks similar to this:
@@ -82,7 +95,7 @@ The last line shows that we loaded 4 products. Let's go ahead and play with the 
 We'll load a specific product and log its name. Add this at the end of the unit test:
 
 ```go
-prod, errProd := cc.GetProductByID("6dbjWqNd9SqccegcqYq224")
+prod, errProd := cc.GetProductByID(ctx, "6dbjWqNd9SqccegcqYq224")
 require.NoError(t, errProd)
 prodName := prod.ProductName("de")
 testLogger.WithField("name", prodName).Info("Product loaded")
@@ -104,7 +117,7 @@ Let's load the product's brand:
 
 ```go
 // Get the brand
-brandReference := prod.Brand()
+brandReference := prod.Brand(ctx)
 brand := brandReference.VO.(*testapi.CfBrand)
 testLogger.WithField("name", brand.CompanyName()).Info("Brand")
 ```
@@ -126,7 +139,7 @@ INFO[0000] Brand                                         name="Normann Copenhage
 What if we want to follow the reference the other way around and find out which entries link to this brand?
 
 ```go
-parentRefs, errParents := brand.GetParents()
+parentRefs, errParents := brand.GetParents(ctx)
 require.NoError(t, errParents)
 testLogger.WithField("parent count", len(parentRefs)).Info("Parents")
 for _, parentRef := range parentRefs {

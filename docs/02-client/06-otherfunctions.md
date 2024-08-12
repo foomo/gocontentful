@@ -1,14 +1,9 @@
----
-sidebar_label: Other functions
-sidebar_position: 6
----
-
 # Other useful functions
 
 Another thing you might want to know is the content type of an entry with a given ID:
 
 ```go
-(cc *ContentfulClient) GetContentTypeOfID(ID string) (contentType string)
+(cc *ContentfulClient) GetContentTypeOfID(ctx, ID string) (contentType string)
 ```
 
 ## Caveats and limitations

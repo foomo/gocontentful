@@ -1,9 +1,4 @@
----
-sidebar_label: Richtext
-sidebar_position: 4
----
-
-# RichText support
+# RichText
 
 Contentful supports Rich Text fields. Behind the scenes, these are JSON objects that represent
 the content through a Contentful-specific data model. Sooner or later you might want to convert such values to and from HTML.
@@ -26,6 +21,12 @@ The conversion works the other way around too, when you need to source data from
 
 ```go
 myRichText := HtmlToRichText(htmlSrc)
+```
+
+You can also convert RichText to plain text with
+
+```go
+txt, err := RichTextToPlainText(rt interface{}, locale Locale)
 ```
 
 See the [API Reference](./api-reference) for more details about these functions.

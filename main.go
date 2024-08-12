@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -14,7 +15,7 @@ import (
 	"github.com/foomo/gocontentful/erm"
 )
 
-var VERSION = "v1.1.0"
+var VERSION = "latest"
 
 type contentfulRc struct {
 	ManagementToken string `json:"managementToken"`
@@ -105,7 +106,10 @@ func main() {
 	}
 	if conf.ExportFile == "" && conf.SpaceID == "" ||
 		conf.ExportFile != "" && conf.SpaceID != "" {
-		byt, _ := json.MarshalIndent(conf, "", "  ")
+		byt, errMarshal := json.MarshalIndent(conf, "", "  ")
+		if errMarshal != nil {
+			fatal(errMarshal)
+		}
 		fmt.Println(string(byt))
 		usageError("Please provide either a Contentful Space ID and CMA access token or an export file name")
 	}
@@ -136,7 +140,7 @@ func main() {
 		}
 	}
 
-	err = erm.GenerateAPI(filepath.Dir(path), packageName, conf.SpaceID, cmaKey, conf.Environment, conf.ExportFile, cleanContentTypes, VERSION)
+	err = erm.GenerateAPI(context.Background(), filepath.Dir(path), packageName, conf.SpaceID, cmaKey, conf.Environment, conf.ExportFile, cleanContentTypes, VERSION)
 	if err != nil {
 		fatal("Something went horribly wrong...", err)
 	}

@@ -1,8 +1,3 @@
----
-sidebar_label: API Reference
-sidebar_position: 4
----
-
 # API Reference
 
 ## Client and cache
@@ -19,7 +14,7 @@ NewContentfulClient(
 	) (*ContentfulClient, error)
 ```
 
-Creates a Contentful client, [read this](client/basicclientoperations) for an explanation of all parameters.
+Creates a Contentful client, [read this](02-client/01-basicclientoperations) for an explanation of all parameters.
 
 ```go
 SetOfflineFallback(filename string) error
@@ -86,6 +81,20 @@ Builds or re-builds the entire client cache.
 ```
 
 Updates a single entry or asset (the sysType can take const sysTypeEntry or sysTypeAsset values) in the cache.
+
+```go
+(cc *ContentfulClient) ClientMode() ClientMode
+```
+
+Returns the internal client mode. There are three constants defined in the generated API:
+
+```go
+const (
+	ClientModeCDA ClientMode = "CDA"
+	ClientModeCPA ClientMode = "CPA"
+	ClientModeCMA ClientMode = "CMA"
+)
+```
 
 ## Content functions and methods
 
@@ -373,7 +382,7 @@ bold tags, horizontal rules, blockquote, ordered and unordered lists, code. Unkn
 doesn't return any error as it converts the input text into something as good as possible, without validation.
 
 ```go
-RichTextToHtml(rt interface{}, linkResolver LinkResolverFunc, entryLinkResolver EntryLinkResolverFunc, imageResolver ImageResolverFunc, locale Locale) (string, error) {
+RichTextToHtml(rt interface{}, linkResolver LinkResolverFunc, entryLinkResolver EntryLinkResolverFunc, imageResolver ImageResolverFunc, locale Locale) (string, error)
 ```
 
 Converts an interface representing a Contentful RichText value (usually from a field getter) into HTML.
@@ -395,6 +404,12 @@ type EmbeddedEntryResolverFunc func(entryID string, locale Locale) (html string,
 ```
 
 All the three functions above can be passed as nil with different levels of graceful degrading.
+
+```go
+RichTextToPlainText(rt interface{}, locale Locale) (string, error)
+
+Converts the RichText to plain text.
+```
 
 ### Constants and global variables
 

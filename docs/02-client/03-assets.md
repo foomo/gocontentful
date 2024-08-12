@@ -1,15 +1,10 @@
----
-sidebar_label: Assets
-sidebar_position: 3
----
-
 # Assets
 
 Contentful allows upload and reference of binary assets and gocontentful fully supports them.
 Assuming the dog entry references a picture in a field you can get it with:
 
 ```go
-picture := dog.Picture() // you can pass a locale to this function as usual
+picture := dog.Picture(ctx) // you can pass a locale to this function as usual
 ```
 
 This returns a \*contenful.AssetNoLocale object handling localization for you in two ways.

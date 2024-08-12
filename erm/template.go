@@ -1,7 +1,11 @@
 package erm
 
 import (
+	"strings"
 	"text/template"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 func getFuncMap() template.FuncMap {
@@ -27,6 +31,7 @@ func getFuncMap() template.FuncMap {
 		"mapFieldType":             mapFieldType,
 		"mapFieldTypeLiteral":      mapFieldTypeLiteral,
 		"onlyLetters":              onlyLetters,
+		"oneLine":                  oneLine,
 	}
 }
 
@@ -151,4 +156,12 @@ func fieldIsBasic(field ContentTypeField) bool {
 
 func fieldIsComplex(field ContentTypeField) bool {
 	return field.Type == fieldTypeJSON || field.Type == fieldTypeLocation || field.Type == fieldTypeRichText
+}
+
+func oneLine(v string) string {
+	return strings.ReplaceAll(v, "\n", " ")
+}
+
+func firstCap(s string) string {
+	return strings.TrimRight(cases.Title(language.Und, cases.NoLower).String(s), "_")
 }

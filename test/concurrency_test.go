@@ -14,20 +14,20 @@ var (
 	concurrency   = 10000
 )
 
-func readWorker(contentfulClient *testapi.ContentfulClient, i int) error {
-	product, err := contentfulClient.GetProductByID(testProductID)
+func readWorker(ctx context.Context, contentfulClient *testapi.ContentfulClient, i int) error {
+	product, err := contentfulClient.GetProductByID(ctx, testProductID)
 	if err != nil {
 		return err
 	}
-	_, err = contentfulClient.GetAllProduct()
+	_, err = contentfulClient.GetAllProduct(ctx)
 	if err != nil {
 		return err
 	}
 	price := product.Price()
 	testLogger.Infof("Read worker %d read price: %f", i, price)
-	_ = product.Brand()
-	_ = product.Categories()
-	_ = product.Image()
+	_ = product.Brand(ctx)
+	_ = product.Categories(ctx)
+	_ = product.Image(ctx)
 	_ = product.Nodes()
 	_ = product.ProductDescription()
 	_ = product.ProductName()
@@ -42,12 +42,12 @@ func readWorker(contentfulClient *testapi.ContentfulClient, i int) error {
 	return nil
 }
 
-func parentWorker(contentfulClient *testapi.ContentfulClient, i int) error {
-	brand, err := contentfulClient.GetBrandByID(testBrandID)
+func parentWorker(ctx context.Context, contentfulClient *testapi.ContentfulClient, i int) error {
+	brand, err := contentfulClient.GetBrandByID(ctx, testBrandID)
 	if err != nil {
 		return err
 	}
-	parents, err := brand.GetParents()
+	parents, err := brand.GetParents(ctx)
 	if err != nil {
 		return err
 	}
@@ -55,8 +55,8 @@ func parentWorker(contentfulClient *testapi.ContentfulClient, i int) error {
 	return nil
 }
 
-func writeWorker(contentfulClient *testapi.ContentfulClient, i int) error {
-	product, err := contentfulClient.GetProductByID(testProductID)
+func writeWorker(ctx context.Context, contentfulClient *testapi.ContentfulClient, i int) error {
+	product, err := contentfulClient.GetProductByID(ctx, testProductID)
 	if err != nil {
 		return err
 	}
@@ -66,19 +66,37 @@ func writeWorker(contentfulClient *testapi.ContentfulClient, i int) error {
 	}
 	contentfulClient.SetProductInCache(product)
 	testLogger.Infof("Write worker %d set price: %d", i, i)
-	product.SetBrand(testapi.ContentTypeSys{})
-	product.SetCategories([]testapi.ContentTypeSys{})
-	product.SetImage([]testapi.ContentTypeSys{})
-	product.SetNodes(nil)
-	product.SetProductDescription("")
-	product.SetProductName("")
-	product.SetQuantity(1)
-	product.SetSeoText("")
-	product.SetSizetypecolor("")
-	product.SetSku("")
-	product.SetSlug("")
-	product.SetTags([]string{""})
-	product.SetWebsite("")
+	_ = product.SetBrand(testapi.ContentTypeSys{
+		Sys: testapi.ContentTypeSysAttributes{
+			ID:       "651CQ8rLoIYCeY6G0QG22q",
+			Type:     "Link",
+			LinkType: "Entry",
+		},
+	})
+	_ = product.SetCategories([]testapi.ContentTypeSys{
+		{Sys: testapi.ContentTypeSysAttributes{
+			ID:       "7LAnCobuuWYSqks6wAwY2a",
+			Type:     "Link",
+			LinkType: "Entry",
+		}},
+	})
+	_ = product.SetImage([]testapi.ContentTypeSys{
+		{Sys: testapi.ContentTypeSysAttributes{
+			ID:       "10TkaLheGeQG6qQGqWYqUI",
+			Type:     "Link",
+			LinkType: "Asset",
+		}},
+	})
+	_ = product.SetNodes(nil)
+	_ = product.SetProductDescription("")
+	_ = product.SetProductName("")
+	_ = product.SetQuantity(1)
+	_ = product.SetSeoText("")
+	_ = product.SetSizetypecolor("")
+	_ = product.SetSku("")
+	_ = product.SetSlug("")
+	_ = product.SetTags([]string{""})
+	_ = product.SetWebsite("")
 	return nil
 }
 
@@ -94,7 +112,7 @@ func TestConcurrentReadWrites(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			testLogger.Infof("testConcurrentReadWrites: caching run %d", i)
-			err := contentfulClient.UpdateCache(context.TODO(), nil, false)
+			_, _, err := contentfulClient.UpdateCache(context.TODO(), nil, false)
 			if err != nil {
 				testLogger.Errorf("testConcurrentReadWrites: %v", err)
 			}
@@ -105,7 +123,7 @@ func TestConcurrentReadWrites(t *testing.T) {
 		i := i
 		go func() {
 			defer wg.Done()
-			err := writeWorker(contentfulClient, i)
+			err := writeWorker(context.TODO(), contentfulClient, i)
 			if err != nil {
 				testLogger.Errorf("testConcurrentReadWrites: %v", err)
 			}
@@ -116,7 +134,7 @@ func TestConcurrentReadWrites(t *testing.T) {
 		i := i
 		go func() {
 			defer wg.Done()
-			err := readWorker(contentfulClient, i)
+			err := readWorker(context.TODO(), contentfulClient, i)
 			if err != nil {
 				testLogger.Errorf("testConcurrentReadWrites: %v", err)
 			}
@@ -127,7 +145,7 @@ func TestConcurrentReadWrites(t *testing.T) {
 		i := i
 		go func() {
 			defer wg.Done()
-			err := parentWorker(contentfulClient, i)
+			err := parentWorker(context.TODO(), contentfulClient, i)
 			if err != nil {
 				testLogger.Errorf("testConcurrentReadWrites: %v", err)
 			}

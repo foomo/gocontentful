@@ -1,8 +1,3 @@
----
-sidebar_label: Basic client operations
-sidebar_position: 1
----
-
 # Basic client operations
 
 Let's consider a very simple use case. You have a Contentful space where you store information
@@ -39,11 +34,12 @@ The generated files will be in the "people" subdirectory of your project. Your g
 client from them:
 
 ```go
-cc, err := people.NewContentfulClient(YOUR_SPACE_ID, people.ClientModeCDA, YOUR_API_KEY, 1000, contentfulLogger, people.LogDebug,false)
+cc, err := people.NewContentfulClient(ctx context.Context, YOUR_SPACE_ID, people.ClientModeCDA, YOUR_API_KEY, 1000, contentfulLogger, people.LogDebug,false)
 ```
 
 The parameters to pass to NewContentfulClient are:
 
+- _ctx_ (context.Context)
 - _spaceID_ (string)
 - _clientMode_ (string) supports the constants ClientModeCDA, ClientModeCPA and ClientModeCMA. If you need to operate
   on multiple APIs (e.g. one for reading and CMA for writing) you need to get two clients
@@ -154,7 +150,7 @@ Finally, you can get the parents (AKA referring) entries of either an entry or
 an EntryReference with the _GetParents()_ method. This returns a slice of `[]EntryReference`:
 
 ```go
-(vo *CfPerson) GetParents() (parents []EntryReference, err error)
+(vo *CfPerson) GetParents(ctx context.Context) (parents []EntryReference, err error)
 (ref *EntryReference) GetParents(cc *ContentfulClient) (parents []EntryReference, err error)
 ```
 
@@ -163,7 +159,7 @@ an EntryReference with the _GetParents()_ method. This returns a slice of `[]Ent
 Another thing you might want to know is the content type of an entry with a given ID:
 
 ```go
-(cc *ContentfulClient) GetContentTypeOfID(ID string) (contentType string)
+(cc *ContentfulClient) GetContentTypeOfID(ctx context.Context, ID string) (contentType string)
 ```
 
 ### Caveats and limitations
