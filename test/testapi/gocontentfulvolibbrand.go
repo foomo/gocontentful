@@ -68,6 +68,33 @@ func (cc *ContentfulClient) GetFilteredBrand(ctx context.Context, query *content
 	return brandMap, nil
 }
 
+func (cc *ContentfulClient) GetBrandByTag(ctx context.Context, tagName string) (vos []*CfBrand, err error) {
+	if cc == nil || cc.Client == nil {
+		return nil, errors.New("GetBrandByTag: No client available")
+	}
+	if !cc.cacheInit {
+		return nil, errors.New("GetBrandByTag: only available with cache")
+	}
+	tags, err := cc.getAllTags(ctx, true)
+	if err != nil {
+		return nil, errors.New("GetBrandByTag could not get tags from cache: " + err.Error())
+	}
+	cc.cacheMutex.brandGcLock.RLock()
+	defer cc.cacheMutex.brandGcLock.RUnlock()
+	if _, tagExists := tags[tagName]; !tagExists {
+		return nil, nil
+	}
+	tagID := tags[tagName]
+	for _, vo := range cc.Cache.entryMaps.brand {
+		for _, voTag := range vo.Metadata.Tags {
+			if voTag.Sys.ID == tagID {
+				vos = append(vos, vo)
+			}
+		}
+	}
+	return vos, nil
+}
+
 func (cc *ContentfulClient) GetBrandByID(ctx context.Context, id string, forceNoCache ...bool) (vo *CfBrand, err error) {
 	if cc == nil || cc.Client == nil {
 		return nil, errors.New("GetBrandByID: No client available")
@@ -433,6 +460,28 @@ func (vo *CfBrand) Phone(locale ...Locale) []string {
 		}
 	}
 	return vo.Fields.Phone[string(loc)]
+}
+
+func (vo *CfBrand) IsArchived(ctx context.Context) (bool, error) {
+	if vo == nil {
+		return false, errors.New("IsArchived: Value Object is nil")
+	}
+	if vo.CC == nil {
+		return false, errors.New("IsArchived: Value Object has nil Contentful client")
+	}
+	if vo.CC.clientMode != ClientModeCMA {
+		return false, errors.New("IsArchived: Only available in ClientModeCMA")
+	}
+	cfEntry := &contentful.Entry{}
+	tmp, errMarshal := json.Marshal(vo)
+	if errMarshal != nil {
+		return false, errors.New("CfBrand IsArchived: Can't marshal JSON from VO")
+	}
+	errUnmarshal := json.Unmarshal(tmp, &cfEntry)
+	if errUnmarshal != nil {
+		return false, errors.New("CfBrand IsArchived: Can't unmarshal JSON into CF entry")
+	}
+	return len(cfEntry.Sys.ArchivedAt) > 0, nil
 }
 
 // Brand Field setters

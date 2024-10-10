@@ -34,12 +34,14 @@ type ContentfulCache struct {
 	genericEntries   map[string]*GenericEntry
 	idContentTypeMap map[string]string
 	parentMap        map[string][]EntryReference
+	tags             tagsCacheMap
 }
 
 type ContentfulCacheMutex struct {
 	fullCacheGcLock        sync.RWMutex
 	sharedDataGcLock       sync.RWMutex
 	assetsGcLock           sync.RWMutex
+	tagGcLock              sync.RWMutex
 	idContentTypeMapGcLock sync.RWMutex
 	parentMapGcLock        sync.RWMutex
 	genericEntriesGcLock   sync.RWMutex
@@ -49,6 +51,8 @@ type ContentfulCacheMutex struct {
 }
 
 type assetCacheMap map[string]*contentful.Asset
+
+type tagsCacheMap map[string]string
 
 type ContentfulClient struct {
 	Cache              *ContentfulCache
@@ -79,6 +83,7 @@ type ContentfulClient struct {
 type offlineTemp struct {
 	Entries []contentful.Entry `json:"entries"`
 	Assets  []contentful.Asset `json:"assets"`
+	Tags    []contentful.Tag   `json:"tags"`
 }
 
 type ContentTypeResult struct {
@@ -144,6 +149,7 @@ var localeFallback = map[Locale]Locale{SpaceLocaleGerman: "", SpaceLocaleFrench:
 const (
 	assetPageSize   = 1000
 	assetWorkerType = "_asset"
+	tagWorkerType   = "_tag"
 )
 
 const cacheUpdateConcurrency = 4
@@ -165,6 +171,7 @@ var (
 	InfoUpdatedEntityCache           = "updated cache for entity"
 	InfoCachedAllEntries             = "cached all entries of content type"
 	InfoCachedAllAssets              = "cached all assets"
+	InfoCachedAllTags                = "cached all tags"
 	InfoFallingBackToFile            = "gonna use a local file"
 	InfoLoadingFromFile              = "loading space from local file"
 	InfoCacheIsNil                   = "contentful cache is nil"
@@ -313,6 +320,37 @@ func (cc *ContentfulClient) EnableTextJanitor() {
 
 func (cc *ContentfulClient) GetAllAssets(ctx context.Context) (map[string]*contentful.Asset, error) {
 	return cc.getAllAssets(ctx, true)
+}
+
+func (cc *ContentfulClient) GetAssetsByTag(ctx context.Context, tagName string) (vos []*contentful.Asset, err error) {
+	if cc == nil || cc.Client == nil {
+		return nil, errors.New("GetAssetsByTag: No client available")
+	}
+	if !cc.cacheInit {
+		return nil, errors.New("GetAssetsByTag: only available with cache")
+	}
+	tags, err := cc.getAllTags(ctx, true)
+	if err != nil {
+		return nil, errors.New("GetAssetsByTag could not get tags from cache: " + err.Error())
+	}
+	cc.cacheMutex.assetsGcLock.RLock()
+	defer cc.cacheMutex.assetsGcLock.RUnlock()
+	if _, tagExists := tags[tagName]; !tagExists {
+		return nil, nil
+	}
+	tagID := tags[tagName]
+	for _, vo := range cc.Cache.assets {
+		for _, voTag := range vo.Metadata.Tags {
+			if voTag.Sys.ID == tagID {
+				vos = append(vos, vo)
+			}
+		}
+	}
+	return vos, nil
+}
+
+func (cc *ContentfulClient) GetAllTags(ctx context.Context) (map[string]string, error) {
+	return cc.getAllTags(ctx, true)
 }
 
 func (cc *ContentfulClient) GetAssetByID(ctx context.Context, id string, forceNoCache ...bool) (*contentful.Asset, error) {
@@ -1258,6 +1296,16 @@ func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []stri
 			}
 		}
 	}
+	tags, err := cc.GetAllTags(ctx)
+	if err != nil {
+		if cc.logFn != nil && cc.logLevel <= LogWarn {
+			cc.logFn(map[string]interface{}{"task": "UpdateCache", "error": err.Error()}, LogWarn, "failed to cache tags")
+		}
+	}
+	cc.cacheMutex.tagGcLock.Lock()
+	cc.Cache.tags = tags
+	cc.cacheMutex.tagGcLock.Unlock()
+
 	if isSync {
 		return cc.syncCache(ctxAtWork, contentTypes)
 	}
@@ -1448,7 +1496,7 @@ func (cc *ContentfulClient) cacheSpace(ctx context.Context, contentTypes []strin
 		parentMap:        map[string][]EntryReference{},
 	}
 	if cacheAssets {
-		contentTypes = append([]string{assetWorkerType}, contentTypes...)
+		contentTypes = append([]string{assetWorkerType, tagWorkerType}, contentTypes...)
 	}
 	_, errCanWeEvenConnect := cc.Client.Spaces.Get(ctx, cc.SpaceID)
 	cc.cacheMutex.sharedDataGcLock.RLock()
@@ -1711,6 +1759,49 @@ func (cc *ContentfulClient) getAllAssets(ctx context.Context, tryCacheFirst bool
 		assets[asset.Sys.ID] = &asset
 	}
 	return assets, nil
+}
+
+func (cc *ContentfulClient) getAllTags(ctx context.Context, tryCacheFirst bool) (map[string]string, error) {
+	if cc == nil || cc.Client == nil {
+		return nil, errors.New("getAllTags: No client available")
+	}
+	cc.cacheMutex.sharedDataGcLock.RLock()
+	offline := cc.offline
+	cacheInit := cc.cacheInit
+	cc.cacheMutex.sharedDataGcLock.RUnlock()
+	cc.cacheMutex.tagGcLock.RLock()
+	defer cc.cacheMutex.tagGcLock.RUnlock()
+	if cacheInit && cc.Cache.tags != nil && tryCacheFirst {
+		return cc.Cache.tags, nil
+	}
+	allItems := []interface{}{}
+	tags := map[string]string{}
+	if offline {
+		for _, asset := range cc.offlineTemp.Tags {
+			allItems = append(allItems, asset)
+		}
+	} else {
+		col := cc.Client.Tags.List(ctx, cc.SpaceID)
+		col.Query.Limit(1000)
+		_, err := col.Next()
+		if err != nil {
+			return nil, err
+		}
+		allItems = col.Items
+	}
+	for _, item := range allItems {
+		tag := contentful.Tag{}
+		byt, err := json.Marshal(item)
+		if err != nil {
+			return nil, err
+		}
+		err = json.Unmarshal(byt, &tag)
+		if err != nil {
+			return nil, err
+		}
+		tags[tag.Name] = tag.Sys.ID
+	}
+	return tags, nil
 }
 
 func getOfflineSpaceFromFile(file []byte) (*offlineTemp, error) {
@@ -2230,6 +2321,16 @@ func updateCacheForContentType(ctx context.Context, results chan ContentTypeResu
 		tempCache.assets = allAssets
 		if cc.logFn != nil && cc.logLevel <= LogInfo {
 			cc.logFn(map[string]interface{}{"contentType": "asset", "method": "updateCacheForContentType", "size": len(allAssets)}, LogInfo, InfoCachedAllAssets)
+		}
+
+	case tagWorkerType:
+		allTags, err := cc.getAllTags(ctx, false)
+		if err != nil {
+			return errors.New("updateCacheForContentType failed for tags")
+		}
+		tempCache.tags = allTags
+		if cc.logFn != nil && cc.logLevel <= LogInfo {
+			cc.logFn(map[string]interface{}{"contentType": "tag", "method": "updateCacheForContentType", "size": len(allTags)}, LogInfo, InfoCachedAllTags)
 		}
 	}
 	return nil

@@ -66,6 +66,33 @@ func (cc *ContentfulClient) GetFiltered{{ firstCap $contentType.Sys.ID }}(ctx co
 	return {{ $contentType.Sys.ID }}Map, nil
 }
 
+func (cc *ContentfulClient) Get{{ firstCap $contentType.Sys.ID }}ByTag(ctx context.Context, tagName string) (vos []*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
+	if cc == nil || cc.Client == nil {
+		return nil, errors.New("Get{{ firstCap $contentType.Sys.ID }}ByTag: No client available")
+	}
+	if !cc.cacheInit {
+		return nil, errors.New("Get{{ firstCap $contentType.Sys.ID }}ByTag: only available with cache")
+	}
+	tags, err := cc.getAllTags(ctx, true)
+	if err != nil {
+		return nil, errors.New("Get{{ firstCap $contentType.Sys.ID }}ByTag could not get tags from cache: " + err.Error())
+	}
+	cc.cacheMutex.{{ $contentType.Sys.ID }}GcLock.RLock()
+	defer cc.cacheMutex.{{ $contentType.Sys.ID }}GcLock.RUnlock()
+	if _, tagExists := tags[tagName]; !tagExists {
+		return nil, nil
+	}
+	tagID := tags[tagName]
+	for _, vo := range cc.Cache.entryMaps.{{ $contentType.Sys.ID }} {
+		for _, voTag := range vo.Metadata.Tags {
+			if voTag.Sys.ID == tagID {
+				vos = append(vos, vo)
+			}
+		}
+	}
+	return vos, nil
+}
+
 func (cc *ContentfulClient) Get{{ firstCap $contentType.Sys.ID }}ByID(ctx context.Context, id string, forceNoCache ...bool) (vo *Cf{{ firstCap $contentType.Sys.ID }}, err error) {
 	if cc == nil || cc.Client == nil {
 		return nil, errors.New("Get{{ firstCap $contentType.Sys.ID }}ByID: No client available")
@@ -467,6 +494,28 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(ctx con
 }
 {{ end }}
 {{ end }}
+
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) IsArchived(ctx context.Context) (bool, error) {
+if vo == nil {
+return false, errors.New("IsArchived: Value Object is nil")
+}
+if vo.CC == nil {
+return false, errors.New("IsArchived: Value Object has nil Contentful client")
+}
+if vo.CC.clientMode != ClientModeCMA {
+return false, errors.New("IsArchived: Only available in ClientModeCMA")
+}
+cfEntry := &contentful.Entry{}
+tmp, errMarshal := json.Marshal(vo)
+if errMarshal != nil {
+return false, errors.New("Cf{{ firstCap $contentType.Sys.ID }} IsArchived: Can't marshal JSON from VO")
+}
+errUnmarshal := json.Unmarshal(tmp, &cfEntry)
+if errUnmarshal != nil {
+return false, errors.New("Cf{{ firstCap $contentType.Sys.ID }} IsArchived: Can't unmarshal JSON into CF entry")
+}
+return len(cfEntry.Sys.ArchivedAt) > 0, nil
+}
 
 // {{ firstCap $contentType.Sys.ID }} Field setters
 {{ range $fieldIndex, $field := $contentType.Fields }}
