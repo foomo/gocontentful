@@ -14,18 +14,21 @@ type ContentTypeSys struct {
 }
 
 type ContentfulSys struct {
-	ID               string         `json:"id,omitempty"`
-	Type             string         `json:"type,omitempty"`
-	LinkType         string         `json:"linkType,omitempty"`
-	ContentType      ContentTypeSys `json:"contentType,omitempty"`
-	Environment      ContentTypeSys `json:"environment,omitempty"`
-	Space            ContentTypeSys `json:"space,omitempty"`
-	CreatedAt        string         `json:"createdAt,omitempty"`
-	UpdatedAt        string         `json:"updatedAt,omitempty"`
-	Revision         float64        `json:"revision,omitempty"`
-	Version          float64        `json:"version,omitempty"`
-	PublishedCounter float64        `json:"publishedCounter,omitempty"`
-	PublishedVersion float64        `json:"publishedVersion,omitempty"`
+	ID               string                    `json:"id,omitempty"`
+	Type             string                    `json:"type,omitempty"`
+	LinkType         string                    `json:"linkType,omitempty"`
+	ContentType      ContentTypeSys            `json:"contentType,omitempty"`
+	Environment      ContentTypeSys            `json:"environment,omitempty"`
+	Space            ContentTypeSys            `json:"space,omitempty"`
+	CreatedAt        string                    `json:"createdAt,omitempty"`
+	UpdatedAt        string                    `json:"updatedAt,omitempty"`
+	Revision         float64                   `json:"revision,omitempty"`
+	Version          float64                   `json:"version,omitempty"`
+	ArchivedAt       string                    `json:"archivedAt,omitempty"`
+	ArchivedBy       *ContentTypeSysAttributes `json:"archivedBy,omitempty"`
+	ArchivedVersion  int                       `json:"archivedVersion,omitempty"`
+	PublishedCounter float64                   `json:"publishedCounter,omitempty"`
+	PublishedVersion float64                   `json:"publishedVersion,omitempty"`
 }
 
 type RawFields map[string]interface{}

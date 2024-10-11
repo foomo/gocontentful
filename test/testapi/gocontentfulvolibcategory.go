@@ -68,6 +68,33 @@ func (cc *ContentfulClient) GetFilteredCategory(ctx context.Context, query *cont
 	return categoryMap, nil
 }
 
+func (cc *ContentfulClient) GetCategoryByTag(ctx context.Context, tagName string) (vos []*CfCategory, err error) {
+	if cc == nil || cc.Client == nil {
+		return nil, errors.New("GetCategoryByTag: No client available")
+	}
+	if !cc.cacheInit {
+		return nil, errors.New("GetCategoryByTag: only available with cache")
+	}
+	tags, err := cc.getAllTags(ctx, true)
+	if err != nil {
+		return nil, errors.New("GetCategoryByTag could not get tags from cache: " + err.Error())
+	}
+	cc.cacheMutex.categoryGcLock.RLock()
+	defer cc.cacheMutex.categoryGcLock.RUnlock()
+	if _, tagExists := tags[tagName]; !tagExists {
+		return nil, nil
+	}
+	tagID := tags[tagName]
+	for _, vo := range cc.Cache.entryMaps.category {
+		for _, voTag := range vo.Metadata.Tags {
+			if voTag.Sys.ID == tagID {
+				vos = append(vos, vo)
+			}
+		}
+	}
+	return vos, nil
+}
+
 func (cc *ContentfulClient) GetCategoryByID(ctx context.Context, id string, forceNoCache ...bool) (vo *CfCategory, err error) {
 	if cc == nil || cc.Client == nil {
 		return nil, errors.New("GetCategoryByID: No client available")
@@ -277,6 +304,28 @@ func (vo *CfCategory) CategoryDescription(locale ...Locale) string {
 		}
 	}
 	return vo.Fields.CategoryDescription[string(loc)]
+}
+
+func (vo *CfCategory) IsArchived(ctx context.Context) (bool, error) {
+	if vo == nil {
+		return false, errors.New("IsArchived: Value Object is nil")
+	}
+	if vo.CC == nil {
+		return false, errors.New("IsArchived: Value Object has nil Contentful client")
+	}
+	if vo.CC.clientMode != ClientModeCMA {
+		return false, errors.New("IsArchived: Only available in ClientModeCMA")
+	}
+	cfEntry := &contentful.Entry{}
+	tmp, errMarshal := json.Marshal(vo)
+	if errMarshal != nil {
+		return false, errors.New("CfCategory IsArchived: Can't marshal JSON from VO")
+	}
+	errUnmarshal := json.Unmarshal(tmp, &cfEntry)
+	if errUnmarshal != nil {
+		return false, errors.New("CfCategory IsArchived: Can't unmarshal JSON into CF entry")
+	}
+	return len(cfEntry.Sys.ArchivedAt) > 0, nil
 }
 
 // Category Field setters

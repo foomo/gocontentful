@@ -68,6 +68,33 @@ func (cc *ContentfulClient) GetFilteredProduct(ctx context.Context, query *conte
 	return productMap, nil
 }
 
+func (cc *ContentfulClient) GetProductByTag(ctx context.Context, tagName string) (vos []*CfProduct, err error) {
+	if cc == nil || cc.Client == nil {
+		return nil, errors.New("GetProductByTag: No client available")
+	}
+	if !cc.cacheInit {
+		return nil, errors.New("GetProductByTag: only available with cache")
+	}
+	tags, err := cc.getAllTags(ctx, true)
+	if err != nil {
+		return nil, errors.New("GetProductByTag could not get tags from cache: " + err.Error())
+	}
+	cc.cacheMutex.productGcLock.RLock()
+	defer cc.cacheMutex.productGcLock.RUnlock()
+	if _, tagExists := tags[tagName]; !tagExists {
+		return nil, nil
+	}
+	tagID := tags[tagName]
+	for _, vo := range cc.Cache.entryMaps.product {
+		for _, voTag := range vo.Metadata.Tags {
+			if voTag.Sys.ID == tagID {
+				vos = append(vos, vo)
+			}
+		}
+	}
+	return vos, nil
+}
+
 func (cc *ContentfulClient) GetProductByID(ctx context.Context, id string, forceNoCache ...bool) (vo *CfProduct, err error) {
 	if cc == nil || cc.Client == nil {
 		return nil, errors.New("GetProductByID: No client available")
@@ -875,6 +902,28 @@ func (vo *CfProduct) Nodes(locale ...Locale) *interface{} {
 	}
 	nodes := vo.Fields.Nodes[string(loc)]
 	return &nodes
+}
+
+func (vo *CfProduct) IsArchived(ctx context.Context) (bool, error) {
+	if vo == nil {
+		return false, errors.New("IsArchived: Value Object is nil")
+	}
+	if vo.CC == nil {
+		return false, errors.New("IsArchived: Value Object has nil Contentful client")
+	}
+	if vo.CC.clientMode != ClientModeCMA {
+		return false, errors.New("IsArchived: Only available in ClientModeCMA")
+	}
+	cfEntry := &contentful.Entry{}
+	tmp, errMarshal := json.Marshal(vo)
+	if errMarshal != nil {
+		return false, errors.New("CfProduct IsArchived: Can't marshal JSON from VO")
+	}
+	errUnmarshal := json.Unmarshal(tmp, &cfEntry)
+	if errUnmarshal != nil {
+		return false, errors.New("CfProduct IsArchived: Can't unmarshal JSON into CF entry")
+	}
+	return len(cfEntry.Sys.ArchivedAt) > 0, nil
 }
 
 // Product Field setters

@@ -5,6 +5,7 @@ import "github.com/foomo/contentful"
 
 {{ range $index , $contentType := $contentTypes }}
 type Cf{{ firstCap $contentType.Sys.ID }} struct {
+  Metadata *contentful.Metadata `json:"metadata,omitempty"`
 	Sys    ContentfulSys          `json:"sys,omitempty"`
 	Fields Cf{{ firstCap $contentType.Sys.ID }}Fields `json:"fields,omitempty"`
 	RawFields RawFields `json:"-"`

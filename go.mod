@@ -3,7 +3,7 @@ module github.com/foomo/gocontentful
 go 1.21
 
 require (
-	github.com/foomo/contentful v0.5.1
+	github.com/foomo/contentful v0.5.3
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.9.0

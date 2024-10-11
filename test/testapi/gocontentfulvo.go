@@ -8,10 +8,11 @@ import (
 )
 
 type CfBrand struct {
-	Sys       ContentfulSys     `json:"sys,omitempty"`
-	Fields    CfBrandFields     `json:"fields,omitempty"`
-	RawFields RawFields         `json:"-"`
-	CC        *ContentfulClient `json:"-"`
+	Metadata  *contentful.Metadata `json:"metadata,omitempty"`
+	Sys       ContentfulSys        `json:"sys,omitempty"`
+	Fields    CfBrandFields        `json:"fields,omitempty"`
+	RawFields RawFields            `json:"-"`
+	CC        *ContentfulClient    `json:"-"`
 }
 
 // CfBrandFields is a CfNameFields VO
@@ -38,10 +39,11 @@ type CfBrandFieldsLogo struct {
 }
 
 type CfCategory struct {
-	Sys       ContentfulSys     `json:"sys,omitempty"`
-	Fields    CfCategoryFields  `json:"fields,omitempty"`
-	RawFields RawFields         `json:"-"`
-	CC        *ContentfulClient `json:"-"`
+	Metadata  *contentful.Metadata `json:"metadata,omitempty"`
+	Sys       ContentfulSys        `json:"sys,omitempty"`
+	Fields    CfCategoryFields     `json:"fields,omitempty"`
+	RawFields RawFields            `json:"-"`
+	CC        *ContentfulClient    `json:"-"`
 }
 
 // CfCategoryFields is a CfNameFields VO
@@ -60,10 +62,11 @@ type CfCategoryFieldsIcon struct {
 }
 
 type CfProduct struct {
-	Sys       ContentfulSys     `json:"sys,omitempty"`
-	Fields    CfProductFields   `json:"fields,omitempty"`
-	RawFields RawFields         `json:"-"`
-	CC        *ContentfulClient `json:"-"`
+	Metadata  *contentful.Metadata `json:"metadata,omitempty"`
+	Sys       ContentfulSys        `json:"sys,omitempty"`
+	Fields    CfProductFields      `json:"fields,omitempty"`
+	RawFields RawFields            `json:"-"`
+	CC        *ContentfulClient    `json:"-"`
 }
 
 // CfProductFields is a CfNameFields VO

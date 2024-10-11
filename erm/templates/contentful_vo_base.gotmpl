@@ -24,6 +24,9 @@ type ContentfulSys struct {
 	UpdatedAt   		string         `json:"updatedAt,omitempty"`
 	Revision    		float64        `json:"revision,omitempty"`
 	Version     		float64        `json:"version,omitempty"`
+	ArchivedAt       string       `json:"archivedAt,omitempty"`
+	ArchivedBy       *ContentTypeSysAttributes         `json:"archivedBy,omitempty"`
+	ArchivedVersion  int          `json:"archivedVersion,omitempty"`
 	PublishedCounter    float64        `json:"publishedCounter,omitempty"`
 	PublishedVersion    float64        `json:"publishedVersion,omitempty"`
 }
