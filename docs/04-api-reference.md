@@ -149,14 +149,17 @@ retrieve referenced entries return a more flexible and useful _[]\*EntryReferenc
 a reference you need a ContentTypeSys.
 
 ```go
-(vo *CfPerson) GetParents() (parents []EntryReference, err error)
-(ref *EntryReference) GetParents(cc *ContentfulClient) (parents []EntryReference, err error)
+(vo *CfPerson) GetParents(ctx context.Context, contentType ...string) (parents []EntryReference, err error)
+(ref *EntryReference) GetParents(ctx context.Context, contentType ...string) (parents []EntryReference, err error)
 ```
 
 Return a slice of EntryReference objects that represent entries that reference the value object or the entry reference.
 
-Note that in case of parents of an entry reference you need to pass a pointer to a ContentfulClient because
-EntryReference objects are generic and can't carry any.
+```go
+HasAncestor(ctx context.Context, contentType string, entry entryOrRef, visited map[string]bool) (*EntryReference, error)
+```
+
+Returns the ancestor, if any, of the contentType specified for the entryOrRef. The function travels back in the references graph until it finds an ancestor, or no parent, or hits an infinite loop condition.
 
 ```go
 (vo *CfPerson) GetPublishingStatus() string

@@ -292,7 +292,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(ctx con
 			}
 			return nil
 		}
-		{{ $field.ID }} = append({{ $field.ID }},&EntryReference{ContentType: contentType, ID: eachLocalized{{ firstCap $field.ID }}.Sys.ID, VO: referencedVO})
+		{{ $field.ID }} = append({{ $field.ID }},&EntryReference{ContentType: contentType, ID: eachLocalized{{ firstCap $field.ID }}.Sys.ID, VO: referencedVO, CC: vo.CC})
 		{{ end }}
 		}
 	}
@@ -352,7 +352,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(ctx con
 			}
 			return nil
 		}
-		return &EntryReference{ContentType: contentType, ID: localized{{ firstCap $field.ID }}.Sys.ID, VO: referencedVO}
+		return &EntryReference{ContentType: contentType, ID: localized{{ firstCap $field.ID }}.Sys.ID, VO: referencedVO, CC: vo.CC}
 	{{ end }}
 	}
 	return nil
@@ -750,6 +750,7 @@ func (cc *ContentfulClient) cacheAll{{ firstCap $contentType.Sys.ID }}(ctx conte
 				addEntry(child.Sys.ID, EntryReference{ContentType: {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID,
 					ID: {{ $contentType.Sys.ID }}.Sys.ID,
 					VO: {{ $contentType.Sys.ID }},
+					CC: cc,
 					FromField: "{{ $field.ID }}",
 				})
 			}
@@ -763,6 +764,7 @@ func (cc *ContentfulClient) cacheAll{{ firstCap $contentType.Sys.ID }}(ctx conte
 			addEntry(child.Sys.ID, EntryReference{ContentType: {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID,
 				ID: {{ $contentType.Sys.ID }}.Sys.ID,
 				VO: {{ $contentType.Sys.ID }},
+				CC: cc,
 				FromField: "{{ $field.ID }}",
 })
 		}
@@ -850,7 +852,7 @@ func (cc *ContentfulClient) cache{{ firstCap $contentType.Sys.ID }}ByID(ctx cont
 				if cc.Cache.parentMap[child.Sys.ID] == nil {
 					cc.Cache.parentMap[child.Sys.ID] = []EntryReference{}
 				}
-				newParentRef := EntryReference{ContentType: {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID, ID: {{ $contentType.Sys.ID }}.Sys.ID, VO: {{ $contentType.Sys.ID }}, FromField: "{{ $field.ID }}" }
+				newParentRef := EntryReference{ContentType: {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID, ID: {{ $contentType.Sys.ID }}.Sys.ID, VO: {{ $contentType.Sys.ID }}, CC: cc, FromField: "{{ $field.ID }}" }
 				newParentSlice := []EntryReference{}
 				for _, parent := range cc.Cache.parentMap[child.Sys.ID] {
 					if parent.ID != id {
@@ -871,7 +873,7 @@ func (cc *ContentfulClient) cache{{ firstCap $contentType.Sys.ID }}ByID(ctx cont
 				if cc.Cache.parentMap[child.Sys.ID] == nil {
 					cc.Cache.parentMap[child.Sys.ID] = []EntryReference{}
 				}
-				newParentRef := EntryReference{ContentType: {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID, ID: {{ $contentType.Sys.ID }}.Sys.ID, VO: {{ $contentType.Sys.ID }}, FromField: "{{ $field.ID }}" }
+				newParentRef := EntryReference{ContentType: {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID, ID: {{ $contentType.Sys.ID }}.Sys.ID, VO: {{ $contentType.Sys.ID }}, CC: cc, FromField: "{{ $field.ID }}" }
 				newParentSlice := []EntryReference{}
 				for _, parent := range cc.Cache.parentMap[child.Sys.ID] {
 					if parent.ID != id {

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"reflect"
 	"regexp"
 	"strings"
 	"sync"
@@ -104,7 +105,12 @@ type EntryReference struct {
 	ContentType string
 	ID          string
 	VO          interface{}
+	CC          *ContentfulClient
 	FromField   string
+}
+
+type entryOrRef interface {
+	GetParents(ctx context.Context, contentType ...string) (parents []EntryReference, err error)
 }
 
 type BrokenReference struct {
@@ -448,17 +454,56 @@ func (cc *ContentfulClient) GetContentTypeOfID(ctx context.Context, id string) (
 	return vo.Sys.ContentType.Sys.ID, nil
 }
 
-func (ref *EntryReference) GetParents(cc *ContentfulClient) (parents []EntryReference, err error) {
-	if ref == nil {
+func (ref EntryReference) GetParents(ctx context.Context, contentType ...string) (parents []EntryReference, err error) {
+	if ref.ID == "" {
 		return nil, errors.New("GetParents: reference is nil")
 	}
+	var candidateParents []EntryReference
+	var cc *ContentfulClient
+	if ref.CC != nil {
+		cc = ref.CC
+	} else if ref.VO != nil {
+		v := reflect.ValueOf(ref.VO)
+		if v.Kind() == reflect.Ptr {
+			if v.IsNil() {
+				return nil, errors.New("GetParents: no client available, tried reflection to no avail")
+			}
+			v = v.Elem()
+		}
+		field := v.FieldByName("CC")
+		if !field.IsValid() {
+			return nil, errors.New("GetParents: VO has no CC field")
+		}
+		if field.Kind() != reflect.Ptr {
+			return nil, errors.New("GetParents: VO field CC is not a pointer")
+		}
+		if field.IsNil() {
+			return nil, errors.New("GetParents: VO field CC is nil")
+		}
+		var ok bool
+		cc, ok = field.Interface().(*ContentfulClient)
+		if !ok {
+			return nil, errors.New("GetParents: VO field CC is not of type *ContentfulClient")
+		}
+	}
 	if cc == nil {
-		return nil, errors.New("GetParents: Contentful client is nil")
+		return nil, errors.New("GetParents: contentful client is nil")
 	}
 	if cc.Cache == nil {
 		return nil, errors.New("GetParents: only available in cached mode")
 	}
-	return cc.Cache.parentMap[ref.ID], nil
+	if len(contentType) == 0 {
+		return cc.Cache.parentMap[ref.ID], nil
+	} else {
+		cType := contentType[0]
+		for _, candidateParent := range cc.Cache.parentMap[ref.ID] {
+			if candidateParent.ContentType == cType {
+				candidateParents = append(candidateParents, candidateParent)
+			}
+		}
+		return candidateParents, nil
+	}
+	return nil, errors.New("GetParents: reference VO and CC are both nil")
 }
 
 func HtmlToRichText(htmlSrc string) *RichTextNode {
@@ -565,7 +610,7 @@ func NewContentfulClient(ctx context.Context, spaceID string, clientMode ClientM
 		logLevel:           logLevel,
 		optimisticPageSize: optimisticPageSize,
 		SpaceID:            spaceID,
-		sync:               clientMode == ClientModeCDA,
+		sync:               false,
 	}
 	_, err = cc.Client.Spaces.Get(ctx, spaceID)
 	if err != nil {
@@ -1349,6 +1394,13 @@ func (cc *ContentfulClient) syncCache(ctx context.Context, contentTypes []string
 	if cc.logFn != nil && cc.logLevel <= LogInfo {
 		cc.logFn(map[string]interface{}{"task": "syncCache"}, LogInfo, InfoCacheUpdateQueued)
 	}
+	allTags, err := cc.getAllTags(ctx, false)
+	if err != nil {
+		return nil, nil, errors.New("syncCache failed for tags")
+	}
+	cc.cacheMutex.sharedDataGcLock.Lock()
+	cc.Cache.tags = allTags
+	cc.cacheMutex.sharedDataGcLock.Unlock()
 	var syncdEntries map[string][]string
 	var syncdAssets []string
 	for {
@@ -2399,6 +2451,13 @@ func updateCacheForContentTypeAndEntity(ctx context.Context, cc *ContentfulClien
 		}
 
 	}
+	allTags, err := cc.getAllTags(ctx, false)
+	if err != nil {
+		return fmt.Errorf("syncCache failed for tags: %s", err.Error())
+	}
+	cc.cacheMutex.sharedDataGcLock.Lock()
+	cc.Cache.tags = allTags
+	cc.cacheMutex.sharedDataGcLock.Unlock()
 	return nil
 }
 
@@ -2458,6 +2517,7 @@ func commonGetParents(ctx context.Context, cc *ContentfulClient, id string, cont
 					ContentType: entry.Sys.ContentType.Sys.ID,
 					ID:          entry.Sys.ID,
 					VO:          &parentVO,
+					CC:          cc,
 				})
 
 		case ContentTypeCategory:
@@ -2476,6 +2536,7 @@ func commonGetParents(ctx context.Context, cc *ContentfulClient, id string, cont
 					ContentType: entry.Sys.ContentType.Sys.ID,
 					ID:          entry.Sys.ID,
 					VO:          &parentVO,
+					CC:          cc,
 				})
 
 		case ContentTypeProduct:
@@ -2494,6 +2555,7 @@ func commonGetParents(ctx context.Context, cc *ContentfulClient, id string, cont
 					ContentType: entry.Sys.ContentType.Sys.ID,
 					ID:          entry.Sys.ID,
 					VO:          &parentVO,
+					CC:          cc,
 				})
 		}
 	}
@@ -2610,4 +2672,25 @@ func (rawFields RawFields) GetChildIDs() (childIDs []string) {
 		}
 	}
 	return childIDs
+}
+
+func HasAncestor(ctx context.Context, contentType string, entry entryOrRef, visited map[string]bool) (*EntryReference, error) {
+	if visited == nil {
+		visited = make(map[string]bool)
+	}
+	parents, err := entry.GetParents(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, parent := range parents {
+		if visited[parent.ID] {
+			continue
+		}
+		visited[parent.ID] = true
+		if parent.ContentType == contentType {
+			return &parent, nil
+		}
+		return HasAncestor(ctx, contentType, parent, visited)
+	}
+	return nil, nil
 }

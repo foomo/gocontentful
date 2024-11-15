@@ -72,7 +72,17 @@ func TestGetParents(t *testing.T) {
 	product, err := contentfulClient.GetProductByID(context.TODO(), "6dbjWqNd9SqccegcqYq224")
 	require.NoError(t, err)
 	brandRef := product.Brand(context.TODO())
-	brandParents, err := brandRef.GetParents(contentfulClient)
+	brandParents, err := brandRef.GetParents(context.TODO())
+	require.NoError(t, err)
+	require.Equal(t, 2, len(brandParents))
+	brandParents, err = brandRef.GetParents(context.TODO(), testapi.ContentTypeProduct)
+	require.NoError(t, err)
+	require.Equal(t, 2, len(brandParents))
+	brandParents, err = brandRef.GetParents(context.TODO(), testapi.ContentTypeCategory)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(brandParents))
+	brandRef.CC = nil
+	brandParents, err = brandRef.GetParents(context.TODO())
 	require.NoError(t, err)
 	require.Equal(t, 2, len(brandParents))
 }

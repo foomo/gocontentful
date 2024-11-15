@@ -497,7 +497,7 @@ func (vo *CfProduct) Categories(ctx context.Context, locale ...Locale) []*EntryR
 				}
 				return nil
 			}
-			categories = append(categories, &EntryReference{ContentType: contentType, ID: eachLocalizedCategories.Sys.ID, VO: referencedVO})
+			categories = append(categories, &EntryReference{ContentType: contentType, ID: eachLocalizedCategories.Sys.ID, VO: referencedVO, CC: vo.CC})
 
 		case ContentTypeCategory:
 			referencedVO, err := vo.CC.GetCategoryByID(ctx, eachLocalizedCategories.Sys.ID)
@@ -507,7 +507,7 @@ func (vo *CfProduct) Categories(ctx context.Context, locale ...Locale) []*EntryR
 				}
 				return nil
 			}
-			categories = append(categories, &EntryReference{ContentType: contentType, ID: eachLocalizedCategories.Sys.ID, VO: referencedVO})
+			categories = append(categories, &EntryReference{ContentType: contentType, ID: eachLocalizedCategories.Sys.ID, VO: referencedVO, CC: vo.CC})
 
 		case ContentTypeProduct:
 			referencedVO, err := vo.CC.GetProductByID(ctx, eachLocalizedCategories.Sys.ID)
@@ -517,7 +517,7 @@ func (vo *CfProduct) Categories(ctx context.Context, locale ...Locale) []*EntryR
 				}
 				return nil
 			}
-			categories = append(categories, &EntryReference{ContentType: contentType, ID: eachLocalizedCategories.Sys.ID, VO: referencedVO})
+			categories = append(categories, &EntryReference{ContentType: contentType, ID: eachLocalizedCategories.Sys.ID, VO: referencedVO, CC: vo.CC})
 
 		}
 	}
@@ -613,7 +613,7 @@ func (vo *CfProduct) Brand(ctx context.Context, locale ...Locale) *EntryReferenc
 			}
 			return nil
 		}
-		return &EntryReference{ContentType: contentType, ID: localizedBrand.Sys.ID, VO: referencedVO}
+		return &EntryReference{ContentType: contentType, ID: localizedBrand.Sys.ID, VO: referencedVO, CC: vo.CC}
 
 	case ContentTypeCategory:
 		referencedVO, err := vo.CC.GetCategoryByID(ctx, localizedBrand.Sys.ID)
@@ -623,7 +623,7 @@ func (vo *CfProduct) Brand(ctx context.Context, locale ...Locale) *EntryReferenc
 			}
 			return nil
 		}
-		return &EntryReference{ContentType: contentType, ID: localizedBrand.Sys.ID, VO: referencedVO}
+		return &EntryReference{ContentType: contentType, ID: localizedBrand.Sys.ID, VO: referencedVO, CC: vo.CC}
 
 	case ContentTypeProduct:
 		referencedVO, err := vo.CC.GetProductByID(ctx, localizedBrand.Sys.ID)
@@ -633,7 +633,7 @@ func (vo *CfProduct) Brand(ctx context.Context, locale ...Locale) *EntryReferenc
 			}
 			return nil
 		}
-		return &EntryReference{ContentType: contentType, ID: localizedBrand.Sys.ID, VO: referencedVO}
+		return &EntryReference{ContentType: contentType, ID: localizedBrand.Sys.ID, VO: referencedVO, CC: vo.CC}
 
 	}
 	return nil
@@ -691,7 +691,7 @@ func (vo *CfProduct) SubProduct(ctx context.Context, locale ...Locale) *EntryRef
 			}
 			return nil
 		}
-		return &EntryReference{ContentType: contentType, ID: localizedSubProduct.Sys.ID, VO: referencedVO}
+		return &EntryReference{ContentType: contentType, ID: localizedSubProduct.Sys.ID, VO: referencedVO, CC: vo.CC}
 
 	case ContentTypeCategory:
 		referencedVO, err := vo.CC.GetCategoryByID(ctx, localizedSubProduct.Sys.ID)
@@ -701,7 +701,7 @@ func (vo *CfProduct) SubProduct(ctx context.Context, locale ...Locale) *EntryRef
 			}
 			return nil
 		}
-		return &EntryReference{ContentType: contentType, ID: localizedSubProduct.Sys.ID, VO: referencedVO}
+		return &EntryReference{ContentType: contentType, ID: localizedSubProduct.Sys.ID, VO: referencedVO, CC: vo.CC}
 
 	case ContentTypeProduct:
 		referencedVO, err := vo.CC.GetProductByID(ctx, localizedSubProduct.Sys.ID)
@@ -711,7 +711,7 @@ func (vo *CfProduct) SubProduct(ctx context.Context, locale ...Locale) *EntryRef
 			}
 			return nil
 		}
-		return &EntryReference{ContentType: contentType, ID: localizedSubProduct.Sys.ID, VO: referencedVO}
+		return &EntryReference{ContentType: contentType, ID: localizedSubProduct.Sys.ID, VO: referencedVO, CC: vo.CC}
 
 	}
 	return nil
@@ -1438,6 +1438,7 @@ func (cc *ContentfulClient) cacheAllProduct(ctx context.Context, resultChan chan
 					addEntry(child.Sys.ID, EntryReference{ContentType: product.Sys.ContentType.Sys.ID,
 						ID:        product.Sys.ID,
 						VO:        product,
+						CC:        cc,
 						FromField: "categories",
 					})
 				}
@@ -1450,6 +1451,7 @@ func (cc *ContentfulClient) cacheAllProduct(ctx context.Context, resultChan chan
 				addEntry(child.Sys.ID, EntryReference{ContentType: product.Sys.ContentType.Sys.ID,
 					ID:        product.Sys.ID,
 					VO:        product,
+					CC:        cc,
 					FromField: "brand",
 				})
 			}
@@ -1461,6 +1463,7 @@ func (cc *ContentfulClient) cacheAllProduct(ctx context.Context, resultChan chan
 				addEntry(child.Sys.ID, EntryReference{ContentType: product.Sys.ContentType.Sys.ID,
 					ID:        product.Sys.ID,
 					VO:        product,
+					CC:        cc,
 					FromField: "subProduct",
 				})
 			}
@@ -1546,7 +1549,7 @@ func (cc *ContentfulClient) cacheProductByID(ctx context.Context, id string, ent
 				if cc.Cache.parentMap[child.Sys.ID] == nil {
 					cc.Cache.parentMap[child.Sys.ID] = []EntryReference{}
 				}
-				newParentRef := EntryReference{ContentType: product.Sys.ContentType.Sys.ID, ID: product.Sys.ID, VO: product, FromField: "categories"}
+				newParentRef := EntryReference{ContentType: product.Sys.ContentType.Sys.ID, ID: product.Sys.ID, VO: product, CC: cc, FromField: "categories"}
 				newParentSlice := []EntryReference{}
 				for _, parent := range cc.Cache.parentMap[child.Sys.ID] {
 					if parent.ID != id {
@@ -1566,7 +1569,7 @@ func (cc *ContentfulClient) cacheProductByID(ctx context.Context, id string, ent
 			if cc.Cache.parentMap[child.Sys.ID] == nil {
 				cc.Cache.parentMap[child.Sys.ID] = []EntryReference{}
 			}
-			newParentRef := EntryReference{ContentType: product.Sys.ContentType.Sys.ID, ID: product.Sys.ID, VO: product, FromField: "brand"}
+			newParentRef := EntryReference{ContentType: product.Sys.ContentType.Sys.ID, ID: product.Sys.ID, VO: product, CC: cc, FromField: "brand"}
 			newParentSlice := []EntryReference{}
 			for _, parent := range cc.Cache.parentMap[child.Sys.ID] {
 				if parent.ID != id {
@@ -1585,7 +1588,7 @@ func (cc *ContentfulClient) cacheProductByID(ctx context.Context, id string, ent
 			if cc.Cache.parentMap[child.Sys.ID] == nil {
 				cc.Cache.parentMap[child.Sys.ID] = []EntryReference{}
 			}
-			newParentRef := EntryReference{ContentType: product.Sys.ContentType.Sys.ID, ID: product.Sys.ID, VO: product, FromField: "subProduct"}
+			newParentRef := EntryReference{ContentType: product.Sys.ContentType.Sys.ID, ID: product.Sys.ID, VO: product, CC: cc, FromField: "subProduct"}
 			newParentSlice := []EntryReference{}
 			for _, parent := range cc.Cache.parentMap[child.Sys.ID] {
 				if parent.ID != id {
