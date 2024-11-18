@@ -425,6 +425,16 @@ func (cc *ContentfulClient) GetContentTypeOfID(ctx context.Context, id string) (
 	return vo.Sys.ContentType.Sys.ID, nil
 }
 
+func (vo *GenericEntry) GetParents(ctx context.Context, contentType ...string) (parents []EntryReference, err error) {
+	if vo == nil {
+		return nil, errors.New("GetParents: Value Object is nil")
+	}
+	if vo.CC == nil {
+		return nil, errors.New("GetParents: Value Object has no Contentful Client set")
+	}
+	return commonGetParents(ctx, vo.CC, vo.Sys.ID, contentType)
+}
+
 func (ref EntryReference) GetParents(ctx context.Context, contentType ...string) (parents []EntryReference, err error) {
 	if ref.ID == "" {
 		return nil, errors.New("GetParents: reference is nil")
