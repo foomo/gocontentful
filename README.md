@@ -1,3 +1,12 @@
+[![Build Status](https://github.com/foomo/gocontentful/actions/workflows/pr.yml/badge.svg?branch=main&event=push)](https://github.com/foomo/gocontentful/actions/workflows/pr.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/foomo/gocontentful)](https://goreportcard.com/report/github.com/foomo/gocontentful)
+[![Coverage Status](https://coveralls.io/repos/github/foomo/gocontentful/badge.svg?branch=main&)](https://coveralls.io/github/foomo/gocontentful?branch=main)
+[![GoDoc](https://godoc.org/github.com/foomo/gocontentful?status.svg)](https://godoc.org/github.com/foomo/gocontentful)
+
+<p align="center">
+  <img alt="sesamy" src=".github/assets/gocontentful.png"/>
+</p>
+
 # Gocontentful
 
 Gocontentful is a command line tool that generates a set of APIs for the [Go Language](https://go.dev) to interact with a [Contentful](https://www.contentful.com) CMS space.
@@ -46,3 +55,13 @@ Gocontentful generates a Go API that handles both issues above and can be regene
 ---
 
 Read the documentation: [Getting Started](docs/00-gettingstarted.md)
+
+## How to Contribute
+
+Make a pull request...
+
+## License
+
+Distributed under MIT License, please see license file within the code for more details.
+
+_Made with ♥ [foomo](https://www.foomo.org) by [bestbytes](https://www.bestbytes.com)_
