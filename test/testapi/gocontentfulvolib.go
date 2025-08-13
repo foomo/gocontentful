@@ -294,6 +294,78 @@ func (ref ContentfulReferencedEntry) ContentType() (contentType string) {
 	return ref.Entry.Sys.ContentType.Sys.ID
 }
 
+func (cc *ContentfulClient) UpsertAsset(ctx context.Context, asset *contentful.Asset) error {
+	if cc == nil || cc.Client == nil {
+		return errors.New("UpsertAsset: No client available")
+	}
+	if cc.clientMode != ClientModeCMA {
+		return errors.New("UpsertAsset: Only available in ClientModeCMA")
+	}
+	if asset.Fields != nil && asset.Fields.File != nil {
+		for _, locale := range SpaceLocales {
+			if asset.Fields.File[string(locale)] != nil {
+				asset.Fields.File[string(locale)].URL = strings.ReplaceAll(asset.Fields.File[string(locale)].URL, "https:", "")
+			}
+		}
+	}
+	errUpsert := cc.Client.Assets.Upsert(ctx, cc.SpaceID, asset)
+	if errUpsert != nil && !strings.Contains(errUpsert.Error(), "Not upserted") {
+		return errUpsert
+	}
+	return nil
+}
+
+func (cc *ContentfulClient) PublishAsset(ctx context.Context, asset *contentful.Asset) error {
+	if cc == nil || cc.Client == nil {
+		return errors.New("PublishAsset: No client available")
+	}
+	if cc.clientMode != ClientModeCMA {
+		return errors.New("PublishAsset: Only available in ClientModeCMA")
+	}
+	errPublish := cc.Client.Assets.Publish(ctx, cc.SpaceID, asset)
+	if errPublish != nil && !strings.Contains(errPublish.Error(), "Not published") {
+		return errPublish
+	}
+	return nil
+}
+
+func GetAssetPublishingStatus(asset *contentful.Asset) string {
+	if asset == nil {
+		return ""
+	}
+	if asset.Sys.PublishedVersion == 0 {
+		return StatusDraft
+	}
+	if asset.Sys.Version-asset.Sys.PublishedVersion == 1 {
+		return StatusPublished
+	}
+	return StatusChanged
+}
+
+func (cc *ContentfulClient) UpdateAsset(ctx context.Context, asset *contentful.Asset) (err error) {
+	if asset == nil {
+		return errors.New("UpdateAsset: Generic Entry is nil")
+	}
+	if cc == nil {
+		return errors.New("UpdateAsset: Generic Entry has nil Contentful client")
+	}
+	if cc.clientMode != ClientModeCMA {
+		return errors.New("UpdateAsset: Generic Entry not in ClientModeCMA")
+	}
+	publishingStatus := GetAssetPublishingStatus(asset)
+	err = cc.UpsertAsset(ctx, asset)
+	if err != nil {
+		return fmt.Errorf("UpdateAsset: upsert operation failed: %w", err)
+	}
+	if publishingStatus == StatusPublished {
+		err = cc.PublishAsset(ctx, asset)
+		if err != nil {
+			return fmt.Errorf("UpdateAsset: publish operation failed: %w", err)
+		}
+	}
+	return
+}
+
 func (cc *ContentfulClient) DeleteAsset(ctx context.Context, asset *contentful.Asset) error {
 	if cc == nil || cc.Client == nil {
 		return errors.New("DeleteAsset: No client available")
@@ -949,6 +1021,9 @@ func (genericEntry *GenericEntry) FieldAsReference(fieldName string, locale ...L
 		if err != nil {
 			return nil, err
 		}
+		if cts.Sys.ID == "" {
+			return nil, errors.New("not a reference")
+		}
 		referencedEntry, err := genericEntry.CC.GetGenericEntry(cts.Sys.ID)
 		if err != nil || referencedEntry == nil {
 			return nil, err
@@ -1079,6 +1154,9 @@ func (genericEntry *GenericEntry) FieldAsMultipleReference(fieldName string, loc
 		}
 		var refs []*EntryReference
 		for _, cts := range ctss {
+			if cts.Sys.ID == "" {
+				continue
+			}
 			referencedEntry, err := genericEntry.CC.GetGenericEntry(cts.Sys.ID)
 			if err != nil || referencedEntry == nil {
 				return nil, err
@@ -1282,6 +1360,62 @@ func (genericEntry *GenericEntry) Upsert(ctx context.Context) error {
 		return err
 	}
 	return nil
+}
+
+func (genericEntry *GenericEntry) Update(ctx context.Context) (err error) {
+	if genericEntry == nil {
+		return errors.New("Update: Generic Entry is nil")
+	}
+	if genericEntry.CC == nil {
+		return errors.New("Update: Generic Entry has nil Contentful client")
+	}
+	if genericEntry.CC.clientMode != ClientModeCMA {
+		return errors.New("Update: Generic Entry not in ClientModeCMA")
+	}
+	publishingStatus := genericEntry.GetPublishingStatus()
+	cfEntry := &contentful.Entry{}
+	tmp, errMarshal := json.Marshal(genericEntry)
+	if errMarshal != nil {
+		return errors.New("Update: Can't marshal JSON from VO")
+	}
+	errUnmarshal := json.Unmarshal(tmp, &cfEntry)
+	if errUnmarshal != nil {
+		return errors.New("Update: Can't unmarshal JSON into CF entry")
+	}
+
+	err = genericEntry.CC.Client.Entries.Upsert(ctx, genericEntry.CC.SpaceID, cfEntry)
+	if err != nil {
+		return fmt.Errorf("Update: upsert operation failed: %w", err)
+	}
+	tmp, errMarshal = json.Marshal(cfEntry)
+	if errMarshal != nil {
+		return errors.New("Update: Can't marshal JSON back from CF entry")
+	}
+	errUnmarshal = json.Unmarshal(tmp, &genericEntry)
+	if errUnmarshal != nil {
+		return errors.New("Update: Can't unmarshal JSON back into Generic Entry")
+	}
+	if publishingStatus == StatusPublished {
+		genericEntry.Sys.Version++
+		err = genericEntry.CC.Client.Entries.Publish(ctx, genericEntry.CC.SpaceID, cfEntry)
+		if err != nil {
+			return fmt.Errorf("Update: publish operation failed: %w", err)
+		}
+	}
+	return
+}
+
+func (genericEntry *GenericEntry) GetPublishingStatus() string {
+	if genericEntry == nil {
+		return ""
+	}
+	if genericEntry.Sys.PublishedVersion == 0 {
+		return StatusDraft
+	}
+	if genericEntry.Sys.Version-genericEntry.Sys.PublishedVersion == 1 {
+		return StatusPublished
+	}
+	return StatusChanged
 }
 
 func (cc *ContentfulClient) ClientMode() ClientMode {
@@ -2301,6 +2435,41 @@ func (n *RichTextGenericNode) richTextRenderHTML(w io.Writer, linkResolver LinkR
 	}
 	tags.richTextHtmlTagsClose(w)
 	return
+}
+
+// MarshalJSON implements custom JSON marshalling for RichTextGenericNode for compatibility with Contentful's upsert API
+func (n *RichTextGenericNode) MarshalJSON() ([]byte, error) {
+	if n == nil {
+		return []byte("null"), nil
+	}
+	if n.Data == nil {
+		n.Data = make(map[string]interface{})
+	}
+	if n.NodeType == "text" {
+		// For text nodes, include Data, Value and Marks, but not Content
+		return json.Marshal(&struct {
+			NodeType string                 `json:"nodeType"`
+			Data     map[string]interface{} `json:"data"`
+			Value    string                 `json:"value"`
+			Marks    []RichTextMark         `json:"marks"`
+		}{
+			NodeType: n.NodeType,
+			Data:     n.Data,
+			Value:    n.Value,
+			Marks:    n.Marks,
+		})
+	} else {
+		// For non-text nodes, exclude Data and Marks
+		return json.Marshal(&struct {
+			NodeType string                 `json:"nodeType"`
+			Data     map[string]interface{} `json:"data"`
+			Content  []*RichTextGenericNode `json:"content"`
+		}{
+			NodeType: n.NodeType,
+			Content:  n.Content,
+			Data:     n.Data,
+		})
+	}
 }
 
 func stringSliceContains(s []string, e string) bool {

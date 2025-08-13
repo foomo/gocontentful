@@ -241,9 +241,10 @@ a "Version mismatch" error. This is needed even if you have just upserted the en
 (vo *CfPerson) UpdateEntry(cc *ContentfulClient) (err error)
 ```
 
-Shortcut function that upserts and publishes the entry. Note that before calling this you will need to retrieve the
-entry with one of the Manage\* functions above to acquire the Sys object that contains the version information. Otherwise
-the API call will fail with a "Version mismatch" error. Using this shortcut function avoids retrieving the entry twice.
+First upserts the entry and then it publishes it only if it was already published before upserting.  
+The rationale is to respect the publishing status of entries and prevent unexpected go-live of content.
+Note that before calling this you will need to retrieve theentry with one of the Manage\* functions above to acquire the Sys object that contains the version information. 
+Otherwise the API call will fail with a "Version mismatch" error. Using this shortcut function avoids retrieving the entry twice.
 
 ```go
 (vo *CfPerson) DeleteEntry(cc *ContentfulClient) (err error)
@@ -313,6 +314,21 @@ Sets a generic entry's field value.
 
 Upserts the generic entry to the space it came from.
 
+```go
+(genericEntry *GenericEntry) Update(ctx context.Context) (err error)
+```
+
+Upserts the generic entry and publishes it only if it was already published before upserting. Only available for
+ClientModeCMA. Before calling this you should retrieve the entry to acquire the Sys version; otherwise the API may fail
+with a "Version mismatch" error.
+
+```go
+(genericEntry *GenericEntry) GetPublishingStatus() string
+```
+
+Returns the publishing status of the entry as per the Contentful editor UI. The value is one of `StatusDraft`,
+`StatusChanged`, or `StatusPublished`.
+
 ### Asset functions
 
 ```go
@@ -351,6 +367,27 @@ ToAssetReference(asset *contentful.Asset) (refSys ContentTypeSys)
 ```
 
 Converts the asset to a reference. You need to do this before you add the asset to a reference field of an entry.
+
+```go
+(cc *ContentfulClient) UpsertAsset(ctx context.Context, asset *contentful.Asset) error
+```
+
+Upserts an asset into the space. Only available for ClientModeCMA. Normalizes file URLs by removing the `https:` prefix
+for each locale file, and tolerates idempotency errors returned by the SDK.
+
+```go
+(cc *ContentfulClient) PublishAsset(ctx context.Context, asset *contentful.Asset) error
+```
+
+Publishes an asset. Only available for ClientModeCMA. The call is idempotent and tolerates "Not published" responses
+from the SDK.
+
+```go
+(cc *ContentfulClient) UpdateAsset(ctx context.Context, asset *contentful.Asset) (err error)
+```
+
+First upserts the asset and then publishes it only if it was already published before upserting. This respects the
+current publishing status and avoids unintended go-live of assets. Only available for ClientModeCMA.
 
 ```go
 (cc *ContentfulClient) DeleteAsset(asset *contentful.Asset) error

@@ -30,7 +30,7 @@ type spaceConf struct {
 func getLocales(ctx context.Context, CMA *contentful.Contentful, spaceID string) (locales []Locale, err error) {
 	col, err := CMA.Locales.List(ctx, spaceID).GetAll()
 	if err != nil {
-		log.Fatal("Couldn't get locales")
+		log.Fatalf("Couldn't get locales: %v", err)
 	}
 	for _, item := range col.Items {
 		var locale Locale
@@ -49,7 +49,6 @@ func getLocales(ctx context.Context, CMA *contentful.Contentful, spaceID string)
 
 // GetContentTypes retrieves content type definition from Contentful
 func getContentTypes(ctx context.Context, CMA *contentful.Contentful, spaceID string) (contentTypes []ContentType, err error) {
-
 	col := CMA.ContentTypes.List(ctx, spaceID)
 	_, err = col.GetAll()
 	if err != nil {
@@ -148,7 +147,7 @@ func GenerateAPI(ctx context.Context, dir, packageName, spaceID, cmaKey, environ
 	}
 
 	packageDir := filepath.Join(dir, packageName)
-	errMkdir := os.MkdirAll(packageDir, 0766)
+	errMkdir := os.MkdirAll(packageDir, 0o766)
 	if errMkdir != nil {
 		return errors.Wrap(errMkdir, "could not create target folder")
 	}

@@ -1314,6 +1314,7 @@ func (vo *CfProduct) UpdateEntry(ctx context.Context) (err error) {
 	if vo.CC.clientMode != ClientModeCMA {
 		return errors.New("UpdateEntry: Only available in ClientModeCMA")
 	}
+	publishingStatus := vo.GetPublishingStatus()
 	cfEntry := &contentful.Entry{}
 	tmp, errMarshal := json.Marshal(vo)
 	if errMarshal != nil {
@@ -1336,9 +1337,12 @@ func (vo *CfProduct) UpdateEntry(ctx context.Context) (err error) {
 	if errUnmarshal != nil {
 		return errors.New("CfProduct UpdateEntry: Can't unmarshal JSON back into VO")
 	}
-	err = vo.CC.Client.Entries.Publish(ctx, vo.CC.SpaceID, cfEntry)
-	if err != nil {
-		return fmt.Errorf("CfProduct UpdateEntry: publish operation failed: %w", err)
+	if publishingStatus == StatusPublished {
+		vo.Sys.Version++
+		err = vo.CC.Client.Entries.Publish(ctx, vo.CC.SpaceID, cfEntry)
+		if err != nil {
+			return fmt.Errorf("CfShopCategory UpdateEntry: publish operation failed: %w", err)
+		}
 	}
 	return
 }
