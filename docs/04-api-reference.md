@@ -96,6 +96,18 @@ const (
 )
 ```
 
+```go
+(cc *ContentfulClient) Locales() []Locale
+```
+
+Returns the space locales
+
+```go
+(cc *ContentfulClient) LocalesAsStrings() []string
+```
+
+Returns the space locales as strings
+
 ## Content functions and methods
 
 _For these we're assuming a content type named "Person"._

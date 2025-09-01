@@ -526,6 +526,18 @@ func (cc *ContentfulClient) GetContentTypeOfID(ctx context.Context, id string) (
 	return vo.Sys.ContentType.Sys.ID, nil
 }
 
+func (cc *ContentfulClient) Locales() []Locale {
+	return cc.locales
+}
+
+func (cc *ContentfulClient) LocalesAsStrings() []string {
+	locales := []string{}
+	for _, locale := range cc.locales {
+		locales = append(locales, string(locale))
+	}
+	return locales
+}
+
 func (vo *GenericEntry) GetParents(ctx context.Context, contentType ...string) (parents []EntryReference, err error) {
 	if vo == nil {
 		return nil, errors.New("GetParents: Value Object is nil")
@@ -2028,7 +2040,7 @@ func (cc *ContentfulClient) optimisticPageSizeGetAll(ctx context.Context, conten
 	switch errTyped := err.(type) {
 	case contentful.ErrorResponse:
 		msg := errTyped.Message
-		if strings.Contains(msg, "Response size too big") && limit >= 20 {
+		if (strings.Contains(msg, "Response size too big") || strings.Contains(msg, "Too many links")) && limit >= 20 {
 			smallerPageCol, err := cc.optimisticPageSizeGetAll(ctx, contentType, limit/2)
 			return smallerPageCol, err
 		}
