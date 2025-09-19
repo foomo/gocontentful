@@ -1171,7 +1171,7 @@ func (genericEntry *GenericEntry) FieldAsMultipleReference(fieldName string, loc
 			}
 			referencedEntry, err := genericEntry.CC.GetGenericEntry(cts.Sys.ID)
 			if err != nil || referencedEntry == nil {
-				return nil, err
+				continue
 			}
 			refs = append(refs, &EntryReference{
 				ID:          cts.Sys.ID,
@@ -1713,14 +1713,14 @@ func (cc *ContentfulClient) cacheSpace(ctx context.Context, contentTypes []strin
 	if errCanWeEvenConnect != nil {
 		if len(cc.offlineTemp.Entries) > 0 && (cc.Cache == nil || offlinePreviousState) {
 			if cc.logFn != nil && cc.logLevel <= LogInfo {
-				cc.logFn(map[string]interface{}{"task": "UpdateCache"}, LogInfo, InfoFallingBackToFile)
+				cc.logFn(map[string]interface{}{"task": "UpdateCache", "clientMode": cc.clientMode}, LogInfo, InfoFallingBackToFile)
 			}
 			cc.cacheMutex.sharedDataGcLock.Lock()
 			cc.offline = true
 			cc.cacheMutex.sharedDataGcLock.Unlock()
 		} else {
 			if cc.logFn != nil && cc.logLevel <= LogInfo {
-				cc.logFn(map[string]interface{}{"task": "UpdateCache"}, LogInfo, InfoPreservingExistingCache)
+				cc.logFn(map[string]interface{}{"task": "UpdateCache", "clientMode": cc.clientMode}, LogInfo, InfoPreservingExistingCache)
 			}
 		}
 	}
@@ -1734,7 +1734,7 @@ func (cc *ContentfulClient) cacheSpace(ctx context.Context, contentTypes []strin
 				err := updateCacheForContentType(gctx, results, cc, tempCache, contentType)
 				if err != nil {
 					if cc.logFn != nil && cc.logLevel <= LogInfo {
-						cc.logFn(map[string]interface{}{"task": "UpdateCache", "contentType": contentType}, LogError, err.Error())
+						cc.logFn(map[string]interface{}{"task": "UpdateCache", "contentType": contentType, "clientMode": cc.clientMode}, LogError, err.Error())
 					}
 					return err
 				}
@@ -1767,7 +1767,7 @@ func (cc *ContentfulClient) cacheSpace(ctx context.Context, contentTypes []strin
 		cc.offline = offlinePreviousState
 		cc.cacheMutex.sharedDataGcLock.Unlock()
 		if cc.logFn != nil && cc.logLevel <= LogInfo {
-			cc.logFn(map[string]interface{}{"task": "UpdateCache"}, LogError, err.Error())
+			cc.logFn(map[string]interface{}{"task": "UpdateCache", "clientMode": cc.clientMode}, LogError, err.Error())
 		}
 		return
 	}
@@ -1775,7 +1775,7 @@ func (cc *ContentfulClient) cacheSpace(ctx context.Context, contentTypes []strin
 	<-resultsDone
 
 	if cc.logFn != nil && cc.logLevel <= LogInfo {
-		cc.logFn(map[string]interface{}{"time elapsed": fmt.Sprint(time.Since(start)), "task": "UpdateCache"}, LogInfo, InfoUpdateCacheTime)
+		cc.logFn(map[string]interface{}{"time elapsed": fmt.Sprint(time.Since(start)), "task": "UpdateCache", "clientMode": cc.clientMode}, LogInfo, InfoUpdateCacheTime)
 	}
 	cc.cacheMutex.fullCacheGcLock.Lock()
 	cc.cacheMutex.sharedDataGcLock.Lock()
@@ -2515,7 +2515,7 @@ func updateCacheForContentType(ctx context.Context, results chan ContentTypeResu
 		}
 		cc.cacheMutex.genericEntriesGcLock.Unlock()
 		if cc.logFn != nil && cc.logLevel <= LogInfo {
-			cc.logFn(map[string]interface{}{"contentType": "brand", "method": "updateCacheForContentType", "size": len(allBrand)}, LogInfo, InfoCachedAllEntries)
+			cc.logFn(map[string]interface{}{"contentType": "brand", "method": "updateCacheForContentType", "clientMode": cc.clientMode, "size": len(allBrand)}, LogInfo, InfoCachedAllEntries)
 		}
 
 	case ContentTypeCategory:
@@ -2534,7 +2534,7 @@ func updateCacheForContentType(ctx context.Context, results chan ContentTypeResu
 		}
 		cc.cacheMutex.genericEntriesGcLock.Unlock()
 		if cc.logFn != nil && cc.logLevel <= LogInfo {
-			cc.logFn(map[string]interface{}{"contentType": "category", "method": "updateCacheForContentType", "size": len(allCategory)}, LogInfo, InfoCachedAllEntries)
+			cc.logFn(map[string]interface{}{"contentType": "category", "method": "updateCacheForContentType", "clientMode": cc.clientMode, "size": len(allCategory)}, LogInfo, InfoCachedAllEntries)
 		}
 
 	case ContentTypeProduct:
@@ -2553,7 +2553,7 @@ func updateCacheForContentType(ctx context.Context, results chan ContentTypeResu
 		}
 		cc.cacheMutex.genericEntriesGcLock.Unlock()
 		if cc.logFn != nil && cc.logLevel <= LogInfo {
-			cc.logFn(map[string]interface{}{"contentType": "product", "method": "updateCacheForContentType", "size": len(allProduct)}, LogInfo, InfoCachedAllEntries)
+			cc.logFn(map[string]interface{}{"contentType": "product", "method": "updateCacheForContentType", "clientMode": cc.clientMode, "size": len(allProduct)}, LogInfo, InfoCachedAllEntries)
 		}
 
 	case assetWorkerType:
@@ -2563,7 +2563,7 @@ func updateCacheForContentType(ctx context.Context, results chan ContentTypeResu
 		}
 		tempCache.assets = allAssets
 		if cc.logFn != nil && cc.logLevel <= LogInfo {
-			cc.logFn(map[string]interface{}{"contentType": "asset", "method": "updateCacheForContentType", "size": len(allAssets)}, LogInfo, InfoCachedAllAssets)
+			cc.logFn(map[string]interface{}{"contentType": "asset", "method": "updateCacheForContentType", "clientMode": cc.clientMode, "size": len(allAssets)}, LogInfo, InfoCachedAllAssets)
 		}
 
 	case tagWorkerType:
@@ -2573,7 +2573,7 @@ func updateCacheForContentType(ctx context.Context, results chan ContentTypeResu
 		}
 		tempCache.tags = allTags
 		if cc.logFn != nil && cc.logLevel <= LogInfo {
-			cc.logFn(map[string]interface{}{"contentType": "tag", "method": "updateCacheForContentType", "size": len(allTags)}, LogInfo, InfoCachedAllTags)
+			cc.logFn(map[string]interface{}{"contentType": "tag", "method": "updateCacheForContentType", "clientMode": cc.clientMode, "size": len(allTags)}, LogInfo, InfoCachedAllTags)
 		}
 	}
 	return nil
@@ -2602,7 +2602,7 @@ func updateCacheForContentTypeAndEntity(ctx context.Context, cc *ContentfulClien
 			}
 		}
 		if cc.logFn != nil && cc.logLevel <= LogInfo && entityPayload == nil {
-			cc.logFn(map[string]interface{}{"contentType": "Asset", "method": "updateCacheForContentTypeAndEntity", "entityID": entityID}, LogInfo, InfoUpdatedEntityCache)
+			cc.logFn(map[string]interface{}{"contentType": "Asset", "method": "updateCacheForContentTypeAndEntity", "clientMode": cc.clientMode, "entityID": entityID}, LogInfo, InfoUpdatedEntityCache)
 		}
 
 	case ContentTypeBrand:
@@ -2614,7 +2614,7 @@ func updateCacheForContentTypeAndEntity(ctx context.Context, cc *ContentfulClien
 			return err
 		}
 		if cc.logFn != nil && cc.logLevel <= LogInfo && entityPayload == nil {
-			cc.logFn(map[string]interface{}{"contentType": "brand", "method": "updateCacheForContentTypeAndEntity", "entityID": entityID}, LogInfo, InfoUpdatedEntityCache)
+			cc.logFn(map[string]interface{}{"contentType": "brand", "method": "updateCacheForContentTypeAndEntity", "clientMode": cc.clientMode, "entityID": entityID}, LogInfo, InfoUpdatedEntityCache)
 		}
 
 	case ContentTypeCategory:
@@ -2626,7 +2626,7 @@ func updateCacheForContentTypeAndEntity(ctx context.Context, cc *ContentfulClien
 			return err
 		}
 		if cc.logFn != nil && cc.logLevel <= LogInfo && entityPayload == nil {
-			cc.logFn(map[string]interface{}{"contentType": "category", "method": "updateCacheForContentTypeAndEntity", "entityID": entityID}, LogInfo, InfoUpdatedEntityCache)
+			cc.logFn(map[string]interface{}{"contentType": "category", "method": "updateCacheForContentTypeAndEntity", "clientMode": cc.clientMode, "entityID": entityID}, LogInfo, InfoUpdatedEntityCache)
 		}
 
 	case ContentTypeProduct:
@@ -2638,13 +2638,13 @@ func updateCacheForContentTypeAndEntity(ctx context.Context, cc *ContentfulClien
 			return err
 		}
 		if cc.logFn != nil && cc.logLevel <= LogInfo && entityPayload == nil {
-			cc.logFn(map[string]interface{}{"contentType": "product", "method": "updateCacheForContentTypeAndEntity", "entityID": entityID}, LogInfo, InfoUpdatedEntityCache)
+			cc.logFn(map[string]interface{}{"contentType": "product", "method": "updateCacheForContentTypeAndEntity", "clientMode": cc.clientMode, "entityID": entityID}, LogInfo, InfoUpdatedEntityCache)
 		}
 
 	}
 	allTags, err := cc.getAllTags(ctx, false)
 	if err != nil {
-		return fmt.Errorf("syncCache failed for tags: %s", err.Error())
+		return fmt.Errorf("syncCache failed for tags: %s, clientMode: %s", err.Error(), cc.clientMode)
 	}
 	cc.cacheMutex.sharedDataGcLock.Lock()
 	cc.Cache.tags = allTags
