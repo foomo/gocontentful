@@ -1,2 +1,2 @@
-// gocontentful version: 1.1.5
+// gocontentful version: 1.1.7
 package testapi

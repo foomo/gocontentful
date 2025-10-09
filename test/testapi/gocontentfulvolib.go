@@ -599,46 +599,53 @@ func (ref EntryReference) GetParents(ctx context.Context, contentType ...string)
 	}
 }
 
-func GetOrInheritFieldValue(ctx context.Context, contentfulShop *ContentfulClient, entryID string, field string, parentContentTypes []string, locale Locale) (any, error) {
+func GetOrInheritFieldValue(ctx context.Context, contentfulShop *ContentfulClient, entryID string, field string,
+	parentContentTypes []string, forceContinueFunc func(val any) bool, locale Locale,
+) (any, error) {
 	entry, err := contentfulShop.GetGenericEntry(entryID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get entry %s: %v", entryID, err)
 	}
 
 	// Try to get the field value from the current entry first
-	val, err := entry.FieldAsAny(field, locale)
-	if err == nil {
+	val, _ := entry.FieldAsAny(field, locale)
+	if forceContinueFunc == nil || !forceContinueFunc(val) {
 		return val, nil
 	}
-
-	return inheritFieldValueRecursive(ctx, contentfulShop, entry, field, parentContentTypes, locale, make(map[string]bool))
+	if val == nil || forceContinueFunc(val) {
+		return inheritFieldValueRecursive(ctx, contentfulShop, entry, field, parentContentTypes, forceContinueFunc, make(map[string]bool), locale)
+	}
+	return val, nil
 }
 
-func inheritFieldValueRecursive(ctx context.Context, contentfulShop *ContentfulClient, entry *GenericEntry, field string, parentContentTypes []string, locale Locale, visited map[string]bool) (any, error) {
+func inheritFieldValueRecursive(ctx context.Context, contentfulShop *ContentfulClient, entry *GenericEntry, field string, parentContentTypes []string,
+	forceContinueFunc func(val any) bool, visited map[string]bool, locale Locale,
+) (any, error) {
 	if visited[entry.Sys.ID] {
-		return nil, fmt.Errorf("circular reference detected for entry %s", entry.Sys.ID)
+		return nil, fmt.Errorf("inheritFieldValueRecursive: circular reference detected for entry %s", entry.Sys.ID)
 	}
 	visited[entry.Sys.ID] = true
 
 	parentRefs, err := commonGetParents(ctx, entry.CC, entry.Sys.ID, parentContentTypes)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get parents for entry %s: %v", entry.Sys.ID, err)
+		return nil, fmt.Errorf("inheritFieldValueRecursive: failed to get parents for entry %s: %v", entry.Sys.ID, err)
 	}
 
 	for _, parentRef := range parentRefs {
 		parentEntry, err := entry.CC.GetGenericEntry(parentRef.ID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get parent entry %s: %v", parentRef.ID, err)
+			return nil, fmt.Errorf("inheritFieldValueRecursive: failed to get parent entry %s: %v", parentRef.ID, err)
 		}
 
-		val, err := parentEntry.FieldAsAny(field, locale)
-		if err == nil {
+		val, _ := parentEntry.FieldAsAny(field, locale)
+		if forceContinueFunc == nil || !forceContinueFunc(val) {
 			return val, nil
 		}
-
-		inheritedVal, err := inheritFieldValueRecursive(ctx, contentfulShop, parentEntry, field, parentContentTypes, locale, visited)
-		if err == nil {
-			return inheritedVal, nil
+		if val == nil || forceContinueFunc(val) {
+			val, _ = inheritFieldValueRecursive(ctx, contentfulShop, parentEntry, field, parentContentTypes, forceContinueFunc, visited, locale)
+		}
+		if val != nil {
+			return val, nil
 		}
 	}
 
