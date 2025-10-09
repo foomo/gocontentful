@@ -597,7 +597,52 @@ func (ref EntryReference) GetParents(ctx context.Context, contentType ...string)
 		}
 		return candidateParents, nil
 	}
-	return nil, errors.New("GetParents: reference VO and CC are both nil")
+}
+
+func GetOrInheritFieldValue(ctx context.Context, contentfulShop *ContentfulClient, entryID string, field string, parentContentTypes []string, locale Locale) (any, error) {
+	entry, err := contentfulShop.GetGenericEntry(entryID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get entry %s: %v", entryID, err)
+	}
+
+	// Try to get the field value from the current entry first
+	val, err := entry.FieldAsAny(field, locale)
+	if err == nil {
+		return val, nil
+	}
+
+	return inheritFieldValueRecursive(ctx, contentfulShop, entry, field, parentContentTypes, locale, make(map[string]bool))
+}
+
+func inheritFieldValueRecursive(ctx context.Context, contentfulShop *ContentfulClient, entry *GenericEntry, field string, parentContentTypes []string, locale Locale, visited map[string]bool) (any, error) {
+	if visited[entry.Sys.ID] {
+		return nil, fmt.Errorf("circular reference detected for entry %s", entry.Sys.ID)
+	}
+	visited[entry.Sys.ID] = true
+
+	parentRefs, err := commonGetParents(ctx, entry.CC, entry.Sys.ID, parentContentTypes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get parents for entry %s: %v", entry.Sys.ID, err)
+	}
+
+	for _, parentRef := range parentRefs {
+		parentEntry, err := entry.CC.GetGenericEntry(parentRef.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get parent entry %s: %v", parentRef.ID, err)
+		}
+
+		val, err := parentEntry.FieldAsAny(field, locale)
+		if err == nil {
+			return val, nil
+		}
+
+		inheritedVal, err := inheritFieldValueRecursive(ctx, contentfulShop, parentEntry, field, parentContentTypes, locale, visited)
+		if err == nil {
+			return inheritedVal, nil
+		}
+	}
+
+	return nil, ErrNotSet
 }
 
 func HtmlToRichText(htmlSrc string) *RichTextNode {
