@@ -22,7 +22,7 @@ type Cf{{ firstCap $contentType.Sys.ID }}Fields struct {
 		{{ if fieldIsAsset $field }}
 type Cf{{ firstCap $contentType.Sys.ID }}Fields{{ firstCap $field.ID }} struct {
 	Entry *contentful.Asset
-	Col   *contentful.Collection
+	Col   *contentful.Collection[*Cf{{ firstCap $contentType.Sys.ID }}]
 }
 		{{ end }}
 	{{ end }}

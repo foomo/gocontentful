@@ -2,9 +2,7 @@
 package testapi
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -29,7 +27,7 @@ func (cc *ContentfulClient) GetAllProduct(ctx context.Context) (voMap map[string
 	if cacheInit {
 		return cc.Cache.entryMaps.product, nil
 	}
-	col, err := cc.optimisticPageSizeGetAll(ctx, "product", optimisticPageSize)
+	col, err := cc.optimisticPageSizeGetAllProduct(ctx, "product", optimisticPageSize)
 	if err != nil {
 		return nil, err
 	}
@@ -48,12 +46,12 @@ func (cc *ContentfulClient) GetFilteredProduct(ctx context.Context, query *conte
 	if cc == nil || cc.Client == nil {
 		return nil, errors.New("getFilteredProduct: No client available")
 	}
-	col := cc.Client.Entries.List(ctx, cc.SpaceID)
+	col := cc.ProductClient.List(ctx, cc.SpaceID)
 	if query != nil {
 		col.Query = *query
 	}
 	col.Query.ContentType("product").Locale("*").Include(0)
-	_, err = col.GetAll()
+	col, err = col.GetAll()
 	if err != nil {
 		return nil, errors.New("getFilteredProduct: " + err.Error())
 	}
@@ -108,9 +106,9 @@ func (cc *ContentfulClient) GetProductByID(ctx context.Context, id string, force
 		}
 		return nil, fmt.Errorf("GetProductByID: entry '%s' not found in cache", id)
 	}
-	col := cc.Client.Entries.List(ctx, cc.SpaceID)
+	col := cc.ProductClient.List(ctx, cc.SpaceID)
 	col.Query.ContentType("product").Locale("*").Include(0).Equal("sys.id", id)
-	_, err = col.GetAll()
+	col, err = col.GetAll()
 	if err != nil {
 		return nil, err
 	}
@@ -914,16 +912,7 @@ func (vo *CfProduct) IsArchived(ctx context.Context) (bool, error) {
 	if vo.CC.clientMode != ClientModeCMA {
 		return false, errors.New("IsArchived: Only available in ClientModeCMA")
 	}
-	cfEntry := &contentful.Entry{}
-	tmp, errMarshal := json.Marshal(vo)
-	if errMarshal != nil {
-		return false, errors.New("CfProduct IsArchived: Can't marshal JSON from VO")
-	}
-	errUnmarshal := json.Unmarshal(tmp, &cfEntry)
-	if errUnmarshal != nil {
-		return false, errors.New("CfProduct IsArchived: Can't unmarshal JSON into CF entry")
-	}
-	return len(cfEntry.Sys.ArchivedAt) > 0, nil
+	return len(vo.Sys.ArchivedAt) > 0, nil
 }
 
 // Product Field setters
@@ -1228,7 +1217,7 @@ func (vo *CfProduct) SetNodes(nodes interface{}, locale ...Locale) (err error) {
 	return
 }
 
-func (vo *CfProduct) UpsertEntry(ctx context.Context) (err error) {
+func (vo *CfProduct) UpsertEntry(ctx context.Context) error {
 	if vo == nil {
 		return errors.New("UpsertEntry: Value Object is nil")
 	}
@@ -1238,23 +1227,14 @@ func (vo *CfProduct) UpsertEntry(ctx context.Context) (err error) {
 	if vo.CC.clientMode != ClientModeCMA {
 		return errors.New("UpsertEntry: Only available in ClientModeCMA")
 	}
-	cfEntry := &contentful.Entry{}
-	tmp, errMarshal := json.Marshal(vo)
-	if errMarshal != nil {
-		return errors.New("CfProduct UpsertEntry: Can't marshal JSON from VO")
-	}
-	errUnmarshal := json.Unmarshal(tmp, &cfEntry)
-	if errUnmarshal != nil {
-		return errors.New("CfProduct UpsertEntry: Can't unmarshal JSON into CF entry")
-	}
-
-	err = vo.CC.Client.Entries.Upsert(ctx, vo.CC.SpaceID, cfEntry)
-	if err != nil {
+	if err := vo.CC.ProductClient.Upsert(ctx, vo.CC.SpaceID, vo); err != nil {
 		return fmt.Errorf("CfProduct UpsertEntry: Operation failed: %w", err)
 	}
-	return
+
+	return nil
 }
-func (vo *CfProduct) PublishEntry(ctx context.Context) (err error) {
+
+func (vo *CfProduct) PublishEntry(ctx context.Context) error {
 	if vo == nil {
 		return errors.New("PublishEntry: Value Object is nil")
 	}
@@ -1264,22 +1244,14 @@ func (vo *CfProduct) PublishEntry(ctx context.Context) (err error) {
 	if vo.CC.clientMode != ClientModeCMA {
 		return errors.New("PublishEntry: Only available in ClientModeCMA")
 	}
-	cfEntry := &contentful.Entry{}
-	tmp, errMarshal := json.Marshal(vo)
-	if errMarshal != nil {
-		return errors.New("CfProduct PublishEntry: Can't marshal JSON from VO")
-	}
-	errUnmarshal := json.Unmarshal(tmp, &cfEntry)
-	if errUnmarshal != nil {
-		return errors.New("CfProduct PublishEntry: Can't unmarshal JSON into CF entry")
-	}
-	err = vo.CC.Client.Entries.Publish(ctx, vo.CC.SpaceID, cfEntry)
+	err := vo.CC.ProductClient.Publish(ctx, vo.CC.SpaceID, vo)
 	if err != nil {
 		return fmt.Errorf("CfProduct PublishEntry: publish operation failed: %w", err)
 	}
-	return
+
+	return nil
 }
-func (vo *CfProduct) UnpublishEntry(ctx context.Context) (err error) {
+func (vo *CfProduct) UnpublishEntry(ctx context.Context) error {
 	if vo == nil {
 		return errors.New("UnpublishEntry: Value Object is nil")
 	}
@@ -1289,22 +1261,14 @@ func (vo *CfProduct) UnpublishEntry(ctx context.Context) (err error) {
 	if vo.CC.clientMode != ClientModeCMA {
 		return errors.New("UnpublishEntry: Only available in ClientModeCMA")
 	}
-	cfEntry := &contentful.Entry{}
-	tmp, errMarshal := json.Marshal(vo)
-	if errMarshal != nil {
-		return errors.New("CfProduct UnpublishEntry: Can't marshal JSON from VO")
-	}
-	errUnmarshal := json.Unmarshal(tmp, &cfEntry)
-	if errUnmarshal != nil {
-		return errors.New("CfProduct UnpublishEntry: Can't unmarshal JSON into CF entry")
-	}
-	err = vo.CC.Client.Entries.Unpublish(ctx, vo.CC.SpaceID, cfEntry)
+	err := vo.CC.ProductClient.Unpublish(ctx, vo.CC.SpaceID, vo)
 	if err != nil {
 		return fmt.Errorf("CfProduct UnpublishEntry: unpublish operation failed: %w", err)
 	}
-	return
+
+	return nil
 }
-func (vo *CfProduct) UpdateEntry(ctx context.Context) (err error) {
+func (vo *CfProduct) UpdateEntry(ctx context.Context) error {
 	if vo == nil {
 		return errors.New("UpdateEntry: Value Object is nil")
 	}
@@ -1315,38 +1279,21 @@ func (vo *CfProduct) UpdateEntry(ctx context.Context) (err error) {
 		return errors.New("UpdateEntry: Only available in ClientModeCMA")
 	}
 	publishingStatus := vo.GetPublishingStatus()
-	cfEntry := &contentful.Entry{}
-	tmp, errMarshal := json.Marshal(vo)
-	if errMarshal != nil {
-		return errors.New("CfProduct UpdateEntry: Can't marshal JSON from VO")
-	}
-	errUnmarshal := json.Unmarshal(tmp, &cfEntry)
-	if errUnmarshal != nil {
-		return errors.New("CfProduct UpdateEntry: Can't unmarshal JSON into CF entry")
-	}
-
-	err = vo.CC.Client.Entries.Upsert(ctx, vo.CC.SpaceID, cfEntry)
+	err := vo.CC.ProductClient.Upsert(ctx, vo.CC.SpaceID, vo)
 	if err != nil {
 		return fmt.Errorf("CfProduct UpdateEntry: upsert operation failed: %w", err)
 	}
-	tmp, errMarshal = json.Marshal(cfEntry)
-	if errMarshal != nil {
-		return errors.New("CfProduct UpdateEntry: Can't marshal JSON back from CF entry")
-	}
-	errUnmarshal = json.Unmarshal(tmp, &vo)
-	if errUnmarshal != nil {
-		return errors.New("CfProduct UpdateEntry: Can't unmarshal JSON back into VO")
-	}
 	if publishingStatus == StatusPublished {
 		vo.Sys.Version++
-		err = vo.CC.Client.Entries.Publish(ctx, vo.CC.SpaceID, cfEntry)
+		err = vo.CC.ProductClient.Publish(ctx, vo.CC.SpaceID, vo)
 		if err != nil {
 			return fmt.Errorf("CfShopCategory UpdateEntry: publish operation failed: %w", err)
 		}
 	}
-	return
+
+	return nil
 }
-func (vo *CfProduct) DeleteEntry(ctx context.Context) (err error) {
+func (vo *CfProduct) DeleteEntry(ctx context.Context) error {
 	if vo == nil {
 		return errors.New("DeleteEntry: Value Object is nil")
 	}
@@ -1356,25 +1303,17 @@ func (vo *CfProduct) DeleteEntry(ctx context.Context) (err error) {
 	if vo.CC.clientMode != ClientModeCMA {
 		return errors.New("DeleteEntry: Only available in ClientModeCMA")
 	}
-	cfEntry := &contentful.Entry{}
-	tmp, errMarshal := json.Marshal(vo)
-	if errMarshal != nil {
-		return errors.New("CfProduct DeleteEntry: Can't marshal JSON from VO")
-	}
-	errUnmarshal := json.Unmarshal(tmp, &cfEntry)
-	if errUnmarshal != nil {
-		return errors.New("CfProduct DeleteEntry: Can't unmarshal JSON into CF entry")
-	}
-	if cfEntry.Sys.PublishedCounter > 0 {
-		errUnpublish := vo.CC.Client.Entries.Unpublish(ctx, vo.CC.SpaceID, cfEntry)
+	if vo.Sys.PublishedCounter > 0 {
+		errUnpublish := vo.CC.ProductClient.Unpublish(ctx, vo.CC.SpaceID, vo)
 		if errUnpublish != nil && !strings.Contains(errUnpublish.Error(), "Not published") {
 			return fmt.Errorf("CfProduct DeleteEntry: Unpublish entry failed: %w", errUnpublish)
 		}
 	}
-	errDelete := vo.CC.Client.Entries.Delete(ctx, vo.CC.SpaceID, cfEntry.Sys.ID)
+	errDelete := vo.CC.ProductClient.Delete(ctx, vo.CC.SpaceID, vo.Sys.ID)
 	if errDelete != nil {
 		return fmt.Errorf("CfProduct DeleteEntry: Delete entry failed: %w", errDelete)
 	}
+
 	return nil
 }
 func (vo *CfProduct) ToReference() (refSys ContentTypeSys) {
@@ -1387,24 +1326,59 @@ func (vo *CfProduct) ToReference() (refSys ContentTypeSys) {
 	return
 }
 
+func (cc *ContentfulClient) optimisticPageSizeGetAllProduct(ctx context.Context, contentType string, limit uint16) (*contentful.Collection[CfProduct], error) {
+	col := cc.ProductClient.List(ctx, cc.SpaceID)
+	col.Query.ContentType(contentType).Locale("*").Include(0).Limit(limit)
+	var allItems []CfProduct
+	var err error
+	for {
+		var nextCol *contentful.Collection[CfProduct]
+		nextCol, err = col.Next()
+		if err != nil {
+			break
+		}
+		col = nextCol
+		allItems = append(allItems, col.Items...)
+		if uint16(len(col.Items)) < limit {
+			break
+		}
+	}
+	col.Items = allItems
+	switch errTyped := err.(type) {
+	case contentful.ErrorResponse:
+		msg := errTyped.Message
+		if (strings.Contains(msg, "Response size too big") || strings.Contains(msg, "Too many links")) && limit >= 20 {
+			smallerPageCol, err := cc.optimisticPageSizeGetAllProduct(ctx, contentType, limit/2)
+			return smallerPageCol, err
+		}
+		return nil, err
+	case nil:
+	default:
+		return nil, err
+	}
+	return col, nil
+}
+
 func (cc *ContentfulClient) cacheAllProduct(ctx context.Context, resultChan chan<- ContentTypeResult) (vos map[string]*CfProduct, err error) {
 	if cc == nil || cc.Client == nil {
 		return nil, errors.New("cacheAllProduct: No CDA/CPA client available")
 	}
 	var allProduct []*CfProduct
-	col := &contentful.Collection{
-		Items: []interface{}{},
-	}
+	col := &contentful.Collection[CfProduct]{}
 	cc.cacheMutex.sharedDataGcLock.RLock()
 	defer cc.cacheMutex.sharedDataGcLock.RUnlock()
 	if cc.offline {
 		for _, entry := range cc.offlineTemp.Entries {
 			if entry.Sys.ContentType.Sys.ID == ContentTypeProduct {
-				col.Items = append(col.Items, entry)
+				var vo CfProduct
+				if err := contentful.DeepCopy(&vo, entry); err != nil {
+					return nil, err
+				}
+				col.Items = append(col.Items, vo)
 			}
 		}
 	} else {
-		col, err = cc.optimisticPageSizeGetAll(ctx, "product", cc.optimisticPageSize)
+		col, err = cc.optimisticPageSizeGetAllProduct(ctx, "product", cc.optimisticPageSize)
 		if err != nil {
 			return nil, errors.New("optimisticPageSizeGetAll for Product failed: " + err.Error())
 		}
@@ -1490,20 +1464,19 @@ func (cc *ContentfulClient) cacheProductByID(ctx context.Context, id string, ent
 	defer cc.cacheMutex.parentMapGcLock.Unlock()
 	cc.cacheMutex.genericEntriesGcLock.Lock()
 	defer cc.cacheMutex.genericEntriesGcLock.Unlock()
-	var col *contentful.Collection
+	var col *contentful.Collection[CfProduct]
 	if entryPayload != nil {
-		col = &contentful.Collection{
-			Items: []interface{}{entryPayload},
-		}
+		col = &contentful.Collection[CfProduct]{}
 		id = entryPayload.Sys.ID
 	} else {
 		if cc.Client == nil {
 			return errors.New("cacheProductByID: No client available")
 		}
 		if !entryDelete {
-			col = cc.Client.Entries.List(ctx, cc.SpaceID)
+			col = cc.ProductClient.List(ctx, cc.SpaceID)
 			col.Query.ContentType("product").Locale("*").Include(0).Equal("sys.id", id)
-			_, err := col.GetAll()
+			var err error
+			col, err = col.GetAll()
 			if err != nil {
 				return err
 			}
@@ -1621,14 +1594,8 @@ func (cc *ContentfulClient) cacheProductByID(ctx context.Context, id string, ent
 	return nil
 }
 
-func colToCfProduct(col *contentful.Collection, cc *ContentfulClient) (vos []*CfProduct, err error) {
-	for _, item := range col.Items {
-		var vo CfProduct
-		byteArray, _ := json.Marshal(item)
-		err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&vo)
-		if err != nil {
-			break
-		}
+func colToCfProduct(col *contentful.Collection[CfProduct], cc *ContentfulClient) (vos []*CfProduct, err error) {
+	for _, vo := range col.Items {
 		if cc.textJanitor {
 
 			vo.Fields.ProductName = cleanUpStringField(vo.Fields.ProductName)
@@ -1648,13 +1615,12 @@ func colToCfProduct(col *contentful.Collection, cc *ContentfulClient) (vos []*Cf
 			vo.Fields.SeoText = cleanUpRichTextField(vo.Fields.SeoText)
 
 		}
-		var typedItem RawItem
-		err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&typedItem)
-		if err != nil {
+		var rawFields RawFields
+		if err := contentful.DeepCopy(&rawFields, vo.Fields); err != nil {
 			break
 		}
 		vo.CC = cc
-		vo.RawFields = typedItem.Fields
+		vo.RawFields = rawFields
 		vos = append(vos, &vo)
 	}
 	return vos, err

@@ -35,7 +35,7 @@ type CfBrandFields struct {
 
 type CfBrandFieldsLogo struct {
 	Entry *contentful.Asset
-	Col   *contentful.Collection
+	Col   *contentful.Collection[*CfBrand]
 }
 
 type CfCategory struct {
@@ -58,7 +58,7 @@ type CfCategoryFields struct {
 
 type CfCategoryFieldsIcon struct {
 	Entry *contentful.Asset
-	Col   *contentful.Collection
+	Col   *contentful.Collection[*CfCategory]
 }
 
 type CfProduct struct {

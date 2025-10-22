@@ -69,5 +69,4 @@ func TestRichTextToHTML(t *testing.T) {
 	require.NoError(t, err)
 	want := "<h1>A sample page</h1><p>The paragraph <b>with bold stuff</b></p><p>This was not working before</p>"
 	require.Equal(t, want, html)
-
 }

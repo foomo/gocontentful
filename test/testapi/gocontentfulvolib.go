@@ -4,12 +4,12 @@ package testapi
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"reflect"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -65,6 +65,9 @@ type ContentfulClient struct {
 	cacheWorkerOnce    sync.Once
 	clientMode         ClientMode
 	Client             *contentful.Contentful
+	BrandClient        *contentful.ContentTypeService[CfBrand]
+	CategoryClient     *contentful.ContentTypeService[CfCategory]
+	ProductClient      *contentful.ContentTypeService[CfProduct]
 	locales            []Locale
 	logFn              func(
 		fields map[string]interface{},
@@ -140,8 +143,10 @@ const (
 	LogError = 3
 )
 
-const SpaceLocaleGerman Locale = "de"
-const SpaceLocaleFrench Locale = "fr"
+const (
+	SpaceLocaleGerman Locale = "de"
+	SpaceLocaleFrench Locale = "fr"
+)
 
 var SpaceLocales = []Locale{
 	"de",
@@ -448,25 +453,17 @@ func (cc *ContentfulClient) GetAssetByID(ctx context.Context, id string, forceNo
 			return nil, errors.New("GetAssetByID: not found")
 		}
 	}
+	var err error
 	col := cc.Client.Assets.List(ctx, cc.SpaceID)
 	col.Query.Locale("*").Equal("sys.id", id)
-	_, err := col.Next()
+	col, err = col.Next()
 	if err != nil {
 		return nil, err
 	}
 	if len(col.Items) == 0 {
 		return nil, errors.New("GetAssetByID: Not found " + id)
 	}
-	item := col.Items[0]
-	asset := contentful.Asset{}
-	byt, err := json.Marshal(item)
-	if err != nil {
-		return nil, err
-	}
-	err = json.Unmarshal(byt, &asset)
-	if err != nil {
-		return nil, err
-	}
+	asset := col.Items[0]
 	for _, loc := range []Locale{SpaceLocaleGerman, SpaceLocaleFrench} {
 		if _, ok := asset.Fields.File[string(loc)]; ok {
 			asset.Fields.File[string(loc)].URL = "https:" + asset.Fields.File[string(loc)].URL
@@ -510,20 +507,14 @@ func (cc *ContentfulClient) GetContentTypeOfID(ctx context.Context, id string) (
 	}
 	col := cc.Client.Entries.List(ctx, cc.SpaceID)
 	col.Query.Include(0).Equal("sys.id", id)
-	_, err := col.GetAll()
+	col, err := col.GetAll()
 	if err != nil {
 		return "", errors.New("GetContentTypeOfID: " + err.Error())
 	}
 	if len(col.Items) == 0 {
 		return "", fmt.Errorf("GetContentTypeOfID: %s Not found online", id)
 	}
-	var vo genericEntryNoFields
-	byteArray, _ := json.Marshal(col.Items[0])
-	err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&vo)
-	if err != nil {
-		return "", errors.New("GetContentTypeOfID: " + err.Error())
-	}
-	return vo.Sys.ContentType.Sys.ID, nil
+	return col.Items[0].Sys.ContentType.Sys.ID, nil
 }
 
 func (cc *ContentfulClient) Locales() []Locale {
@@ -737,8 +728,11 @@ func NewContentfulClient(ctx context.Context, spaceID string, clientMode ClientM
 	}
 	apiClient.Debug = debug
 	cc := &ContentfulClient{
-		clientMode: clientMode,
-		Client:     apiClient,
+		clientMode:     clientMode,
+		Client:         apiClient,
+		BrandClient:    contentful.NewContentTypeService[CfBrand](apiClient),
+		CategoryClient: contentful.NewContentTypeService[CfCategory](apiClient),
+		ProductClient:  contentful.NewContentTypeService[CfProduct](apiClient),
 		Cache: &ContentfulCache{
 			assets:           assetCacheMap{},
 			contentTypes:     []string{},
@@ -811,15 +805,10 @@ func NewOfflineContentfulClient(file []byte, logFn func(fields map[string]interf
 func RichTextToHtml(rt interface{}, linkResolver LinkResolverFunc, entryLinkResolver EntryLinkResolverFunc, imageResolver ImageResolverFunc, embeddedEntryResolver EmbeddedEntryResolverFunc, locale Locale) (string, error) {
 	w := bytes.NewBuffer([]byte{})
 	node := &RichTextGenericNode{}
-	byt, err := json.Marshal(rt)
-	if err != nil {
+	if err := contentful.DeepCopy(&node, rt); err != nil {
 		return "", err
 	}
-	err = json.Unmarshal(byt, node)
-	if err != nil {
-		return "", err
-	}
-	err = node.richTextRenderHTML(w, linkResolver, entryLinkResolver, imageResolver, embeddedEntryResolver, locale)
+	err := node.richTextRenderHTML(w, linkResolver, entryLinkResolver, imageResolver, embeddedEntryResolver, locale)
 	if err != nil {
 		return "", err
 	}
@@ -1077,12 +1066,7 @@ func (genericEntry *GenericEntry) FieldAsReference(fieldName string, locale ...L
 		if fieldVal == nil {
 			fieldVal = field[string(DefaultLocale)]
 		}
-		byt, err := json.Marshal(fieldVal)
-		if err != nil {
-			return nil, err
-		}
-		err = json.Unmarshal(byt, &cts)
-		if err != nil {
+		if err := contentful.DeepCopy(&cts, fieldVal); err != nil {
 			return nil, err
 		}
 		if cts.Sys.ID == "" {
@@ -1150,12 +1134,7 @@ func (genericEntry *GenericEntry) FieldAsAsset(ctx context.Context, fieldName st
 		if fieldVal == nil {
 			fieldVal = field[string(DefaultLocale)]
 		}
-		byt, err := json.Marshal(fieldVal)
-		if err != nil {
-			return nil, err
-		}
-		err = json.Unmarshal(byt, &cts)
-		if err != nil {
+		if err := contentful.DeepCopy(&cts, fieldVal); err != nil {
 			return nil, err
 		}
 		asset, err := genericEntry.CC.GetAssetByID(ctx, cts.Sys.ID)
@@ -1198,7 +1177,7 @@ func (genericEntry *GenericEntry) FieldAsMultipleReference(fieldName string, loc
 	} else {
 		loc = DefaultLocale
 	}
-	var ctss []ContentTypeSys
+	var cts []ContentTypeSys
 	if _, ok := genericEntry.RawFields[fieldName]; !ok {
 		return nil, ErrNotSet
 	}
@@ -1208,16 +1187,11 @@ func (genericEntry *GenericEntry) FieldAsMultipleReference(fieldName string, loc
 		if fieldVal == nil {
 			fieldVal = field[string(DefaultLocale)]
 		}
-		byt, err := json.Marshal(fieldVal)
-		if err != nil {
-			return nil, err
-		}
-		err = json.Unmarshal(byt, &ctss)
-		if err != nil {
+		if err := contentful.DeepCopy(&cts, fieldVal); err != nil {
 			return nil, err
 		}
 		var refs []*EntryReference
-		for _, cts := range ctss {
+		for _, cts := range cts {
 			if cts.Sys.ID == "" {
 				continue
 			}
@@ -1403,13 +1377,8 @@ func (genericEntry *GenericEntry) Upsert(ctx context.Context) error {
 		Fields: map[string]interface{}{},
 	}
 	// get the generic entry sys into the cfEntry sys
-	tmp, errMarshal := json.Marshal(genericEntry)
-	if errMarshal != nil {
-		return errors.New("can't marshal JSON from entry")
-	}
-	errUnmarshal := json.Unmarshal(tmp, &cfEntry)
-	if errUnmarshal != nil {
-		return errors.New("can't unmarshal JSON into CF entry")
+	if err := contentful.DeepCopy(&cfEntry, genericEntry); err != nil {
+		return err
 	}
 	// copy fields
 	for key, fieldValue := range genericEntry.RawFields {
@@ -1438,26 +1407,15 @@ func (genericEntry *GenericEntry) Update(ctx context.Context) (err error) {
 	}
 	publishingStatus := genericEntry.GetPublishingStatus()
 	cfEntry := &contentful.Entry{}
-	tmp, errMarshal := json.Marshal(genericEntry)
-	if errMarshal != nil {
+	if err := contentful.DeepCopy(&cfEntry, genericEntry); err != nil {
 		return errors.New("Update: Can't marshal JSON from VO")
 	}
-	errUnmarshal := json.Unmarshal(tmp, &cfEntry)
-	if errUnmarshal != nil {
-		return errors.New("Update: Can't unmarshal JSON into CF entry")
-	}
-
 	err = genericEntry.CC.Client.Entries.Upsert(ctx, genericEntry.CC.SpaceID, cfEntry)
 	if err != nil {
 		return fmt.Errorf("Update: upsert operation failed: %w", err)
 	}
-	tmp, errMarshal = json.Marshal(cfEntry)
-	if errMarshal != nil {
+	if err := contentful.DeepCopy(&genericEntry, cfEntry); err != nil {
 		return errors.New("Update: Can't marshal JSON back from CF entry")
-	}
-	errUnmarshal = json.Unmarshal(tmp, &genericEntry)
-	if errUnmarshal != nil {
-		return errors.New("Update: Can't unmarshal JSON back into Generic Entry")
 	}
 	if publishingStatus == StatusPublished {
 		genericEntry.Sys.Version++
@@ -1544,7 +1502,7 @@ func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []stri
 		contentTypes = spaceContentTypes
 	} else {
 		for _, contentType := range contentTypes {
-			if !stringSliceContains(spaceContentTypes, contentType) {
+			if !slices.Contains(spaceContentTypes, contentType) {
 				return nil, nil, fmt.Errorf("UpdateCache: Content Type %q not available in this space", contentType)
 			}
 		}
@@ -1623,7 +1581,8 @@ func (cc *ContentfulClient) syncCache(ctx context.Context, contentTypes []string
 			cc.syncToken,
 		)
 		cc.cacheMutex.sharedDataGcLock.RUnlock()
-		if _, err := col.GetAll(); err != nil {
+		col, err := col.GetAll()
+		if err != nil {
 			return nil, nil, err
 		}
 		cc.cacheMutex.sharedDataGcLock.Lock()
@@ -1636,19 +1595,17 @@ func (cc *ContentfulClient) syncCache(ctx context.Context, contentTypes []string
 			}
 			return syncdEntries, syncdAssets, nil
 		}
-		var entries []*contentful.Entry
-		var assets []*contentful.Asset
-		for _, item := range col.Items {
+		var (
+			assets  []*contentful.Asset
+			entries []*contentful.Entry
+		)
+		for _, entry := range col.Items {
 			if ctx.Err() != nil {
 				return nil, nil, ctx.Err()
 			}
-			entry := &contentful.Entry{}
-			byteArray, _ := json.Marshal(item)
-			errEntry := json.NewDecoder(bytes.NewReader(byteArray)).Decode(entry)
-			if errEntry == nil && entry.Sys != nil && (entry.Sys.Type == sysTypeAsset || entry.Sys.Type == sysTypeDeletedAsset) {
+			if entry.Sys != nil && (entry.Sys.Type == sysTypeAsset || entry.Sys.Type == sysTypeDeletedAsset) {
 				asset := &contentful.Asset{}
-				errAsset := json.NewDecoder(bytes.NewReader(byteArray)).Decode(asset)
-				if errAsset != nil {
+				if err := contentful.DeepCopy(&asset, entry); err != nil {
 					continue
 				}
 				if asset.Sys != nil {
@@ -1657,7 +1614,7 @@ func (cc *ContentfulClient) syncCache(ctx context.Context, contentTypes []string
 				continue
 			}
 			if entry.Sys != nil {
-				entries = append(entries, entry)
+				entries = append(entries, &entry)
 			}
 		}
 		for _, entry := range entries {
@@ -1666,7 +1623,7 @@ func (cc *ContentfulClient) syncCache(ctx context.Context, contentTypes []string
 			}
 			switch entry.Sys.Type {
 			case sysTypeEntry:
-				if !stringSliceContains(spaceContentTypes, entry.Sys.ContentType.Sys.ID) {
+				if !slices.Contains(spaceContentTypes, entry.Sys.ContentType.Sys.ID) {
 					continue
 				}
 				if err := updateCacheForContentTypeAndEntity(ctx, cc, entry.Sys.ContentType.Sys.ID, entry.Sys.ID, entry, false); err != nil {
@@ -1867,22 +1824,10 @@ func (cc *ContentfulClient) UpdateCacheForEntity(ctx context.Context, sysType st
 	if sysType == sysTypeAsset {
 		contentType = assetWorkerType
 	}
-	if contentType != assetWorkerType && !stringSliceContains(spaceContentTypes, contentType) {
+	if contentType != assetWorkerType && !slices.Contains(spaceContentTypes, contentType) {
 		return fmt.Errorf("UpdateCache: Content Type %q not available in this space", contentType)
 	}
 	return updateCacheForContentTypeAndEntity(ctx, cc, contentType, entityID, nil, false)
-}
-
-func FieldToObject(jsonField interface{}, targetObject interface{}) error {
-	byteArray, err := json.Marshal(jsonField)
-	if err != nil {
-		return err
-	}
-	err = json.Unmarshal(byteArray, &targetObject)
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func (cc *ContentfulClient) cacheGcAssetByID(ctx context.Context, id string, asset *contentful.Asset) error {
@@ -1890,24 +1835,17 @@ func (cc *ContentfulClient) cacheGcAssetByID(ctx context.Context, id string, ass
 		if cc.Client == nil {
 			return errors.New("cacheGcAssetByID: No client available")
 		}
+		var err error
 		col := cc.Client.Assets.List(ctx, cc.SpaceID)
 		col.Query.Locale("*").Equal("sys.id", id)
-		_, err := col.Next()
+		col, err = col.Next()
 		if err != nil {
 			return err
 		}
 		if len(col.Items) == 0 {
 			return errors.New("cacheGcAssetByID: Not found " + id)
 		}
-		item := col.Items[0]
-		byt, err := json.Marshal(item)
-		if err != nil {
-			return err
-		}
-		err = json.Unmarshal(byt, &asset)
-		if err != nil {
-			return err
-		}
+		asset = &col.Items[0]
 	}
 	for _, loc := range []Locale{SpaceLocaleGerman, SpaceLocaleFrench} {
 		if _, ok := asset.Fields.File[string(loc)]; ok {
@@ -1981,17 +1919,16 @@ func (cc *ContentfulClient) getAllAssets(ctx context.Context, tryCacheFirst bool
 	if cacheInit && cc.Cache.assets != nil && tryCacheFirst {
 		return cc.Cache.assets, nil
 	}
-	allItems := []interface{}{}
+	allItems := []contentful.Asset{}
 	assets := map[string]*contentful.Asset{}
 	if offline {
-		for _, asset := range cc.offlineTemp.Assets {
-			allItems = append(allItems, asset)
-		}
+		allItems = append(allItems, cc.offlineTemp.Assets...)
 	} else {
 		col := cc.Client.Assets.List(ctx, cc.SpaceID)
 		col.Query.Locale("*").Limit(assetPageSize)
 		for {
-			_, err := col.Next()
+			var err error
+			col, err = col.Next()
 			if err != nil {
 				return nil, err
 			}
@@ -2001,16 +1938,7 @@ func (cc *ContentfulClient) getAllAssets(ctx context.Context, tryCacheFirst bool
 			}
 		}
 	}
-	for _, item := range allItems {
-		asset := contentful.Asset{}
-		byt, err := json.Marshal(item)
-		if err != nil {
-			return nil, err
-		}
-		err = json.Unmarshal(byt, &asset)
-		if err != nil {
-			return nil, err
-		}
+	for _, asset := range allItems {
 		for _, loc := range []Locale{SpaceLocaleGerman, SpaceLocaleFrench} {
 			if _, ok := asset.Fields.File[string(loc)]; ok {
 				asset.Fields.File[string(loc)].URL = "https:" + asset.Fields.File[string(loc)].URL
@@ -2031,77 +1959,37 @@ func (cc *ContentfulClient) getAllTags(ctx context.Context, tryCacheFirst bool) 
 	cc.cacheMutex.sharedDataGcLock.RUnlock()
 	cc.cacheMutex.tagGcLock.RLock()
 	defer cc.cacheMutex.tagGcLock.RUnlock()
+
 	if cacheInit && cc.Cache.tags != nil && tryCacheFirst {
 		return cc.Cache.tags, nil
 	}
-	allItems := []interface{}{}
+	allItems := []contentful.Tag{}
 	tags := map[string]string{}
 	if offline {
-		for _, asset := range cc.offlineTemp.Tags {
-			allItems = append(allItems, asset)
-		}
+		allItems = append(allItems, cc.offlineTemp.Tags...)
 	} else {
+		var err error
 		col := cc.Client.Tags.List(ctx, cc.SpaceID)
 		col.Query.Limit(1000)
-		_, err := col.Next()
+		col, err = col.Next()
 		if err != nil {
 			return nil, err
 		}
 		allItems = col.Items
 	}
 	for _, item := range allItems {
-		tag := contentful.Tag{}
-		byt, err := json.Marshal(item)
-		if err != nil {
-			return nil, err
-		}
-		err = json.Unmarshal(byt, &tag)
-		if err != nil {
-			return nil, err
-		}
-		tags[tag.Name] = tag.Sys.ID
+		tags[item.Name] = item.Sys.ID
 	}
 	return tags, nil
 }
 
 func getOfflineSpaceFromFile(file []byte) (*offlineTemp, error) {
 	offlineTemp := &offlineTemp{}
-	err := json.Unmarshal(file, offlineTemp)
+	err := contentful.Unmarshal(file, offlineTemp)
 	if err != nil {
 		return nil, fmt.Errorf("getOfflineSpaceFromFile could not parse space export file: %v", err)
 	}
 	return offlineTemp, nil
-}
-
-func (cc *ContentfulClient) optimisticPageSizeGetAll(ctx context.Context, contentType string, limit uint16) (*contentful.Collection, error) {
-	col := cc.Client.Entries.List(ctx, cc.SpaceID)
-	col.Query.ContentType(contentType).Locale("*").Include(0).Limit(limit)
-	allItems := []interface{}{}
-	var err error
-	for {
-		_, err = col.Next()
-		if err != nil {
-			break
-		}
-		allItems = append(allItems, col.Items...)
-		if uint16(len(col.Items)) < limit {
-			break
-		}
-	}
-	col.Items = allItems
-	switch errTyped := err.(type) {
-	case contentful.ErrorResponse:
-		msg := errTyped.Message
-		if (strings.Contains(msg, "Response size too big") || strings.Contains(msg, "Too many links")) && limit >= 20 {
-			smallerPageCol, err := cc.optimisticPageSizeGetAll(ctx, contentType, limit/2)
-			return smallerPageCol, err
-		}
-		return nil, err
-	case nil:
-	default:
-		return nil, err
-	}
-	return col, nil
 }
 
 func richTextGetAttribute(htmlLine string, attribute string) string {
@@ -2128,7 +2016,7 @@ func richTextGetMark(mark string) string {
 }
 
 func richTextHtmlLinesToNode(htmlLines []string, start int, pendingTag string, marks []string, isBasic bool) ([]interface{}, int, bool) {
-	nodeSlice := make([]interface{}, 0)
+	var nodeSlice []interface{}
 	for i := start; i < len(htmlLines); i++ {
 		htmlLine := htmlLines[i]
 		if richTextIsHtmlClosingPending(htmlLine, pendingTag) {
@@ -2422,12 +2310,7 @@ func (n *RichTextGenericNode) richTextRenderHTML(w io.Writer, linkResolver LinkR
 			return errors.New("can't resolve image asset URL")
 		}
 		dataObj := RichTextData{}
-		byt, err := json.Marshal(n.Data)
-		if err != nil {
-			return err
-		}
-		err = json.Unmarshal(byt, &dataObj)
-		if err != nil {
+		if err := contentful.DeepCopy(&dataObj, n.Data); err != nil {
 			return err
 		}
 		if dataObj.Target == nil {
@@ -2440,13 +2323,8 @@ func (n *RichTextGenericNode) richTextRenderHTML(w io.Writer, linkResolver LinkR
 		tags = []richTextHtmlTag{richTextHtmlTag{name: HtmlImage, attrs: attrs, customHTML: customHTML}}
 	case RichTextNodeEmbeddedEntry:
 		dataObj := RichTextData{}
-		byt, errMarshal := json.Marshal(n.Data)
-		if errMarshal != nil {
-			return errMarshal
-		}
-		errUnmarshal := json.Unmarshal(byt, &dataObj)
-		if errUnmarshal != nil {
-			return errUnmarshal
+		if err := contentful.DeepCopy(&dataObj, n.Data); err != nil {
+			return err
 		}
 		if dataObj.Target == nil {
 			return errors.New("data target is empty")
@@ -2511,7 +2389,7 @@ func (n *RichTextGenericNode) MarshalJSON() ([]byte, error) {
 	}
 	if n.NodeType == "text" {
 		// For text nodes, include Data, Value and Marks, but not Content
-		return json.Marshal(&struct {
+		return contentful.Marshal(&struct {
 			NodeType string                 `json:"nodeType"`
 			Data     map[string]interface{} `json:"data"`
 			Value    string                 `json:"value"`
@@ -2524,7 +2402,7 @@ func (n *RichTextGenericNode) MarshalJSON() ([]byte, error) {
 		})
 	} else {
 		// For non-text nodes, exclude Data and Marks
-		return json.Marshal(&struct {
+		return contentful.Marshal(&struct {
 			NodeType string                 `json:"nodeType"`
 			Data     map[string]interface{} `json:"data"`
 			Content  []*RichTextGenericNode `json:"content"`
@@ -2534,15 +2412,6 @@ func (n *RichTextGenericNode) MarshalJSON() ([]byte, error) {
 			Data:     n.Data,
 		})
 	}
-}
-
-func stringSliceContains(s []string, e string) bool {
-	for _, a := range s {
-		if a == e {
-			return true
-		}
-	}
-	return false
 }
 
 func updateCacheForContentType(ctx context.Context, results chan ContentTypeResult, cc *ContentfulClient, tempCache *ContentfulCache, contentType string) error {
@@ -2726,80 +2595,51 @@ func commonGetParents(ctx context.Context, cc *ContentfulClient, id string, cont
 	}
 	col := cc.Client.Entries.List(ctx, cc.SpaceID)
 	col.Query.Equal("links_to_entry", id).Locale("*")
-	_, err = col.GetAll()
+	col, err = col.GetAll()
 	if err != nil {
 		return nil, errors.New("GetParents: " + err.Error())
 	}
-	for _, item := range col.Items {
-		var entry contentful.Entry
-		byteArray, err := json.Marshal(item)
-		if err != nil {
-			return nil, err
-		}
-		err = json.Unmarshal(byteArray, &entry)
-		if err != nil {
-			return nil, err
-		}
+	for _, entry := range col.Items {
 		if len(contentTypes) == 1 && contentTypes[0] != entry.Sys.ContentType.Sys.ID {
 			continue
 		}
 		switch entry.Sys.ContentType.Sys.ID {
 		case ContentTypeBrand:
 			var parentVO CfBrand
-			byteArray, err := json.Marshal(item)
-			if err != nil {
-				return nil, errors.New("GetParents: " + err.Error())
-			}
-			err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&parentVO)
-			if err != nil {
+			if err = contentful.DeepCopy(&parentVO, entry); err != nil {
 				return nil, errors.New("GetParents: " + err.Error())
 			}
 			parentVO.CC = cc
-			parents = append(
-				parents, EntryReference{
-					ContentType: entry.Sys.ContentType.Sys.ID,
-					ID:          entry.Sys.ID,
-					VO:          &parentVO,
-					CC:          cc,
-				})
-
+			parents = append(parents, EntryReference{
+				ContentType: entry.Sys.ContentType.Sys.ID,
+				ID:          entry.Sys.ID,
+				VO:          &parentVO,
+				CC:          cc,
+			})
 		case ContentTypeCategory:
 			var parentVO CfCategory
-			byteArray, err := json.Marshal(item)
-			if err != nil {
-				return nil, errors.New("GetParents: " + err.Error())
-			}
-			err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&parentVO)
-			if err != nil {
+			if err = contentful.DeepCopy(&parentVO, entry); err != nil {
 				return nil, errors.New("GetParents: " + err.Error())
 			}
 			parentVO.CC = cc
-			parents = append(
-				parents, EntryReference{
-					ContentType: entry.Sys.ContentType.Sys.ID,
-					ID:          entry.Sys.ID,
-					VO:          &parentVO,
-					CC:          cc,
-				})
-
+			parents = append(parents, EntryReference{
+				ContentType: entry.Sys.ContentType.Sys.ID,
+				ID:          entry.Sys.ID,
+				VO:          &parentVO,
+				CC:          cc,
+			})
 		case ContentTypeProduct:
 			var parentVO CfProduct
-			byteArray, err := json.Marshal(item)
-			if err != nil {
-				return nil, errors.New("GetParents: " + err.Error())
-			}
-			err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&parentVO)
-			if err != nil {
+			if err = contentful.DeepCopy(&parentVO, entry); err != nil {
 				return nil, errors.New("GetParents: " + err.Error())
 			}
 			parentVO.CC = cc
-			parents = append(
-				parents, EntryReference{
-					ContentType: entry.Sys.ContentType.Sys.ID,
-					ID:          entry.Sys.ID,
-					VO:          &parentVO,
-					CC:          cc,
-				})
+			parents = append(parents, EntryReference{
+				ContentType: entry.Sys.ContentType.Sys.ID,
+				ID:          entry.Sys.ID,
+				VO:          &parentVO,
+				CC:          cc,
+			})
 		}
 	}
 	return parents, nil
@@ -2871,12 +2711,7 @@ func isFieldRichText(field map[string]interface{}) bool {
 
 func objectToRichTextGenericNode(value interface{}) (*RichTextGenericNode, error) {
 	node := &RichTextGenericNode{}
-	byt, err := json.Marshal(value)
-	if err != nil {
-		return nil, err
-	}
-	err = json.Unmarshal(byt, node)
-	if err != nil {
+	if err := contentful.DeepCopy(&node, value); err != nil {
 		return nil, err
 	}
 	return node, nil
@@ -2897,13 +2732,8 @@ func (rawFields RawFields) GetChildIDs() (childIDs []string) {
 		if !strings.HasSuffix(fieldKey, "_") {
 			continue
 		}
-		byt, err := json.Marshal(localizedField)
-		if err != nil {
-			return nil
-		}
 		fieldMap := map[string][]*ContentTypeSys{}
-		err = json.Unmarshal(byt, &fieldMap)
-		if err != nil {
+		if err := contentful.DeepCopy(&fieldMap, localizedField); err != nil {
 			return nil
 		}
 		for _, fieldValue := range fieldMap {
