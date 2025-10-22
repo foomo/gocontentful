@@ -1,0 +1,42 @@
+name: Test Brach
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  merge_group:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: jdx/mise-action@v3
+
+      - uses: actions/setup-go@v6
+        with:
+          check-latest: true
+          go-version-file: go.mod
+
+      - name: Setup golangci-lint cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/golangci-lint
+          key: ${{ runner.os }}-golangci-lint-${{ hashFiles('**/go.mod') }}
+          restore-keys: |
+            ${{ runner.os }}-golangci-lint-
+
+      - name: Run lint
+        run: make lint
+
+      - name: Run tests
+        run: make test
