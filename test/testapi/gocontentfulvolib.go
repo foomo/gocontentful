@@ -1323,7 +1323,6 @@ func (genericEntry *GenericEntry) SetField(fieldName string, fieldValue any, loc
 	if value, ok := genericEntry.RawFields[fieldName]; !ok || value == nil {
 		mType := reflect.MapOf(reflect.TypeOf(""), reflect.TypeOf(fieldValue))
 		m = reflect.MakeMap(mType)
-		fmt.Printf("Reflect map: %v\n", m.Interface())
 	} else {
 		m = reflect.ValueOf(genericEntry.RawFields[fieldName])
 	}
