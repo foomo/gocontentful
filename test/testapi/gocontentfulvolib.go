@@ -16,6 +16,7 @@ import (
 	"unicode"
 
 	"github.com/foomo/contentful"
+	"github.com/mitchellh/mapstructure"
 	"golang.org/x/net/html"
 	"golang.org/x/sync/errgroup"
 )
@@ -2766,4 +2767,15 @@ func HasAncestor(ctx context.Context, contentType string, entry entryOrRef, visi
 		return HasAncestor(ctx, contentType, parent, visited)
 	}
 	return nil, nil
+}
+
+func MapStructure[S, T any](source S, target T) error {
+	dec, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		TagName: "json",
+		Result:  target,
+	})
+	if err != nil {
+		return err
+	}
+	return dec.Decode(source)
 }

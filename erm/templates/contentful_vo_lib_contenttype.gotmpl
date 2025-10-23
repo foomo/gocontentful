@@ -882,21 +882,19 @@ func (cc *ContentfulClient) cache{{ firstCap $contentType.Sys.ID }}ByID(ctx cont
 func colToCf{{ firstCap $contentType.Sys.ID }}(col *contentful.Collection[Cf{{ firstCap $contentType.Sys.ID }}], cc *ContentfulClient) (vos []*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
 	for _, vo := range col.Items {
 		if cc.textJanitor {
-			{{ range $fieldIndex, $field := $contentType.Fields }}
-			{{ if or (fieldIsSymbol $field) (fieldIsText $field) }}
+			{{- range $fieldIndex, $field := $contentType.Fields }}
+			{{- if or (fieldIsSymbol $field) (fieldIsText $field) }}
 			vo.Fields.{{ firstCap $field.ID }} = cleanUpStringField(vo.Fields.{{ firstCap $field.ID }}){{ end }}
-			{{ if fieldIsSymbolList $field }}
+			{{- if fieldIsSymbolList $field }}
 			vo.Fields.{{ firstCap $field.ID }} = cleanUpStringSliceField(vo.Fields.{{ firstCap $field.ID }}){{ end }}
-			{{ if fieldIsRichText $field }}
+			{{- if fieldIsRichText $field }}
 			vo.Fields.{{ firstCap $field.ID }} = cleanUpRichTextField(vo.Fields.{{ firstCap $field.ID }}){{ end }}
-			{{ end }}
-		}
-		var rawFields RawFields
-		if err := contentful.DeepCopy(&rawFields, vo.Fields); err != nil {
-			break
+			{{- end }}
 		}
 		vo.CC = cc
-		vo.RawFields = rawFields
+		if err := MapStructure(vo.Fields, &vo.RawFields); err != nil {
+			return nil, err
+		}
 		vos = append(vos, &vo)
 	}
 	return vos, err

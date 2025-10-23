@@ -662,18 +662,13 @@ func (cc *ContentfulClient) cacheCategoryByID(ctx context.Context, id string, en
 func colToCfCategory(col *contentful.Collection[CfCategory], cc *ContentfulClient) (vos []*CfCategory, err error) {
 	for _, vo := range col.Items {
 		if cc.textJanitor {
-
 			vo.Fields.Title = cleanUpStringField(vo.Fields.Title)
-
 			vo.Fields.CategoryDescription = cleanUpStringField(vo.Fields.CategoryDescription)
-
-		}
-		var rawFields RawFields
-		if err := contentful.DeepCopy(&rawFields, vo.Fields); err != nil {
-			break
 		}
 		vo.CC = cc
-		vo.RawFields = rawFields
+		if err := MapStructure(vo.Fields, &vo.RawFields); err != nil {
+			return nil, err
+		}
 		vos = append(vos, &vo)
 	}
 	return vos, err

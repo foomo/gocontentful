@@ -1597,30 +1597,19 @@ func (cc *ContentfulClient) cacheProductByID(ctx context.Context, id string, ent
 func colToCfProduct(col *contentful.Collection[CfProduct], cc *ContentfulClient) (vos []*CfProduct, err error) {
 	for _, vo := range col.Items {
 		if cc.textJanitor {
-
 			vo.Fields.ProductName = cleanUpStringField(vo.Fields.ProductName)
-
 			vo.Fields.Slug = cleanUpStringField(vo.Fields.Slug)
-
 			vo.Fields.ProductDescription = cleanUpStringField(vo.Fields.ProductDescription)
-
 			vo.Fields.Sizetypecolor = cleanUpStringField(vo.Fields.Sizetypecolor)
-
 			vo.Fields.Tags = cleanUpStringSliceField(vo.Fields.Tags)
-
 			vo.Fields.Sku = cleanUpStringField(vo.Fields.Sku)
-
 			vo.Fields.Website = cleanUpStringField(vo.Fields.Website)
-
 			vo.Fields.SeoText = cleanUpRichTextField(vo.Fields.SeoText)
-
-		}
-		var rawFields RawFields
-		if err := contentful.DeepCopy(&rawFields, vo.Fields); err != nil {
-			break
 		}
 		vo.CC = cc
-		vo.RawFields = rawFields
+		if err := MapStructure(vo.Fields, &vo.RawFields); err != nil {
+			return nil, err
+		}
 		vos = append(vos, &vo)
 	}
 	return vos, err

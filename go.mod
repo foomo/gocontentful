@@ -4,6 +4,7 @@ go 1.24.0
 
 require (
 	github.com/foomo/contentful v0.5.6-0.20251022132504-a2b6d630e3b3
+	github.com/mitchellh/mapstructure v1.5.0
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.11.1

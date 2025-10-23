@@ -898,26 +898,17 @@ func (cc *ContentfulClient) cacheBrandByID(ctx context.Context, id string, entry
 func colToCfBrand(col *contentful.Collection[CfBrand], cc *ContentfulClient) (vos []*CfBrand, err error) {
 	for _, vo := range col.Items {
 		if cc.textJanitor {
-
 			vo.Fields.CompanyName = cleanUpStringField(vo.Fields.CompanyName)
-
 			vo.Fields.CompanyDescription = cleanUpStringField(vo.Fields.CompanyDescription)
-
 			vo.Fields.Website = cleanUpStringField(vo.Fields.Website)
-
 			vo.Fields.Twitter = cleanUpStringField(vo.Fields.Twitter)
-
 			vo.Fields.Email = cleanUpStringField(vo.Fields.Email)
-
 			vo.Fields.Phone = cleanUpStringSliceField(vo.Fields.Phone)
-
-		}
-		var rawFields RawFields
-		if err := contentful.DeepCopy(&rawFields, vo.Fields); err != nil {
-			break
 		}
 		vo.CC = cc
-		vo.RawFields = rawFields
+		if err := MapStructure(vo.Fields, &vo.RawFields); err != nil {
+			return nil, err
+		}
 		vos = append(vos, &vo)
 	}
 	return vos, err
