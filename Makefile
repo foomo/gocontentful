@@ -1,48 +1,48 @@
 .DEFAULT_GOAL:=help
 -include .makerc
 
+# --- Config -----------------------------------------------------------------
+
+# Newline hack for error output
+define br
+
+
+endef
+
 # --- Targets -----------------------------------------------------------------
 
 # This allows us to accept extra arguments
-%:
+%: .mise .husky
 	@:
 
-## === Tasks ===
+.PHONY: .mise
+# Install dependencies
+.mise: msg := $(br)$(br)Please ensure you have 'mise' installed and activated!$(br)$(br)$$ brew update$(br)$$ brew install mise$(br)$(br)See the documentation: https://mise.jdx.dev/getting-started.html$(br)$(br)
+.mise:
+ifeq (, $(shell command -v mise))
+	$(error ${msg})
+endif
+	@mise install
 
-.PHONY: doc
-## Run tests
-doc:
-	@open "http://localhost:6060/pkg/github.com/foomo/contentful/"
-	@godoc -http=localhost:6060 -play
+.PHONY: .husky
+# Configure git hooks for husky
+.husky:
+	@git config core.hooksPath .husky
 
-.PHONY: install
-## Install binary
-install:
-	go build -o ${GOPATH}/bin/gocontentful main.go
+### Tasks
 
-.PHONY: build
-## Build binary
-build:
-	@mkdir -p bin
-	@go build -o bin/gocontenful main.go
+.PHONY: check
+## Run tidy, lint & tests
+check: tidy lint test
 
-.PHONY: test
-## Run tests
-test: testapi
-	@go test -p 1 -coverprofile=coverage.out -race -json ./... | gotestfmt
-
-.PHONY: test
-## Run tests
-testapi:
-	@go run ./main.go -exportfile ./test/test-space-export.json ./test/testapi
-
-## Test & view coverage
-cover: test
-	@go tool cover -html=coverage.out -o coverage.html; open coverage.html
+.PHONY: tidy
+## Run go mod tidy
+tidy:
+	@go mod tidy
 
 .PHONY: lint
 ## Run linter
-lint: testapi
+lint:
 	@golangci-lint run
 
 .PHONY: lint.fix
@@ -50,46 +50,65 @@ lint: testapi
 lint.fix:
 	@golangci-lint run --fix
 
-.PHONY: tidy
-## Run go mod tidy
-tidy:
-	@go mod tidy
+.PHONY: testapi
+## Run api tests
+testapi:
+	@go run ./main.go -exportfile ./test/test-space-export.json ./test/testapi
+
+.PHONY: test
+## Run tests
+test: testapi
+	@echo "〉go test"
+	@GO_TEST_TAGS=-skip go test -coverprofile=coverage.out -tags=safe -race ./...
+
+.PHONY: coverage
+## Test & view coverage
+coverage: test
+	@go tool cover -html=coverage.out -o coverage.html; open coverage.html
+
+.PHONY: build
+## Build binary
+build:
+	@echo "〉building bin/gocontenful"
+	@go build -o bin/gocontenful main.go
+
+.PHONY: install
+## Install binary
+install:
+	@echo "〉installing ${GOPATH}/bin/gocontentful"
+	@go build -o ${GOPATH}/bin/gocontentful main.go
 
 .PHONY: outdated
 ## Show outdated direct dependencies
 outdated:
+	@echo "〉go mod outdated"
 	@go list -u -m -json all | go-mod-outdated -update -direct
 
-## === Utils ===
+### Utils
 
+.PHONY: docs
+## Open go docs
+docs:
+	@echo "〉starting go docs"
+	@go doc -http
+
+.PHONY: help
 ## Show help text
 help:
+	@echo "GoContentful - A Contentful Entry-Reference Mapper for Go\n"
+	@echo "Usage:\n  make [task]"
 	@awk '{ \
-			if ($$0 ~ /^.PHONY: [a-zA-Z\-\_0-9]+$$/) { \
-				helpCommand = substr($$0, index($$0, ":") + 2); \
-				if (helpMessage) { \
-					printf "\033[36m%-23s\033[0m %s\n", \
-						helpCommand, helpMessage; \
-					helpMessage = ""; \
-				} \
-			} else if ($$0 ~ /^[a-zA-Z\-\_0-9.]+:/) { \
-				helpCommand = substr($$0, 0, index($$0, ":")); \
-				if (helpMessage) { \
-					printf "\033[36m%-23s\033[0m %s\n", \
-						helpCommand, helpMessage"\n"; \
-					helpMessage = ""; \
-				} \
-			} else if ($$0 ~ /^##/) { \
-				if (helpMessage) { \
-					helpMessage = helpMessage"\n                        "substr($$0, 3); \
-				} else { \
-					helpMessage = substr($$0, 3); \
-				} \
-			} else { \
-				if (helpMessage) { \
-					print "\n                        "helpMessage"\n" \
-				} \
-				helpMessage = ""; \
-			} \
-		}' \
-		$(MAKEFILE_LIST)
+		if($$0 ~ /^### /){ \
+			if(help) printf "%-23s %s\n\n", cmd, help; help=""; \
+			printf "\n%s:\n", substr($$0,5); \
+		} else if($$0 ~ /^[a-zA-Z0-9._-]+:/){ \
+			cmd = substr($$0, 1, index($$0, ":")-1); \
+			if(help) printf "  %-23s %s\n", cmd, help; help=""; \
+		} else if($$0 ~ /^##/){ \
+			help = help ? help "\n                        " substr($$0,3) : substr($$0,3); \
+		} else if(help){ \
+			print "\n                        " help "\n"; help=""; \
+		} \
+	}' $(MAKEFILE_LIST)
+
+

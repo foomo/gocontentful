@@ -27,7 +27,7 @@ func (cc *ContentfulClient) GetAll{{ firstCap $contentType.Sys.ID }}(ctx context
 	if cacheInit {
 		return cc.Cache.entryMaps.{{ $contentType.Sys.ID }}, nil
 	}
-	col, err := cc.optimisticPageSizeGetAll(ctx, "{{ $contentType.Sys.ID }}", optimisticPageSize)
+	col, err := cc.optimisticPageSizeGetAll{{ firstCap $contentType.Sys.ID }}(ctx, "{{ $contentType.Sys.ID }}", optimisticPageSize)
 	if err != nil {
 		return nil, err
 	}
@@ -46,12 +46,12 @@ func (cc *ContentfulClient) GetFiltered{{ firstCap $contentType.Sys.ID }}(ctx co
 	if cc == nil || cc.Client == nil {
 		return nil, errors.New("getFiltered{{ firstCap $contentType.Sys.ID }}: No client available")
 	}
-	col := cc.Client.Entries.List(ctx, cc.SpaceID)
+	col := cc.{{ firstCap $contentType.Sys.ID }}Client.List(ctx, cc.SpaceID)
 	if query != nil {
 		col.Query = *query
 	}
 	col.Query.ContentType("{{ $contentType.Sys.ID }}").Locale("*").Include(0)
-	_, err = col.GetAll()
+	col, err = col.GetAll()
 	if err != nil {
 		return nil, errors.New("getFiltered{{ firstCap $contentType.Sys.ID }}: " + err.Error())
 	}
@@ -106,9 +106,9 @@ func (cc *ContentfulClient) Get{{ firstCap $contentType.Sys.ID }}ByID(ctx contex
 		}
 		return nil, fmt.Errorf("Get{{ firstCap $contentType.Sys.ID }}ByID: entry '%s' not found in cache", id)
 	}
-	col := cc.Client.Entries.List(ctx, cc.SpaceID)
+	col := cc.{{ firstCap $contentType.Sys.ID }}Client.List(ctx, cc.SpaceID)
 	col.Query.ContentType("{{ $contentType.Sys.ID }}").Locale("*").Include(0).Equal("sys.id",id)
-	_, err = col.GetAll()
+	col, err = col.GetAll()
 	if err != nil {
 		return nil, err
 	}
@@ -198,8 +198,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 	}
 	return vo.Fields.{{ firstCap $field.ID }}[string(loc)]
 }
-{{ end }}
-{{ if fieldIsComplex $field }}
+{{- else if fieldIsComplex $field }}
 func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale ...Locale) *{{ mapFieldType $contentType.Sys.ID $field }} {
 	if vo == nil {
 		return {{ mapFieldTypeLiteral $contentType.Sys.ID $field }}
@@ -237,8 +236,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(locale 
 	{{ $field.ID }} := vo.Fields.{{ firstCap $field.ID }}[string(loc)]
 	return &{{ $field.ID }}
 }
-{{ end }}
-{{ if fieldIsMultipleReference $field }}
+{{- else if fieldIsMultipleReference $field }}
 func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(ctx context.Context, locale ...Locale) []*EntryReference {
 	if vo == nil {
 		return nil
@@ -298,8 +296,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(ctx con
 	}
 	return {{ $field.ID }}
 }
-{{ end }}
-{{ if fieldIsReference $field }}
+{{- else if fieldIsReference $field }}
 func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(ctx context.Context, locale ...Locale) *EntryReference {
 	if vo == nil {
 		return nil
@@ -357,8 +354,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(ctx con
 	}
 	return nil
 }
-{{ end }}
-{{ if fieldIsMultipleAsset $field }}
+{{- else if fieldIsMultipleAsset $field }}
 func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(ctx context.Context, locale ...Locale) []*contentful.AssetNoLocale {
 	if vo == nil {
 		return nil
@@ -426,8 +422,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(ctx con
 	}
 	return {{ $field.ID }}
 }
-{{ end }}
-{{ if fieldIsAsset $field }}
+{{- else if fieldIsAsset $field }}
 func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(ctx context.Context, locale ...Locale) *contentful.AssetNoLocale {
 	if vo == nil {
 		return nil
@@ -492,29 +487,22 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) {{ firstCap $field.ID }}(ctx con
 	}
 	return tempAsset
 }
-{{ end }}
-{{ end }}
+{{- else }}
+// Unknown field {{ firstCap $field.ID }}: {{ $field.Type }}
+{{- end }}
+{{- end }}
 
 func (vo *Cf{{ firstCap $contentType.Sys.ID }}) IsArchived(ctx context.Context) (bool, error) {
-if vo == nil {
-return false, errors.New("IsArchived: Value Object is nil")
-}
-if vo.CC == nil {
-return false, errors.New("IsArchived: Value Object has nil Contentful client")
-}
-if vo.CC.clientMode != ClientModeCMA {
-return false, errors.New("IsArchived: Only available in ClientModeCMA")
-}
-cfEntry := &contentful.Entry{}
-tmp, errMarshal := json.Marshal(vo)
-if errMarshal != nil {
-return false, errors.New("Cf{{ firstCap $contentType.Sys.ID }} IsArchived: Can't marshal JSON from VO")
-}
-errUnmarshal := json.Unmarshal(tmp, &cfEntry)
-if errUnmarshal != nil {
-return false, errors.New("Cf{{ firstCap $contentType.Sys.ID }} IsArchived: Can't unmarshal JSON into CF entry")
-}
-return len(cfEntry.Sys.ArchivedAt) > 0, nil
+	if vo == nil {
+		return false, errors.New("IsArchived: Value Object is nil")
+	}
+	if vo.CC == nil {
+		return false, errors.New("IsArchived: Value Object has nil Contentful client")
+	}
+	if vo.CC.clientMode != ClientModeCMA {
+		return false, errors.New("IsArchived: Only available in ClientModeCMA")
+	}
+	return len(vo.Sys.ArchivedAt) > 0, nil
 }
 
 // {{ firstCap $contentType.Sys.ID }} Field setters
@@ -539,7 +527,7 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) Set{{ firstCap $field.ID }}({{ $
 	return
 }
 {{ end }}
-func (vo *Cf{{ firstCap $contentType.Sys.ID }}) UpsertEntry(ctx context.Context) (err error) {
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) UpsertEntry(ctx context.Context) error {
 	if vo == nil {
 		return errors.New("UpsertEntry: Value Object is nil")
 	}
@@ -549,23 +537,14 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) UpsertEntry(ctx context.Context)
 	if vo.CC.clientMode != ClientModeCMA {
 		return errors.New("UpsertEntry: Only available in ClientModeCMA")
 	}
-	cfEntry := &contentful.Entry{}
-	tmp, errMarshal := json.Marshal(vo)
-	if errMarshal != nil {
-		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} UpsertEntry: Can't marshal JSON from VO")
-	}
-	errUnmarshal := json.Unmarshal(tmp, &cfEntry)
-	if errUnmarshal != nil {
-		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} UpsertEntry: Can't unmarshal JSON into CF entry")
-	}
-
-	err = vo.CC.Client.Entries.Upsert(ctx, vo.CC.SpaceID, cfEntry)
-	if err != nil {
+	if err := vo.CC.{{ firstCap $contentType.Sys.ID }}Client.Upsert(ctx, vo.CC.SpaceID, vo); err != nil {
 		return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} UpsertEntry: Operation failed: %w", err)
 	}
-	return
+
+	return nil
 }
-func (vo *Cf{{ firstCap $contentType.Sys.ID }}) PublishEntry(ctx context.Context) (err error) {
+
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) PublishEntry(ctx context.Context) error {
 	if vo == nil {
 		return errors.New("PublishEntry: Value Object is nil")
 	}
@@ -575,22 +554,14 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) PublishEntry(ctx context.Context
 	if vo.CC.clientMode != ClientModeCMA {
 		return errors.New("PublishEntry: Only available in ClientModeCMA")
 	}
-	cfEntry := &contentful.Entry{}
-	tmp, errMarshal := json.Marshal(vo)
-	if errMarshal != nil {
-		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} PublishEntry: Can't marshal JSON from VO")
-	}
-	errUnmarshal := json.Unmarshal(tmp, &cfEntry)
-	if errUnmarshal != nil {
-		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} PublishEntry: Can't unmarshal JSON into CF entry")
-	}
-	err = vo.CC.Client.Entries.Publish(ctx, vo.CC.SpaceID, cfEntry)
+	err := vo.CC.{{ firstCap $contentType.Sys.ID }}Client.Publish(ctx, vo.CC.SpaceID, vo)
 	if err != nil {
 		return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} PublishEntry: publish operation failed: %w", err)
 	}
-	return
+
+	return nil
 }
-func (vo *Cf{{ firstCap $contentType.Sys.ID }}) UnpublishEntry(ctx context.Context) (err error) {
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) UnpublishEntry(ctx context.Context) error {
 	if vo == nil {
 		return errors.New("UnpublishEntry: Value Object is nil")
 	}
@@ -600,22 +571,14 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) UnpublishEntry(ctx context.Conte
 	if vo.CC.clientMode != ClientModeCMA {
 		return errors.New("UnpublishEntry: Only available in ClientModeCMA")
 	}
-	cfEntry := &contentful.Entry{}
-	tmp, errMarshal := json.Marshal(vo)
-	if errMarshal != nil {
-		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} UnpublishEntry: Can't marshal JSON from VO")
-	}
-	errUnmarshal := json.Unmarshal(tmp, &cfEntry)
-	if errUnmarshal != nil {
-		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} UnpublishEntry: Can't unmarshal JSON into CF entry")
-	}
-	err = vo.CC.Client.Entries.Unpublish(ctx, vo.CC.SpaceID, cfEntry)
+	err := vo.CC.{{ firstCap $contentType.Sys.ID }}Client.Unpublish(ctx, vo.CC.SpaceID, vo)
 	if err != nil {
 		return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} UnpublishEntry: unpublish operation failed: %w", err)
 	}
-	return
+
+	return nil
 }
-func (vo *Cf{{ firstCap $contentType.Sys.ID }}) UpdateEntry(ctx context.Context) (err error) {
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) UpdateEntry(ctx context.Context) error {
 	if vo == nil {
 		return errors.New("UpdateEntry: Value Object is nil")
 	}
@@ -626,38 +589,21 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) UpdateEntry(ctx context.Context)
 		return errors.New("UpdateEntry: Only available in ClientModeCMA")
 	}
 	publishingStatus := vo.GetPublishingStatus()
-	cfEntry := &contentful.Entry{}
-	tmp, errMarshal := json.Marshal(vo)
-	if errMarshal != nil {
-		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} UpdateEntry: Can't marshal JSON from VO")
-	}
-	errUnmarshal := json.Unmarshal(tmp, &cfEntry)
-	if errUnmarshal != nil {
-		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} UpdateEntry: Can't unmarshal JSON into CF entry")
-	}
-
-	err = vo.CC.Client.Entries.Upsert(ctx, vo.CC.SpaceID, cfEntry)
+	err := vo.CC.{{ firstCap $contentType.Sys.ID }}Client.Upsert(ctx, vo.CC.SpaceID, vo)
 	if err != nil {
 		return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} UpdateEntry: upsert operation failed: %w", err)
 	}
-	tmp, errMarshal = json.Marshal(cfEntry)
-	if errMarshal != nil {
-		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} UpdateEntry: Can't marshal JSON back from CF entry")
-	}
-	errUnmarshal = json.Unmarshal(tmp, &vo)
-	if errUnmarshal != nil {
-		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} UpdateEntry: Can't unmarshal JSON back into VO")
-	}
 	if publishingStatus == StatusPublished {
 		vo.Sys.Version++
-		err = vo.CC.Client.Entries.Publish(ctx, vo.CC.SpaceID, cfEntry)
+		err = vo.CC.{{ firstCap $contentType.Sys.ID }}Client.Publish(ctx, vo.CC.SpaceID, vo)
 		if err != nil {
 			return fmt.Errorf("CfShopCategory UpdateEntry: publish operation failed: %w", err)
 		}
 	}
-	return
+
+	return nil
 }
-func (vo *Cf{{ firstCap $contentType.Sys.ID }}) DeleteEntry(ctx context.Context) (err error) {
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) DeleteEntry(ctx context.Context) error {
 	if vo == nil {
 		return errors.New("DeleteEntry: Value Object is nil")
 	}
@@ -667,25 +613,17 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) DeleteEntry(ctx context.Context)
 	if vo.CC.clientMode != ClientModeCMA {
 		return errors.New("DeleteEntry: Only available in ClientModeCMA")
 	}
-	cfEntry := &contentful.Entry{}
-	tmp, errMarshal := json.Marshal(vo)
-	if errMarshal != nil {
-		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} DeleteEntry: Can't marshal JSON from VO")
-	}
-	errUnmarshal := json.Unmarshal(tmp, &cfEntry)
-	if errUnmarshal != nil {
-		return errors.New("Cf{{ firstCap $contentType.Sys.ID }} DeleteEntry: Can't unmarshal JSON into CF entry")
-	}
-	if cfEntry.Sys.PublishedCounter > 0 {
-		errUnpublish := vo.CC.Client.Entries.Unpublish(ctx, vo.CC.SpaceID, cfEntry)
+	if vo.Sys.PublishedCounter > 0 {
+		errUnpublish := vo.CC.{{ firstCap $contentType.Sys.ID }}Client.Unpublish(ctx, vo.CC.SpaceID, vo)
 		if errUnpublish != nil && !strings.Contains(errUnpublish.Error(), "Not published")  {
 			return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} DeleteEntry: Unpublish entry failed: %w", errUnpublish)
 		}
 	}
-	errDelete := vo.CC.Client.Entries.Delete(ctx, vo.CC.SpaceID, cfEntry.Sys.ID)
+	errDelete := vo.CC.{{ firstCap $contentType.Sys.ID }}Client.Delete(ctx, vo.CC.SpaceID, vo.Sys.ID)
 	if errDelete != nil {
 		return fmt.Errorf("Cf{{ firstCap $contentType.Sys.ID }} DeleteEntry: Delete entry failed: %w", errDelete)
 	}
+
 	return nil
 }
 func (vo *Cf{{ firstCap $contentType.Sys.ID }}) ToReference() (refSys ContentTypeSys) {
@@ -698,24 +636,59 @@ func (vo *Cf{{ firstCap $contentType.Sys.ID }}) ToReference() (refSys ContentTyp
 	return
 }
 
+func (cc *ContentfulClient) optimisticPageSizeGetAll{{ firstCap $contentType.Sys.ID }}(ctx context.Context, contentType string, limit uint16) (*contentful.Collection[Cf{{ firstCap $contentType.Sys.ID }}], error) {
+	col := cc.{{ firstCap $contentType.Sys.ID }}Client.List(ctx, cc.SpaceID)
+	col.Query.ContentType(contentType).Locale("*").Include(0).Limit(limit)
+	var allItems []Cf{{ firstCap $contentType.Sys.ID }}
+	var err error
+	for {
+		var nextCol *contentful.Collection[Cf{{ firstCap $contentType.Sys.ID }}]
+		nextCol, err = col.Next()
+		if err != nil {
+			break
+		}
+		col = nextCol
+		allItems = append(allItems, col.Items...)
+		if uint16(len(col.Items)) < limit {
+			break
+		}
+	}
+	col.Items = allItems
+	switch errTyped := err.(type) {
+	case contentful.ErrorResponse:
+		msg := errTyped.Message
+		if (strings.Contains(msg, "Response size too big") || strings.Contains(msg, "Too many links")) && limit >= 20 {
+			smallerPageCol, err := cc.optimisticPageSizeGetAll{{ firstCap $contentType.Sys.ID }}(ctx, contentType, limit/2)
+			return smallerPageCol, err
+		}
+		return nil, err
+	case nil:
+	default:
+		return nil, err
+	}
+	return col, nil
+}
+
 func (cc *ContentfulClient) cacheAll{{ firstCap $contentType.Sys.ID }}(ctx context.Context, resultChan chan<- ContentTypeResult) (vos map[string]*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
 	if cc == nil || cc.Client == nil {
 		return nil, errors.New("cacheAll{{ firstCap $contentType.Sys.ID }}: No CDA/CPA client available")
 	}
 	var all{{ firstCap $contentType.Sys.ID }} []*Cf{{ firstCap $contentType.Sys.ID }}
-	col := &contentful.Collection{
-		Items: []interface{}{},
-	}
+	col := &contentful.Collection[Cf{{ firstCap $contentType.Sys.ID }}]{}
 	cc.cacheMutex.sharedDataGcLock.RLock()
 	defer cc.cacheMutex.sharedDataGcLock.RUnlock()
 	if cc.offline {
 		for _, entry := range cc.offlineTemp.Entries {
 			if entry.Sys.ContentType.Sys.ID == ContentType{{ firstCap $contentType.Sys.ID }} {
-				col.Items = append(col.Items, entry)
+				var vo Cf{{ firstCap $contentType.Sys.ID }}
+				if err := contentful.DeepCopy(&vo, entry); err != nil {
+					return nil, err
+				}
+				col.Items = append(col.Items, vo)
 			}
 		}
 	} else {
-		col, err = cc.optimisticPageSizeGetAll(ctx, "{{ $contentType.Sys.ID }}", cc.optimisticPageSize)
+		col, err = cc.optimisticPageSizeGetAll{{ firstCap $contentType.Sys.ID }}(ctx, "{{ $contentType.Sys.ID }}", cc.optimisticPageSize)
 		if err != nil {
 			return nil, errors.New("optimisticPageSizeGetAll for {{ firstCap $contentType.Sys.ID }} failed: "+err.Error())
 		}
@@ -792,20 +765,19 @@ func (cc *ContentfulClient) cache{{ firstCap $contentType.Sys.ID }}ByID(ctx cont
 	defer cc.cacheMutex.parentMapGcLock.Unlock()
 	cc.cacheMutex.genericEntriesGcLock.Lock()
 	defer cc.cacheMutex.genericEntriesGcLock.Unlock()
-	var col *contentful.Collection
+	var col *contentful.Collection[Cf{{ firstCap $contentType.Sys.ID }}]
 	if entryPayload != nil {
-		col = &contentful.Collection{
-			Items: []interface{}{entryPayload},
-		}
+		col = &contentful.Collection[Cf{{ firstCap $contentType.Sys.ID }}]{}
 		id = entryPayload.Sys.ID
 	} else {
 		if cc.Client == nil {
 			return errors.New("cache{{ firstCap $contentType.Sys.ID }}ByID: No client available")
 		}
 		if !entryDelete {
-			col = cc.Client.Entries.List(ctx, cc.SpaceID)
+			col = cc.{{ firstCap $contentType.Sys.ID }}Client.List(ctx, cc.SpaceID)
 			col.Query.ContentType("{{ $contentType.Sys.ID }}").Locale("*").Include(0).Equal("sys.id", id)
-			_, err := col.GetAll()
+			var err error
+			col, err = col.GetAll()
 			if err != nil {
 				return err
 			}
@@ -907,31 +879,22 @@ func (cc *ContentfulClient) cache{{ firstCap $contentType.Sys.ID }}ByID(ctx cont
 	return nil
 }
 
-func colToCf{{ firstCap $contentType.Sys.ID }}(col *contentful.Collection, cc *ContentfulClient) (vos []*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
-	for _, item := range col.Items {
-		var vo Cf{{ firstCap $contentType.Sys.ID }}
-		byteArray, _ := json.Marshal(item)
-		err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&vo)
-		if err != nil {
-			break
-		}
+func colToCf{{ firstCap $contentType.Sys.ID }}(col *contentful.Collection[Cf{{ firstCap $contentType.Sys.ID }}], cc *ContentfulClient) (vos []*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
+	for _, vo := range col.Items {
 		if cc.textJanitor {
-			{{ range $fieldIndex, $field := $contentType.Fields }}
-			{{ if or (fieldIsSymbol $field) (fieldIsText $field) }}
+			{{- range $fieldIndex, $field := $contentType.Fields }}
+			{{- if or (fieldIsSymbol $field) (fieldIsText $field) }}
 			vo.Fields.{{ firstCap $field.ID }} = cleanUpStringField(vo.Fields.{{ firstCap $field.ID }}){{ end }}
-			{{ if fieldIsSymbolList $field }}
+			{{- if fieldIsSymbolList $field }}
 			vo.Fields.{{ firstCap $field.ID }} = cleanUpStringSliceField(vo.Fields.{{ firstCap $field.ID }}){{ end }}
-			{{ if fieldIsRichText $field }}
+			{{- if fieldIsRichText $field }}
 			vo.Fields.{{ firstCap $field.ID }} = cleanUpRichTextField(vo.Fields.{{ firstCap $field.ID }}){{ end }}
-			{{ end }}
-		}
-		var typedItem RawItem
-		err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&typedItem)
-		if err != nil {
-			break
+			{{- end }}
 		}
 		vo.CC = cc
-		vo.RawFields = typedItem.Fields
+		if err := MapStructure(vo.Fields, &vo.RawFields); err != nil {
+			return nil, err
+		}
 		vos = append(vos, &vo)
 	}
 	return vos, err

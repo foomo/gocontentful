@@ -2,9 +2,7 @@
 package testapi
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -29,7 +27,7 @@ func (cc *ContentfulClient) GetAllBrand(ctx context.Context) (voMap map[string]*
 	if cacheInit {
 		return cc.Cache.entryMaps.brand, nil
 	}
-	col, err := cc.optimisticPageSizeGetAll(ctx, "brand", optimisticPageSize)
+	col, err := cc.optimisticPageSizeGetAllBrand(ctx, "brand", optimisticPageSize)
 	if err != nil {
 		return nil, err
 	}
@@ -48,12 +46,12 @@ func (cc *ContentfulClient) GetFilteredBrand(ctx context.Context, query *content
 	if cc == nil || cc.Client == nil {
 		return nil, errors.New("getFilteredBrand: No client available")
 	}
-	col := cc.Client.Entries.List(ctx, cc.SpaceID)
+	col := cc.BrandClient.List(ctx, cc.SpaceID)
 	if query != nil {
 		col.Query = *query
 	}
 	col.Query.ContentType("brand").Locale("*").Include(0)
-	_, err = col.GetAll()
+	col, err = col.GetAll()
 	if err != nil {
 		return nil, errors.New("getFilteredBrand: " + err.Error())
 	}
@@ -108,9 +106,9 @@ func (cc *ContentfulClient) GetBrandByID(ctx context.Context, id string, forceNo
 		}
 		return nil, fmt.Errorf("GetBrandByID: entry '%s' not found in cache", id)
 	}
-	col := cc.Client.Entries.List(ctx, cc.SpaceID)
+	col := cc.BrandClient.List(ctx, cc.SpaceID)
 	col.Query.ContentType("brand").Locale("*").Include(0).Equal("sys.id", id)
-	_, err = col.GetAll()
+	col, err = col.GetAll()
 	if err != nil {
 		return nil, err
 	}
@@ -472,16 +470,7 @@ func (vo *CfBrand) IsArchived(ctx context.Context) (bool, error) {
 	if vo.CC.clientMode != ClientModeCMA {
 		return false, errors.New("IsArchived: Only available in ClientModeCMA")
 	}
-	cfEntry := &contentful.Entry{}
-	tmp, errMarshal := json.Marshal(vo)
-	if errMarshal != nil {
-		return false, errors.New("CfBrand IsArchived: Can't marshal JSON from VO")
-	}
-	errUnmarshal := json.Unmarshal(tmp, &cfEntry)
-	if errUnmarshal != nil {
-		return false, errors.New("CfBrand IsArchived: Can't unmarshal JSON into CF entry")
-	}
-	return len(cfEntry.Sys.ArchivedAt) > 0, nil
+	return len(vo.Sys.ArchivedAt) > 0, nil
 }
 
 // Brand Field setters
@@ -626,7 +615,7 @@ func (vo *CfBrand) SetPhone(phone []string, locale ...Locale) (err error) {
 	return
 }
 
-func (vo *CfBrand) UpsertEntry(ctx context.Context) (err error) {
+func (vo *CfBrand) UpsertEntry(ctx context.Context) error {
 	if vo == nil {
 		return errors.New("UpsertEntry: Value Object is nil")
 	}
@@ -636,23 +625,14 @@ func (vo *CfBrand) UpsertEntry(ctx context.Context) (err error) {
 	if vo.CC.clientMode != ClientModeCMA {
 		return errors.New("UpsertEntry: Only available in ClientModeCMA")
 	}
-	cfEntry := &contentful.Entry{}
-	tmp, errMarshal := json.Marshal(vo)
-	if errMarshal != nil {
-		return errors.New("CfBrand UpsertEntry: Can't marshal JSON from VO")
-	}
-	errUnmarshal := json.Unmarshal(tmp, &cfEntry)
-	if errUnmarshal != nil {
-		return errors.New("CfBrand UpsertEntry: Can't unmarshal JSON into CF entry")
-	}
-
-	err = vo.CC.Client.Entries.Upsert(ctx, vo.CC.SpaceID, cfEntry)
-	if err != nil {
+	if err := vo.CC.BrandClient.Upsert(ctx, vo.CC.SpaceID, vo); err != nil {
 		return fmt.Errorf("CfBrand UpsertEntry: Operation failed: %w", err)
 	}
-	return
+
+	return nil
 }
-func (vo *CfBrand) PublishEntry(ctx context.Context) (err error) {
+
+func (vo *CfBrand) PublishEntry(ctx context.Context) error {
 	if vo == nil {
 		return errors.New("PublishEntry: Value Object is nil")
 	}
@@ -662,22 +642,14 @@ func (vo *CfBrand) PublishEntry(ctx context.Context) (err error) {
 	if vo.CC.clientMode != ClientModeCMA {
 		return errors.New("PublishEntry: Only available in ClientModeCMA")
 	}
-	cfEntry := &contentful.Entry{}
-	tmp, errMarshal := json.Marshal(vo)
-	if errMarshal != nil {
-		return errors.New("CfBrand PublishEntry: Can't marshal JSON from VO")
-	}
-	errUnmarshal := json.Unmarshal(tmp, &cfEntry)
-	if errUnmarshal != nil {
-		return errors.New("CfBrand PublishEntry: Can't unmarshal JSON into CF entry")
-	}
-	err = vo.CC.Client.Entries.Publish(ctx, vo.CC.SpaceID, cfEntry)
+	err := vo.CC.BrandClient.Publish(ctx, vo.CC.SpaceID, vo)
 	if err != nil {
 		return fmt.Errorf("CfBrand PublishEntry: publish operation failed: %w", err)
 	}
-	return
+
+	return nil
 }
-func (vo *CfBrand) UnpublishEntry(ctx context.Context) (err error) {
+func (vo *CfBrand) UnpublishEntry(ctx context.Context) error {
 	if vo == nil {
 		return errors.New("UnpublishEntry: Value Object is nil")
 	}
@@ -687,22 +659,14 @@ func (vo *CfBrand) UnpublishEntry(ctx context.Context) (err error) {
 	if vo.CC.clientMode != ClientModeCMA {
 		return errors.New("UnpublishEntry: Only available in ClientModeCMA")
 	}
-	cfEntry := &contentful.Entry{}
-	tmp, errMarshal := json.Marshal(vo)
-	if errMarshal != nil {
-		return errors.New("CfBrand UnpublishEntry: Can't marshal JSON from VO")
-	}
-	errUnmarshal := json.Unmarshal(tmp, &cfEntry)
-	if errUnmarshal != nil {
-		return errors.New("CfBrand UnpublishEntry: Can't unmarshal JSON into CF entry")
-	}
-	err = vo.CC.Client.Entries.Unpublish(ctx, vo.CC.SpaceID, cfEntry)
+	err := vo.CC.BrandClient.Unpublish(ctx, vo.CC.SpaceID, vo)
 	if err != nil {
 		return fmt.Errorf("CfBrand UnpublishEntry: unpublish operation failed: %w", err)
 	}
-	return
+
+	return nil
 }
-func (vo *CfBrand) UpdateEntry(ctx context.Context) (err error) {
+func (vo *CfBrand) UpdateEntry(ctx context.Context) error {
 	if vo == nil {
 		return errors.New("UpdateEntry: Value Object is nil")
 	}
@@ -713,38 +677,21 @@ func (vo *CfBrand) UpdateEntry(ctx context.Context) (err error) {
 		return errors.New("UpdateEntry: Only available in ClientModeCMA")
 	}
 	publishingStatus := vo.GetPublishingStatus()
-	cfEntry := &contentful.Entry{}
-	tmp, errMarshal := json.Marshal(vo)
-	if errMarshal != nil {
-		return errors.New("CfBrand UpdateEntry: Can't marshal JSON from VO")
-	}
-	errUnmarshal := json.Unmarshal(tmp, &cfEntry)
-	if errUnmarshal != nil {
-		return errors.New("CfBrand UpdateEntry: Can't unmarshal JSON into CF entry")
-	}
-
-	err = vo.CC.Client.Entries.Upsert(ctx, vo.CC.SpaceID, cfEntry)
+	err := vo.CC.BrandClient.Upsert(ctx, vo.CC.SpaceID, vo)
 	if err != nil {
 		return fmt.Errorf("CfBrand UpdateEntry: upsert operation failed: %w", err)
 	}
-	tmp, errMarshal = json.Marshal(cfEntry)
-	if errMarshal != nil {
-		return errors.New("CfBrand UpdateEntry: Can't marshal JSON back from CF entry")
-	}
-	errUnmarshal = json.Unmarshal(tmp, &vo)
-	if errUnmarshal != nil {
-		return errors.New("CfBrand UpdateEntry: Can't unmarshal JSON back into VO")
-	}
 	if publishingStatus == StatusPublished {
 		vo.Sys.Version++
-		err = vo.CC.Client.Entries.Publish(ctx, vo.CC.SpaceID, cfEntry)
+		err = vo.CC.BrandClient.Publish(ctx, vo.CC.SpaceID, vo)
 		if err != nil {
 			return fmt.Errorf("CfShopCategory UpdateEntry: publish operation failed: %w", err)
 		}
 	}
-	return
+
+	return nil
 }
-func (vo *CfBrand) DeleteEntry(ctx context.Context) (err error) {
+func (vo *CfBrand) DeleteEntry(ctx context.Context) error {
 	if vo == nil {
 		return errors.New("DeleteEntry: Value Object is nil")
 	}
@@ -754,25 +701,17 @@ func (vo *CfBrand) DeleteEntry(ctx context.Context) (err error) {
 	if vo.CC.clientMode != ClientModeCMA {
 		return errors.New("DeleteEntry: Only available in ClientModeCMA")
 	}
-	cfEntry := &contentful.Entry{}
-	tmp, errMarshal := json.Marshal(vo)
-	if errMarshal != nil {
-		return errors.New("CfBrand DeleteEntry: Can't marshal JSON from VO")
-	}
-	errUnmarshal := json.Unmarshal(tmp, &cfEntry)
-	if errUnmarshal != nil {
-		return errors.New("CfBrand DeleteEntry: Can't unmarshal JSON into CF entry")
-	}
-	if cfEntry.Sys.PublishedCounter > 0 {
-		errUnpublish := vo.CC.Client.Entries.Unpublish(ctx, vo.CC.SpaceID, cfEntry)
+	if vo.Sys.PublishedCounter > 0 {
+		errUnpublish := vo.CC.BrandClient.Unpublish(ctx, vo.CC.SpaceID, vo)
 		if errUnpublish != nil && !strings.Contains(errUnpublish.Error(), "Not published") {
 			return fmt.Errorf("CfBrand DeleteEntry: Unpublish entry failed: %w", errUnpublish)
 		}
 	}
-	errDelete := vo.CC.Client.Entries.Delete(ctx, vo.CC.SpaceID, cfEntry.Sys.ID)
+	errDelete := vo.CC.BrandClient.Delete(ctx, vo.CC.SpaceID, vo.Sys.ID)
 	if errDelete != nil {
 		return fmt.Errorf("CfBrand DeleteEntry: Delete entry failed: %w", errDelete)
 	}
+
 	return nil
 }
 func (vo *CfBrand) ToReference() (refSys ContentTypeSys) {
@@ -785,24 +724,59 @@ func (vo *CfBrand) ToReference() (refSys ContentTypeSys) {
 	return
 }
 
+func (cc *ContentfulClient) optimisticPageSizeGetAllBrand(ctx context.Context, contentType string, limit uint16) (*contentful.Collection[CfBrand], error) {
+	col := cc.BrandClient.List(ctx, cc.SpaceID)
+	col.Query.ContentType(contentType).Locale("*").Include(0).Limit(limit)
+	var allItems []CfBrand
+	var err error
+	for {
+		var nextCol *contentful.Collection[CfBrand]
+		nextCol, err = col.Next()
+		if err != nil {
+			break
+		}
+		col = nextCol
+		allItems = append(allItems, col.Items...)
+		if uint16(len(col.Items)) < limit {
+			break
+		}
+	}
+	col.Items = allItems
+	switch errTyped := err.(type) {
+	case contentful.ErrorResponse:
+		msg := errTyped.Message
+		if (strings.Contains(msg, "Response size too big") || strings.Contains(msg, "Too many links")) && limit >= 20 {
+			smallerPageCol, err := cc.optimisticPageSizeGetAllBrand(ctx, contentType, limit/2)
+			return smallerPageCol, err
+		}
+		return nil, err
+	case nil:
+	default:
+		return nil, err
+	}
+	return col, nil
+}
+
 func (cc *ContentfulClient) cacheAllBrand(ctx context.Context, resultChan chan<- ContentTypeResult) (vos map[string]*CfBrand, err error) {
 	if cc == nil || cc.Client == nil {
 		return nil, errors.New("cacheAllBrand: No CDA/CPA client available")
 	}
 	var allBrand []*CfBrand
-	col := &contentful.Collection{
-		Items: []interface{}{},
-	}
+	col := &contentful.Collection[CfBrand]{}
 	cc.cacheMutex.sharedDataGcLock.RLock()
 	defer cc.cacheMutex.sharedDataGcLock.RUnlock()
 	if cc.offline {
 		for _, entry := range cc.offlineTemp.Entries {
 			if entry.Sys.ContentType.Sys.ID == ContentTypeBrand {
-				col.Items = append(col.Items, entry)
+				var vo CfBrand
+				if err := contentful.DeepCopy(&vo, entry); err != nil {
+					return nil, err
+				}
+				col.Items = append(col.Items, vo)
 			}
 		}
 	} else {
-		col, err = cc.optimisticPageSizeGetAll(ctx, "brand", cc.optimisticPageSize)
+		col, err = cc.optimisticPageSizeGetAllBrand(ctx, "brand", cc.optimisticPageSize)
 		if err != nil {
 			return nil, errors.New("optimisticPageSizeGetAll for Brand failed: " + err.Error())
 		}
@@ -850,20 +824,19 @@ func (cc *ContentfulClient) cacheBrandByID(ctx context.Context, id string, entry
 	defer cc.cacheMutex.parentMapGcLock.Unlock()
 	cc.cacheMutex.genericEntriesGcLock.Lock()
 	defer cc.cacheMutex.genericEntriesGcLock.Unlock()
-	var col *contentful.Collection
+	var col *contentful.Collection[CfBrand]
 	if entryPayload != nil {
-		col = &contentful.Collection{
-			Items: []interface{}{entryPayload},
-		}
+		col = &contentful.Collection[CfBrand]{}
 		id = entryPayload.Sys.ID
 	} else {
 		if cc.Client == nil {
 			return errors.New("cacheBrandByID: No client available")
 		}
 		if !entryDelete {
-			col = cc.Client.Entries.List(ctx, cc.SpaceID)
+			col = cc.BrandClient.List(ctx, cc.SpaceID)
 			col.Query.ContentType("brand").Locale("*").Include(0).Equal("sys.id", id)
-			_, err := col.GetAll()
+			var err error
+			col, err = col.GetAll()
 			if err != nil {
 				return err
 			}
@@ -922,36 +895,20 @@ func (cc *ContentfulClient) cacheBrandByID(ctx context.Context, id string, entry
 	return nil
 }
 
-func colToCfBrand(col *contentful.Collection, cc *ContentfulClient) (vos []*CfBrand, err error) {
-	for _, item := range col.Items {
-		var vo CfBrand
-		byteArray, _ := json.Marshal(item)
-		err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&vo)
-		if err != nil {
-			break
-		}
+func colToCfBrand(col *contentful.Collection[CfBrand], cc *ContentfulClient) (vos []*CfBrand, err error) {
+	for _, vo := range col.Items {
 		if cc.textJanitor {
-
 			vo.Fields.CompanyName = cleanUpStringField(vo.Fields.CompanyName)
-
 			vo.Fields.CompanyDescription = cleanUpStringField(vo.Fields.CompanyDescription)
-
 			vo.Fields.Website = cleanUpStringField(vo.Fields.Website)
-
 			vo.Fields.Twitter = cleanUpStringField(vo.Fields.Twitter)
-
 			vo.Fields.Email = cleanUpStringField(vo.Fields.Email)
-
 			vo.Fields.Phone = cleanUpStringSliceField(vo.Fields.Phone)
-
-		}
-		var typedItem RawItem
-		err = json.NewDecoder(bytes.NewReader(byteArray)).Decode(&typedItem)
-		if err != nil {
-			break
 		}
 		vo.CC = cc
-		vo.RawFields = typedItem.Fields
+		if err := MapStructure(vo.Fields, &vo.RawFields); err != nil {
+			return nil, err
+		}
 		vos = append(vos, &vo)
 	}
 	return vos, err

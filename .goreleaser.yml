@@ -1,3 +1,5 @@
+version: 2
+
 project_name: gocontentful
 
 release:
@@ -8,6 +10,9 @@ release:
 
 builds:
   - binary: gocontentful
+    main: ./main.go
+    env:
+      - CGO_ENABLED=0
     goos:
       - windows
       - darwin
@@ -17,19 +22,17 @@ builds:
       - arm64
     goarm:
       - '7'
-    env:
-      - CGO_ENABLED=0
-    main: ./main.go
     flags:
       - -trimpath
+      - -tags=safe
     ldflags:
       - -s -w -X main.VERSION={{.Version}}
 
 archives:
-  - format: tar.gz
+  - formats: [ tar.gz ]
     format_overrides:
       - goos: windows
-        format: zip
+        formats: [ zip ]
     files:
       - LICENSE
       - README.md
@@ -43,6 +46,77 @@ brews:
       name: homebrew-tap
     caveats: "gocontentful -h"
     homepage: "https://github.com/foomo/gocontentful"
-    description: "An Contentful Entry-Reference Mapper for Go"
+    description: "A Contentful Entry-Reference Mapper for Go"
     test: |
       system "#{bin}/gocontentful --version"
+
+dockers:
+  - use: buildx
+    goos: linux
+    goarch: amd64
+    dockerfile: Dockerfile
+    image_templates:
+      - '{{ if eq .Prerelease "" }}foomo/gocontentful:latest-amd64{{ end }}'
+      - 'foomo/gocontentful:{{ .Version }}-amd64'
+      - '{{ if eq .Prerelease "" }}foomo/gocontentful:{{ .Major }}-amd64{{ end }}'
+      - '{{ if eq .Prerelease "" }}foomo/gocontentful:{{ .Major }}.{{ .Minor }}-amd64{{ end }}'
+    build_flag_templates:
+      - '--pull'
+      # https://github.com/opencontainers/image-spec/blob/main/annotations.md#pre-defined-annotation-keys
+      - '--label=org.opencontainers.image.title={{.ProjectName}}'
+      - '--label=org.opencontainers.image.description=CLI utility manage infrastructure as code with helm'
+      - '--label=org.opencontainers.image.source={{.GitURL}}'
+      - '--label=org.opencontainers.image.url={{.GitURL}}'
+      - '--label=org.opencontainers.image.documentation={{.GitURL}}'
+      - '--label=org.opencontainers.image.created={{.Date}}'
+      - '--label=org.opencontainers.image.revision={{.FullCommit}}'
+      - '--label=org.opencontainers.image.version={{.Version}}'
+      - '--platform=linux/amd64'
+
+  - use: buildx
+    goos: linux
+    goarch: arm64
+    dockerfile: Dockerfile
+    image_templates:
+      - '{{ if eq .Prerelease "" }}foomo/gocontentful:latest-arm64{{ end }}'
+      - 'foomo/gocontentful:{{ .Version }}-arm64'
+      - '{{ if eq .Prerelease "" }}foomo/gocontentful:{{ .Major }}-arm64{{ end }}'
+      - '{{ if eq .Prerelease "" }}foomo/gocontentful:{{ .Major }}.{{ .Minor }}-arm64{{ end }}'
+    build_flag_templates:
+      - '--pull'
+      # https://github.com/opencontainers/image-spec/blob/main/annotations.md#pre-defined-annotation-keys
+      - '--label=org.opencontainers.image.title={{.ProjectName}}'
+      - '--label=org.opencontainers.image.description=A Contentful Entry-Reference Mapper for Go'
+      - '--label=org.opencontainers.image.source={{.GitURL}}'
+      - '--label=org.opencontainers.image.url={{.GitURL}}'
+      - '--label=org.opencontainers.image.documentation={{.GitURL}}'
+      - '--label=org.opencontainers.image.created={{.Date}}'
+      - '--label=org.opencontainers.image.revision={{.FullCommit}}'
+      - '--label=org.opencontainers.image.version={{.Version}}'
+      - '--platform=linux/arm64'
+
+docker_manifests:
+  # basic
+  - name_template: 'foomo/gocontentful:latest'
+    image_templates:
+      - 'foomo/gocontentful:latest-amd64'
+      - 'foomo/gocontentful:latest-arm64'
+    skip_push: auto
+
+  - name_template: 'foomo/gocontentful:{{ .Version }}'
+    image_templates:
+      - 'foomo/gocontentful:{{ .Version }}-amd64'
+      - 'foomo/gocontentful:{{ .Version }}-arm64'
+    skip_push: auto
+
+  - name_template: 'foomo/gocontentful:{{ .Major }}'
+    image_templates:
+      - 'foomo/gocontentful:{{ .Major }}-amd64'
+      - 'foomo/gocontentful:{{ .Major }}-arm64'
+    skip_push: auto
+
+  - name_template: 'foomo/gocontentful:{{ .Major }}.{{ .Minor }}'
+    image_templates:
+      - 'foomo/gocontentful:{{ .Major }}.{{ .Minor }}-amd64'
+      - 'foomo/gocontentful:{{ .Major }}.{{ .Minor }}-arm64'
+    skip_push: auto

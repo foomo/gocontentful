@@ -26,7 +26,7 @@ func formatAndFixImports(filename string) error {
 	if errProcess != nil {
 		return errProcess
 	}
-	return os.WriteFile(filename, finalSource, 0o644)
+	return os.WriteFile(filename, finalSource, 0600)
 }
 
 func generate(filename string, tpl []byte, conf spaceConf) error {

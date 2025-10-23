@@ -1,10 +1,10 @@
 package test
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/foomo/gocontentful/test/testapi"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -20,7 +20,7 @@ var testLogger = logrus.StandardLogger()
 func getTestClient() (*testapi.ContentfulClient, error) {
 	testFile, err := GetTestFile("./test-space-export.json")
 	if err != nil {
-		return nil, fmt.Errorf("getTestClient could not read space export file: %v", err)
+		return nil, errors.Wrap(err, "getTestClient could not read space export file")
 	}
 	return testapi.NewOfflineContentfulClient(testFile, GetContenfulLogger(testLogger), LogDebug, true, true)
 }
@@ -28,7 +28,7 @@ func getTestClient() (*testapi.ContentfulClient, error) {
 func GetTestFile(filename string) ([]byte, error) {
 	fileBytes, err := os.ReadFile(filename)
 	if err != nil {
-		return nil, fmt.Errorf("getTestFile could not read space export file: %v", err)
+		return nil, errors.Wrap(err, "getTestFile could not read space export file")
 	}
 	return fileBytes, nil
 }

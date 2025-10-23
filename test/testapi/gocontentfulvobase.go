@@ -44,7 +44,7 @@ type GenericEntry struct {
 
 type ContentfulReferencedEntry struct {
 	Entry *contentful.Entry
-	Col   *contentful.Collection
+	Col   *contentful.Collection[*contentful.Entry]
 	LogFn func(
 		contentType string,
 		entryID string,

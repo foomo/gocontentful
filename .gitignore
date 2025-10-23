@@ -1,12 +1,33 @@
 .*
-*.log
+*.zip
+*.tar
 *.out
-!.github/
-!.husky/
-!.editorconfig
-!.gitignore
-!.golangci.yml
-!.goreleaser.yml
-!.husky.yaml
+*.log
 /bin/
 /tmp/
+
+## Git
+!.gitkeep
+!.gitignore
+
+## GitHub
+!.github/
+
+## Mise
+!.mise.toml
+
+## Editorconfig
+!.editorconfig
+
+## Docker
+!.dockerignore
+
+## Husky
+!.husky/
+!.husky.yaml
+
+## Golang
+go.work
+go.work.sum
+!.golangci.yml
+!.goreleaser.yml

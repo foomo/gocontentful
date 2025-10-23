@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -17,18 +18,18 @@ import (
 
 // spaceConf is the space config object passed to the template
 type spaceConf struct {
-	FuncMap      map[string]interface{}
-	PackageName  string
-	PackageDir   string
-	Locales      []Locale
-	ContentTypes []ContentType
-	ContentType  ContentType
-	Version      string
+	FuncMap      map[string]interface{} `yaml:"funcMap"`
+	PackageName  string                 `yaml:"packageName"`
+	PackageDir   string                 `yaml:"packageDir"`
+	Locales      []Locale               `yaml:"locales"`
+	ContentTypes []ContentType          `yaml:"contentTypes"`
+	ContentType  ContentType            `yaml:"contentType"`
+	Version      string                 `yaml:"version"`
 }
 
 // GetLocales retrieves locale definition from Contentful
-func getLocales(ctx context.Context, CMA *contentful.Contentful, spaceID string) (locales []Locale, err error) {
-	col, err := CMA.Locales.List(ctx, spaceID).GetAll()
+func getLocales(ctx context.Context, cma *contentful.Contentful, spaceID string) (locales []Locale, err error) {
+	col, err := cma.Locales.List(ctx, spaceID).GetAll()
 	if err != nil {
 		log.Fatalf("Couldn't get locales: %v", err)
 	}
@@ -48,9 +49,9 @@ func getLocales(ctx context.Context, CMA *contentful.Contentful, spaceID string)
 }
 
 // GetContentTypes retrieves content type definition from Contentful
-func getContentTypes(ctx context.Context, CMA *contentful.Contentful, spaceID string) (contentTypes []ContentType, err error) {
-	col := CMA.ContentTypes.List(ctx, spaceID)
-	_, err = col.GetAll()
+func getContentTypes(ctx context.Context, cma *contentful.Contentful, spaceID string) (contentTypes []ContentType, err error) {
+	col := cma.ContentTypes.List(ctx, spaceID)
+	col, err = col.GetAll()
 	if err != nil {
 		log.Fatal("Couldn't get content types")
 	}
@@ -88,12 +89,12 @@ func getData(ctx context.Context, spaceID, cmaKey, environment, exportFile strin
 	if exportFile != "" {
 		fileBytes, err := os.ReadFile(exportFile)
 		if err != nil {
-			return nil, nil, fmt.Errorf("error reading export file: %v", err)
+			return nil, nil, errors.Wrap(err, "error reading export file")
 		}
 		var export ExportFile
 		err = json.Unmarshal(fileBytes, &export)
 		if err != nil {
-			return nil, nil, fmt.Errorf("error parsing export file: %v", err)
+			return nil, nil, errors.Wrap(err, "error parsing export file")
 		}
 		contentTypes = export.ContentTypes
 		locales = export.Locales
@@ -108,14 +109,14 @@ func getData(ctx context.Context, spaceID, cmaKey, environment, exportFile strin
 		// Get space locales
 		locales, err = getLocales(ctx, CMA, spaceID)
 		if err != nil {
-			return nil, nil, fmt.Errorf("could not get locales: %v", err)
+			return nil, nil, errors.Wrap(err, "could not get locales")
 		}
 		fmt.Println("Locales found:", locales)
 
 		// Get content types
 		contentTypes, err = getContentTypes(ctx, CMA, spaceID)
 		if err != nil {
-			return nil, nil, fmt.Errorf("could not get content types: %v", err)
+			return nil, nil, errors.Wrap(err, "could not get content types")
 		}
 	}
 
@@ -126,7 +127,7 @@ func getData(ctx context.Context, spaceID, cmaKey, environment, exportFile strin
 		finalContentTypes = contentTypes
 	} else {
 		for _, ct := range contentTypes {
-			if sliceIncludes(flagContentTypes, ct.Sys.ID) {
+			if slices.Contains(flagContentTypes, ct.Sys.ID) {
 				finalContentTypes = append(finalContentTypes, ct)
 			}
 		}

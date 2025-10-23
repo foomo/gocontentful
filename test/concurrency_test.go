@@ -108,7 +108,6 @@ func TestConcurrentReadWrites(t *testing.T) {
 	var wg sync.WaitGroup
 	for i := 1; i <= concurrency; i++ {
 		wg.Add(1)
-		i := i
 		go func() {
 			defer wg.Done()
 			testLogger.Infof("testConcurrentReadWrites: caching run %d", i)
@@ -120,7 +119,6 @@ func TestConcurrentReadWrites(t *testing.T) {
 	}
 	for i := 1; i <= concurrency; i++ {
 		wg.Add(1)
-		i := i
 		go func() {
 			defer wg.Done()
 			err := writeWorker(context.TODO(), contentfulClient, i)
@@ -131,7 +129,6 @@ func TestConcurrentReadWrites(t *testing.T) {
 	}
 	for i := 1; i <= concurrency; i++ {
 		wg.Add(1)
-		i := i
 		go func() {
 			defer wg.Done()
 			err := readWorker(context.TODO(), contentfulClient, i)
@@ -142,7 +139,6 @@ func TestConcurrentReadWrites(t *testing.T) {
 	}
 	for i := 1; i <= concurrency; i++ {
 		wg.Add(1)
-		i := i
 		go func() {
 			defer wg.Done()
 			err := parentWorker(context.TODO(), contentfulClient, i)
