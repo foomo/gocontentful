@@ -3,8 +3,8 @@ github.com/aoliveti/curling v1.1.0/go.mod h1:xoDmoUg9vX3pMTltyG/rp9tFtIlweL2QeCJ
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/foomo/contentful v0.5.6-0.20251022132504-a2b6d630e3b3 h1:AJ3SH6HslSQVsQ0R0gIMS0LV0NZ+3ap8IuvD45SaIkY=
-github.com/foomo/contentful v0.5.6-0.20251022132504-a2b6d630e3b3/go.mod h1:xJ09xn+hTb5RKFyYL8vscxBh+DSH1wRzOljc9paEpp8=
+github.com/foomo/contentful v0.6.0 h1:k9VOQj1ZxSbl5HR2oBvunNeuqTW9U48yAz6jYeDxYdE=
+github.com/foomo/contentful v0.6.0/go.mod h1:xJ09xn+hTb5RKFyYL8vscxBh+DSH1wRzOljc9paEpp8=
 github.com/google/go-cmp v0.6.0 h1:ofyhxvXcZhMsU5ulbFiLKl/XBFqE1GSq7atu8tAmTRI=
 github.com/google/go-cmp v0.6.0/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
 github.com/mitchellh/mapstructure v1.5.0 h1:jeMsZIYE/09sWLaz43PL7Gy6RuMjD2eJVyuac5Z2hdY=
