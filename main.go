@@ -81,7 +81,12 @@ func main() {
 		os.Exit(0)
 	}
 	var conf *config.Config
+	var err error
 	if *flagConfigFile != "" {
+		conf, err = config.LoadConfigFromYAML(*flagConfigFile)
+		if err != nil {
+			fatal(err)
+		}
 		if conf.RequireVersion != "" && conf.RequireVersion != VERSION && conf.RequireVersion != strings.Trim(VERSION, "v") {
 			fatal("Required version mismatch. Want: " + conf.RequireVersion + "  Have: " + VERSION)
 		}
