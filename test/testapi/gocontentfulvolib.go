@@ -263,7 +263,6 @@ func (cc *ContentfulClient) CacheHasContentType(contentTypeID string) bool {
 
 func (cc *ContentfulClient) ClientStats() {
 	if cc == nil {
-		cc.logFn(nil, LogWarn, "ClientStats: no client available")
 		return
 	}
 	cc.cacheMutex.sharedDataGcLock.RLock()
@@ -1651,8 +1650,8 @@ func (cc *ContentfulClient) syncCache(ctx context.Context, contentTypes []string
 		if cc.logFn != nil && len(assets) > 0 && cc.logLevel <= LogInfo {
 			cc.logFn(map[string]interface{}{"task": "syncCache", "syncAssetCount": len(syncdAssets)}, LogInfo, InfoCacheSyncOp)
 		}
+		return syncdEntries, syncdAssets, nil
 	}
-	return syncdEntries, syncdAssets, nil
 }
 
 func (cc *ContentfulClient) cacheWorker(ctx context.Context, contentTypes []string, cacheAssets bool) {
@@ -1680,7 +1679,7 @@ func (cc *ContentfulClient) cacheSpace(ctx context.Context, contentTypes []strin
 	offlinePreviousState := cc.offline
 	cc.cacheMutex.sharedDataGcLock.RUnlock()
 	if errCanWeEvenConnect != nil {
-		if len(cc.offlineTemp.Entries) > 0 && (cc.Cache == nil || offlinePreviousState) {
+		if len(cc.offlineTemp.Entries) > 0 && (cc.Cache == nil || !cc.IsCacheInitialized()) {
 			if cc.logFn != nil && cc.logLevel <= LogInfo {
 				cc.logFn(map[string]interface{}{"task": "UpdateCache", "clientMode": cc.clientMode}, LogInfo, InfoFallingBackToFile)
 			}
@@ -2179,6 +2178,9 @@ func richTextHtmlTagType(htmlLine string) string {
 }
 
 func (n *RichTextGenericNode) richTextRenderHTML(w io.Writer, linkResolver LinkResolverFunc, entryLinkResolver EntryLinkResolverFunc, imageResolver ImageResolverFunc, embeddedEntryResolver EmbeddedEntryResolverFunc, locale Locale) (err error) {
+	if n == nil {
+		return errors.New("richTextRenderHTML: node is nil")
+	}
 	if linkResolver == nil {
 		linkResolver = func(url string) (transformedAttrs map[string]string, err error) {
 			return map[string]string{
@@ -2533,6 +2535,10 @@ func updateCacheForContentTypeAndEntity(ctx context.Context, cc *ContentfulClien
 	return nil
 }
 
+func (cc *ContentfulClient) IsCacheInitialized() bool {
+	return cc.Cache != nil && cc.cacheInit == true
+}
+
 func commonGetParents(ctx context.Context, cc *ContentfulClient, id string, contentTypes []string) (parents []EntryReference, err error) {
 	parents = []EntryReference{}
 	cc.cacheMutex.sharedDataGcLock.RLock()
@@ -2641,6 +2647,9 @@ func cleanUpRichTextField(field map[string]interface{}) map[string]interface{} {
 }
 
 func cleanUpRichTextIterateNode(node *RichTextGenericNode) *RichTextGenericNode {
+	if node == nil {
+		return nil
+	}
 	cleanNode := &RichTextGenericNode{
 		NodeType: node.NodeType,
 		Data:     node.Data,

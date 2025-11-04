@@ -553,7 +553,7 @@ func (cc *ContentfulClient) cacheAllCategory(ctx context.Context, resultChan cha
 	for _, category := range allCategory {
 		if cc.cacheInit {
 			existingCategory, err := cc.GetCategoryByID(ctx, category.Sys.ID)
-			if err == nil && existingCategory != nil && existingCategory.Sys.Version > category.Sys.Version {
+			if err == nil && existingCategory != nil && existingCategory.Sys.PublishedVersion > category.Sys.PublishedVersion {
 				return nil, fmt.Errorf("cache update canceled because Category entry %s is newer in cache", category.Sys.ID)
 			}
 		}

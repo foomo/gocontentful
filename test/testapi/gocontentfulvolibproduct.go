@@ -1391,7 +1391,7 @@ func (cc *ContentfulClient) cacheAllProduct(ctx context.Context, resultChan chan
 	for _, product := range allProduct {
 		if cc.cacheInit {
 			existingProduct, err := cc.GetProductByID(ctx, product.Sys.ID)
-			if err == nil && existingProduct != nil && existingProduct.Sys.Version > product.Sys.Version {
+			if err == nil && existingProduct != nil && existingProduct.Sys.PublishedVersion > product.Sys.PublishedVersion {
 				return nil, fmt.Errorf("cache update canceled because Product entry %s is newer in cache", product.Sys.ID)
 			}
 		}

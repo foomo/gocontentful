@@ -701,7 +701,7 @@ func (cc *ContentfulClient) cacheAll{{ firstCap $contentType.Sys.ID }}(ctx conte
 	for _, {{ $contentType.Sys.ID }} := range all{{ firstCap $contentType.Sys.ID }} {
 		if cc.cacheInit {
             existing{{ firstCap $contentType.Sys.ID }}, err := cc.Get{{ firstCap $contentType.Sys.ID }}ByID(ctx, {{ $contentType.Sys.ID }}.Sys.ID)
-            if err == nil && existing{{ firstCap $contentType.Sys.ID }} != nil && existing{{ firstCap $contentType.Sys.ID }}.Sys.Version > {{ $contentType.Sys.ID }}.Sys.Version {
+            if err == nil && existing{{ firstCap $contentType.Sys.ID }} != nil && existing{{ firstCap $contentType.Sys.ID }}.Sys.PublishedVersion > {{ $contentType.Sys.ID }}.Sys.PublishedVersion {
                 return nil, fmt.Errorf("cache update canceled because {{ firstCap $contentType.Sys.ID }} entry %s is newer in cache", {{ $contentType.Sys.ID }}.Sys.ID)
             }
         }

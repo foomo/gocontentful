@@ -115,7 +115,7 @@ func TestPreserveCacheIfNewer(t *testing.T) {
 	require.NoError(t, err)
 	brand, err := contentfulClient.GetBrandByID(context.TODO(), "JrePkDVYomE8AwcuCUyMi")
 	require.NoError(t, err)
-	require.Equal(t, 2.0, brand.Sys.Version)
+	require.Equal(t, 1.0, brand.Sys.PublishedVersion)
 }
 
 func TestEntry(t *testing.T) {

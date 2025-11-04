@@ -789,7 +789,7 @@ func (cc *ContentfulClient) cacheAllBrand(ctx context.Context, resultChan chan<-
 	for _, brand := range allBrand {
 		if cc.cacheInit {
 			existingBrand, err := cc.GetBrandByID(ctx, brand.Sys.ID)
-			if err == nil && existingBrand != nil && existingBrand.Sys.Version > brand.Sys.Version {
+			if err == nil && existingBrand != nil && existingBrand.Sys.PublishedVersion > brand.Sys.PublishedVersion {
 				return nil, fmt.Errorf("cache update canceled because Brand entry %s is newer in cache", brand.Sys.ID)
 			}
 		}
