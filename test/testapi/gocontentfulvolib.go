@@ -75,17 +75,18 @@ type ContentfulClient struct {
 		level int,
 		args ...interface{},
 	)
-	logLevel           int
-	optimisticPageSize uint16
-	SpaceID            string
-	offline            bool
-	offlineTemp        offlineTemp
-	sync               bool
-	syncToken          string
-	textJanitor        bool
+	logLevel            int
+	optimisticPageSize  uint16
+	SpaceID             string
+	offline             bool
+	offlineSpace        offlineSpace
+	offlineLastModified int64
+	sync                bool
+	syncToken           string
+	textJanitor         bool
 }
 
-type offlineTemp struct {
+type offlineSpace struct {
 	Entries []contentful.Entry `json:"entries"`
 	Assets  []contentful.Asset `json:"assets"`
 	Tags    []contentful.Tag   `json:"tags"`
@@ -764,7 +765,7 @@ func NewContentfulClient(ctx context.Context, spaceID string, clientMode ClientM
 }
 
 func NewOfflineContentfulClient(file []byte, logFn func(fields map[string]interface{}, level int, args ...interface{}), logLevel int, cacheAssets bool, textJanitor bool) (*ContentfulClient, error) {
-	offlineTemp, err := getOfflineSpaceFromFile(file)
+	offlineSpace, err := convertFileToOfflineSpace(file)
 	if err != nil {
 		return nil, fmt.Errorf("NewOfflineContentfulClient could not parse space export file: %v", err)
 	}
@@ -785,15 +786,15 @@ func NewOfflineContentfulClient(file []byte, logFn func(fields map[string]interf
 			SpaceLocaleGerman,
 			SpaceLocaleFrench,
 		},
-		logFn:       logFn,
-		logLevel:    logLevel,
-		SpaceID:     "OFFLINE",
-		offline:     true,
-		offlineTemp: *offlineTemp,
-		textJanitor: textJanitor,
+		logFn:        logFn,
+		logLevel:     logLevel,
+		SpaceID:      "OFFLINE",
+		offline:      true,
+		offlineSpace: *offlineSpace,
+		textJanitor:  textJanitor,
 	}
 	if cc.logFn != nil && cc.logLevel <= LogInfo {
-		cc.logFn(map[string]interface{}{"entries": len(offlineTemp.Entries), "assets": len(offlineTemp.Assets)}, LogInfo, InfoLoadingFromFile)
+		cc.logFn(map[string]interface{}{"entries": len(offlineSpace.Entries), "assets": len(offlineSpace.Assets)}, LogInfo, InfoLoadingFromFile)
 	}
 	_, _, err = cc.UpdateCache(context.Background(), spaceContentTypes, cacheAssets)
 	if err != nil {
@@ -1106,9 +1107,9 @@ func (genericEntry *GenericEntry) FieldAsAsset(ctx context.Context, fieldName st
 		return nil, ErrNotSet
 	}
 	switch field := genericEntry.RawFields[fieldName].(type) {
-	case map[string]interface{}:
+	case map[string]ContentTypeSys:
 		fieldVal := field[string(loc)]
-		if fieldVal == nil {
+		if fieldVal.Sys.ID == "" {
 			fieldVal = field[string(DefaultLocale)]
 		}
 		if err := contentful.DeepCopy(&cts, fieldVal); err != nil {
@@ -1159,9 +1160,9 @@ func (genericEntry *GenericEntry) FieldAsMultipleReference(fieldName string, loc
 		return nil, ErrNotSet
 	}
 	switch field := genericEntry.RawFields[fieldName].(type) {
-	case map[string]interface{}:
+	case map[string][]ContentTypeSys:
 		fieldVal := field[string(loc)]
-		if fieldVal == nil {
+		if len(fieldVal) == 0 {
 			fieldVal = field[string(DefaultLocale)]
 		}
 		if err := contentful.DeepCopy(&cts, fieldVal); err != nil {
@@ -1418,13 +1419,22 @@ func (cc *ContentfulClient) SetEnvironment(environment string) {
 	cc.Client.Environment = environment
 }
 
-func (cc *ContentfulClient) SetOfflineFallback(file []byte) error {
-	offlineTemp, err := getOfflineSpaceFromFile(file)
+func (cc *ContentfulClient) SetOfflineFallback(file []byte, lastModified int64) error {
+	offlineSpace, err := convertFileToOfflineSpace(file)
 	if err != nil {
 		return err
 	}
-	cc.offlineTemp = *offlineTemp
+	cc.cacheMutex.sharedDataGcLock.Lock()
+	defer cc.cacheMutex.sharedDataGcLock.Unlock()
+	cc.offlineSpace = *offlineSpace
+	cc.offlineLastModified = lastModified
 	return nil
+}
+
+func (cc *ContentfulClient) GetOfflineLastModified() int64 {
+	cc.cacheMutex.sharedDataGcLock.RLock()
+	defer cc.cacheMutex.sharedDataGcLock.RUnlock()
+	return cc.offlineLastModified
 }
 
 func (cc *ContentfulClient) SetSyncMode(mode bool) error {
@@ -1679,7 +1689,7 @@ func (cc *ContentfulClient) cacheSpace(ctx context.Context, contentTypes []strin
 	offlinePreviousState := cc.offline
 	cc.cacheMutex.sharedDataGcLock.RUnlock()
 	if errCanWeEvenConnect != nil {
-		if len(cc.offlineTemp.Entries) > 0 && (cc.Cache == nil || !cc.IsCacheInitialized()) {
+		if len(cc.offlineSpace.Entries) > 0 && (cc.Cache == nil || !cc.IsCacheInitialized()) {
 			if cc.logFn != nil && cc.logLevel <= LogInfo {
 				cc.logFn(map[string]interface{}{"task": "UpdateCache", "clientMode": cc.clientMode}, LogInfo, InfoFallingBackToFile)
 			}
@@ -1866,6 +1876,10 @@ func getContentfulAPIClient(clientMode ClientMode, clientKey string) (*contentfu
 	}
 }
 
+func (cc *ContentfulClient) GetSpaceID() string {
+	return cc.SpaceID
+}
+
 func (cc *ContentfulClient) getAllAssets(ctx context.Context, tryCacheFirst bool) (map[string]*contentful.Asset, error) {
 	if cc == nil || cc.Client == nil {
 		return nil, errors.New("getAllAssets: No client available")
@@ -1881,7 +1895,7 @@ func (cc *ContentfulClient) getAllAssets(ctx context.Context, tryCacheFirst bool
 	allItems := []contentful.Asset{}
 	assets := map[string]*contentful.Asset{}
 	if offline {
-		allItems = append(allItems, cc.offlineTemp.Assets...)
+		allItems = append(allItems, cc.offlineSpace.Assets...)
 	} else {
 		col := cc.Client.Assets.List(ctx, cc.SpaceID)
 		col.Query.Locale("*").Limit(assetPageSize)
@@ -1925,7 +1939,7 @@ func (cc *ContentfulClient) getAllTags(ctx context.Context, tryCacheFirst bool) 
 	allItems := []contentful.Tag{}
 	tags := map[string]string{}
 	if offline {
-		allItems = append(allItems, cc.offlineTemp.Tags...)
+		allItems = append(allItems, cc.offlineSpace.Tags...)
 	} else {
 		var err error
 		col := cc.Client.Tags.List(ctx, cc.SpaceID)
@@ -1942,13 +1956,13 @@ func (cc *ContentfulClient) getAllTags(ctx context.Context, tryCacheFirst bool) 
 	return tags, nil
 }
 
-func getOfflineSpaceFromFile(file []byte) (*offlineTemp, error) {
-	offlineTemp := &offlineTemp{}
-	err := contentful.Unmarshal(file, offlineTemp)
+func convertFileToOfflineSpace(file []byte) (*offlineSpace, error) {
+	offlineSpace := &offlineSpace{}
+	err := contentful.Unmarshal(file, offlineSpace)
 	if err != nil {
-		return nil, fmt.Errorf("getOfflineSpaceFromFile could not parse space export file: %v", err)
+		return nil, fmt.Errorf("convertFileToOfflineSpace could not parse space export file: %v", err)
 	}
-	return offlineTemp, nil
+	return offlineSpace, nil
 }
 
 func richTextGetAttribute(htmlLine string, attribute string) string {

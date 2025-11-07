@@ -766,7 +766,7 @@ func (cc *ContentfulClient) cacheAllBrand(ctx context.Context, resultChan chan<-
 	cc.cacheMutex.sharedDataGcLock.RLock()
 	defer cc.cacheMutex.sharedDataGcLock.RUnlock()
 	if cc.offline {
-		for _, entry := range cc.offlineTemp.Entries {
+		for _, entry := range cc.offlineSpace.Entries {
 			if entry.Sys.ContentType.Sys.ID == ContentTypeBrand {
 				var vo CfBrand
 				if err := contentful.DeepCopy(&vo, entry); err != nil {

@@ -530,7 +530,7 @@ func (cc *ContentfulClient) cacheAllCategory(ctx context.Context, resultChan cha
 	cc.cacheMutex.sharedDataGcLock.RLock()
 	defer cc.cacheMutex.sharedDataGcLock.RUnlock()
 	if cc.offline {
-		for _, entry := range cc.offlineTemp.Entries {
+		for _, entry := range cc.offlineSpace.Entries {
 			if entry.Sys.ContentType.Sys.ID == ContentTypeCategory {
 				var vo CfCategory
 				if err := contentful.DeepCopy(&vo, entry); err != nil {
