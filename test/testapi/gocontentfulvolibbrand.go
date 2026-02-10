@@ -745,7 +745,7 @@ func (cc *ContentfulClient) optimisticPageSizeGetAllBrand(ctx context.Context, c
 	switch errTyped := err.(type) {
 	case contentful.ErrorResponse:
 		msg := errTyped.Message
-		if (strings.Contains(msg, "Response size too big") || strings.Contains(msg, "Too many links")) && limit >= 20 {
+		if (strings.Contains(msg, "Response size too big") || strings.Contains(msg, "Too many links")) && limit >= 2 {
 			smallerPageCol, err := cc.optimisticPageSizeGetAllBrand(ctx, contentType, limit/2)
 			return smallerPageCol, err
 		}
