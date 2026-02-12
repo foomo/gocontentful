@@ -676,9 +676,15 @@ func (cc *ContentfulClient) cacheAll{{ firstCap $contentType.Sys.ID }}(ctx conte
 	var all{{ firstCap $contentType.Sys.ID }} []*Cf{{ firstCap $contentType.Sys.ID }}
 	col := &contentful.Collection[Cf{{ firstCap $contentType.Sys.ID }}]{}
 	cc.cacheMutex.sharedDataGcLock.RLock()
-	defer cc.cacheMutex.sharedDataGcLock.RUnlock()
-	if cc.offline {
-		for _, entry := range cc.offlineSpace.Entries {
+	locales := cc.locales
+	_ = locales
+	offline := cc.offline
+	cacheInit := cc.cacheInit
+	optimisticPageSize := cc.optimisticPageSize
+	offlineSpace := cc.offlineSpace
+	cc.cacheMutex.sharedDataGcLock.RUnlock()
+	if offline {
+		for _, entry := range offlineSpace.Entries {
 			if entry.Sys.ContentType.Sys.ID == ContentType{{ firstCap $contentType.Sys.ID }} {
 				var vo Cf{{ firstCap $contentType.Sys.ID }}
 				if err := contentful.DeepCopy(&vo, entry); err != nil {
@@ -688,7 +694,7 @@ func (cc *ContentfulClient) cacheAll{{ firstCap $contentType.Sys.ID }}(ctx conte
 			}
 		}
 	} else {
-		col, err = cc.optimisticPageSizeGetAll{{ firstCap $contentType.Sys.ID }}(ctx, "{{ $contentType.Sys.ID }}", cc.optimisticPageSize)
+		col, err = cc.optimisticPageSizeGetAll{{ firstCap $contentType.Sys.ID }}(ctx, "{{ $contentType.Sys.ID }}", optimisticPageSize)
 		if err != nil {
 			return nil, errors.New("optimisticPageSizeGetAll for {{ firstCap $contentType.Sys.ID }} failed: "+err.Error())
 		}
@@ -699,7 +705,7 @@ func (cc *ContentfulClient) cacheAll{{ firstCap $contentType.Sys.ID }}(ctx conte
 	}
 	{{ $contentType.Sys.ID }}Map := map[string]*Cf{{ firstCap $contentType.Sys.ID }}{}
 	for _, {{ $contentType.Sys.ID }} := range all{{ firstCap $contentType.Sys.ID }} {
-		if cc.cacheInit {
+		if cacheInit {
             existing{{ firstCap $contentType.Sys.ID }}, err := cc.Get{{ firstCap $contentType.Sys.ID }}ByID(ctx, {{ $contentType.Sys.ID }}.Sys.ID)
             if err == nil && existing{{ firstCap $contentType.Sys.ID }} != nil && existing{{ firstCap $contentType.Sys.ID }}.Sys.PublishedVersion > {{ $contentType.Sys.ID }}.Sys.PublishedVersion {
                 return nil, fmt.Errorf("cache update canceled because {{ firstCap $contentType.Sys.ID }} entry %s is newer in cache", {{ $contentType.Sys.ID }}.Sys.ID)
@@ -720,7 +726,7 @@ func (cc *ContentfulClient) cacheAll{{ firstCap $contentType.Sys.ID }}(ctx conte
 	_ = addEntry
 	{{ range $fieldIndex, $field := $contentType.Fields }}
 	{{ if fieldIsMultipleReference $field }}
-		for _, loc := range cc.locales {
+		for _, loc := range locales {
 		children, okChildren := {{ $contentType.Sys.ID }}.Fields.{{ firstCap $field.ID }}[string(loc)]
 		if okChildren {
 			for _, child := range children {
@@ -735,7 +741,7 @@ func (cc *ContentfulClient) cacheAll{{ firstCap $contentType.Sys.ID }}(ctx conte
 	}
 	{{ end }}
 	{{ if fieldIsReference $field }}
-	for _, loc := range cc.locales {
+	for _, loc := range locales {
 		child, okChild := {{ $contentType.Sys.ID }}.Fields.{{ firstCap $field.ID }}[string(loc)]
 		if okChild {
 			addEntry(child.Sys.ID, EntryReference{ContentType: {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID,

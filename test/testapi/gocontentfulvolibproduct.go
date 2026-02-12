@@ -1366,9 +1366,15 @@ func (cc *ContentfulClient) cacheAllProduct(ctx context.Context, resultChan chan
 	var allProduct []*CfProduct
 	col := &contentful.Collection[CfProduct]{}
 	cc.cacheMutex.sharedDataGcLock.RLock()
-	defer cc.cacheMutex.sharedDataGcLock.RUnlock()
-	if cc.offline {
-		for _, entry := range cc.offlineSpace.Entries {
+	locales := cc.locales
+	_ = locales
+	offline := cc.offline
+	cacheInit := cc.cacheInit
+	optimisticPageSize := cc.optimisticPageSize
+	offlineSpace := cc.offlineSpace
+	cc.cacheMutex.sharedDataGcLock.RUnlock()
+	if offline {
+		for _, entry := range offlineSpace.Entries {
 			if entry.Sys.ContentType.Sys.ID == ContentTypeProduct {
 				var vo CfProduct
 				if err := contentful.DeepCopy(&vo, entry); err != nil {
@@ -1378,7 +1384,7 @@ func (cc *ContentfulClient) cacheAllProduct(ctx context.Context, resultChan chan
 			}
 		}
 	} else {
-		col, err = cc.optimisticPageSizeGetAllProduct(ctx, "product", cc.optimisticPageSize)
+		col, err = cc.optimisticPageSizeGetAllProduct(ctx, "product", optimisticPageSize)
 		if err != nil {
 			return nil, errors.New("optimisticPageSizeGetAll for Product failed: " + err.Error())
 		}
@@ -1389,7 +1395,7 @@ func (cc *ContentfulClient) cacheAllProduct(ctx context.Context, resultChan chan
 	}
 	productMap := map[string]*CfProduct{}
 	for _, product := range allProduct {
-		if cc.cacheInit {
+		if cacheInit {
 			existingProduct, err := cc.GetProductByID(ctx, product.Sys.ID)
 			if err == nil && existingProduct != nil && existingProduct.Sys.PublishedVersion > product.Sys.PublishedVersion {
 				return nil, fmt.Errorf("cache update canceled because Product entry %s is newer in cache", product.Sys.ID)
@@ -1409,7 +1415,7 @@ func (cc *ContentfulClient) cacheAllProduct(ctx context.Context, resultChan chan
 		}
 		_ = addEntry
 
-		for _, loc := range cc.locales {
+		for _, loc := range locales {
 			children, okChildren := product.Fields.Categories[string(loc)]
 			if okChildren {
 				for _, child := range children {
@@ -1423,7 +1429,7 @@ func (cc *ContentfulClient) cacheAllProduct(ctx context.Context, resultChan chan
 			}
 		}
 
-		for _, loc := range cc.locales {
+		for _, loc := range locales {
 			child, okChild := product.Fields.Brand[string(loc)]
 			if okChild {
 				addEntry(child.Sys.ID, EntryReference{ContentType: product.Sys.ContentType.Sys.ID,
@@ -1435,7 +1441,7 @@ func (cc *ContentfulClient) cacheAllProduct(ctx context.Context, resultChan chan
 			}
 		}
 
-		for _, loc := range cc.locales {
+		for _, loc := range locales {
 			child, okChild := product.Fields.SubProduct[string(loc)]
 			if okChild {
 				addEntry(child.Sys.ID, EntryReference{ContentType: product.Sys.ContentType.Sys.ID,
