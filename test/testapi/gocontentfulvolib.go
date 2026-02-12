@@ -850,6 +850,8 @@ func (cc *ContentfulClient) GetGenericEntry(entryID string) (*GenericEntry, erro
 		}
 		return nil, errors.New(InfoCacheIsNil)
 	}
+	cc.cacheMutex.genericEntriesGcLock.RLock()
+	defer cc.cacheMutex.genericEntriesGcLock.RUnlock()
 	if _, ok := cc.Cache.genericEntries[entryID]; !ok {
 		if cc.logFn != nil && cc.logLevel <= LogWarn {
 			cc.logFn(map[string]interface{}{"task": "GetGenericEntry", "entryId": entryID}, LogWarn, ErrorEntryNotFound)
@@ -866,6 +868,8 @@ func (cc *ContentfulClient) GetAllGenericEntries() (map[string]*GenericEntry, er
 		}
 		return nil, errors.New(InfoCacheIsNil)
 	}
+	cc.cacheMutex.genericEntriesGcLock.RLock()
+	defer cc.cacheMutex.genericEntriesGcLock.RUnlock()
 	return cc.Cache.genericEntries, nil
 }
 
@@ -887,6 +891,8 @@ func (genericEntry *GenericEntry) FieldAsString(fieldName string, locale ...Loca
 	if err != nil {
 		return "", err
 	}
+	genericEntry.RWMutex.RLock()
+	defer genericEntry.RWMutex.RUnlock()
 	rawField, ok := genericEntry.RawFields[fieldName]
 	if !ok {
 		return "", ErrNotSet
@@ -934,6 +940,8 @@ func (genericEntry *GenericEntry) FieldAsStringSlice(fieldName string, locale ..
 	if err != nil {
 		return nil, err
 	}
+	genericEntry.RWMutex.RLock()
+	defer genericEntry.RWMutex.RUnlock()
 	rawField, ok := genericEntry.RawFields[fieldName]
 	if !ok {
 		return nil, ErrNotSet
@@ -982,6 +990,8 @@ func (genericEntry *GenericEntry) FieldAsFloat64(fieldName string, locale ...Loc
 	if err != nil {
 		return 0, err
 	}
+	genericEntry.RWMutex.RLock()
+	defer genericEntry.RWMutex.RUnlock()
 	rawField, ok := genericEntry.RawFields[fieldName]
 	if !ok {
 		return 0, ErrNotSet
@@ -1031,6 +1041,8 @@ func (genericEntry *GenericEntry) FieldAsReference(fieldName string, locale ...L
 	if err != nil {
 		return nil, err
 	}
+	genericEntry.RWMutex.RLock()
+	defer genericEntry.RWMutex.RUnlock()
 	rawField, ok := genericEntry.RawFields[fieldName]
 	if !ok {
 		return nil, ErrNotSet
@@ -1103,6 +1115,8 @@ func (genericEntry *GenericEntry) FieldAsAsset(ctx context.Context, fieldName st
 		loc = DefaultLocale
 	}
 	var cts ContentTypeSys
+	genericEntry.RWMutex.RLock()
+	defer genericEntry.RWMutex.RUnlock()
 	if _, ok := genericEntry.RawFields[fieldName]; !ok {
 		return nil, ErrNotSet
 	}
@@ -1156,6 +1170,8 @@ func (genericEntry *GenericEntry) FieldAsMultipleReference(fieldName string, loc
 		loc = DefaultLocale
 	}
 	var cts []ContentTypeSys
+	genericEntry.RWMutex.RLock()
+	defer genericEntry.RWMutex.RUnlock()
 	if _, ok := genericEntry.RawFields[fieldName]; !ok {
 		return nil, ErrNotSet
 	}
@@ -1219,6 +1235,8 @@ func (genericEntry *GenericEntry) FieldAsBool(fieldName string, locale ...Locale
 	if err != nil {
 		return false, err
 	}
+	genericEntry.RWMutex.RLock()
+	defer genericEntry.RWMutex.RUnlock()
 	rawField, ok := genericEntry.RawFields[fieldName]
 	if !ok {
 		return false, ErrNotSet
@@ -1267,6 +1285,8 @@ func (genericEntry *GenericEntry) FieldAsAny(fieldName string, locale ...Locale)
 	if err != nil {
 		return nil, err
 	}
+	genericEntry.RWMutex.RLock()
+	defer genericEntry.RWMutex.RUnlock()
 	rawField, ok := genericEntry.RawFields[fieldName]
 	if !ok {
 		return nil, ErrNotSet
@@ -1315,6 +1335,8 @@ func (genericEntry *GenericEntry) SetField(fieldName string, fieldValue any, loc
 	if err != nil {
 		return err
 	}
+	genericEntry.RWMutex.Lock()
+	defer genericEntry.RWMutex.Unlock()
 	if genericEntry.RawFields == nil {
 		genericEntry.RawFields = make(RawFields)
 	}
@@ -1333,17 +1355,20 @@ func (genericEntry *GenericEntry) SetField(fieldName string, fieldValue any, loc
 }
 
 func (genericEntry *GenericEntry) Upsert(ctx context.Context) error {
+	genericEntry.RWMutex.RLock()
 	cfEntry := &contentful.Entry{
 		Fields: map[string]interface{}{},
 	}
 	// get the generic entry sys into the cfEntry sys
 	if err := contentful.DeepCopy(&cfEntry, genericEntry); err != nil {
+		genericEntry.RWMutex.RUnlock()
 		return err
 	}
 	// copy fields
 	for key, fieldValue := range genericEntry.RawFields {
 		cfEntry.Fields[key] = fieldValue
 	}
+	genericEntry.RWMutex.RUnlock()
 	// upsert the entry
 	err := genericEntry.CC.Client.Entries.Upsert(ctx, genericEntry.CC.SpaceID, cfEntry)
 	if err != nil {
@@ -1365,20 +1390,29 @@ func (genericEntry *GenericEntry) Update(ctx context.Context) (err error) {
 	if genericEntry.CC.clientMode != ClientModeCMA {
 		return errors.New("Update: Generic Entry not in ClientModeCMA")
 	}
+	// Get publishing status before acquiring lock to avoid deadlock with GetPublishingStatus
 	publishingStatus := genericEntry.GetPublishingStatus()
+	genericEntry.RWMutex.Lock()
 	cfEntry := &contentful.Entry{}
 	if err := contentful.DeepCopy(&cfEntry, genericEntry); err != nil {
+		genericEntry.RWMutex.Unlock()
 		return errors.New("Update: Can't marshal JSON from VO")
 	}
+	genericEntry.RWMutex.Unlock()
 	err = genericEntry.CC.Client.Entries.Upsert(ctx, genericEntry.CC.SpaceID, cfEntry)
 	if err != nil {
 		return fmt.Errorf("Update: upsert operation failed: %w", err)
 	}
+	genericEntry.RWMutex.Lock()
 	if err := contentful.DeepCopy(&genericEntry, cfEntry); err != nil {
+		genericEntry.RWMutex.Unlock()
 		return errors.New("Update: Can't marshal JSON back from CF entry")
 	}
 	if publishingStatus == StatusPublished {
 		genericEntry.Sys.Version++
+	}
+	genericEntry.RWMutex.Unlock()
+	if publishingStatus == StatusPublished {
 		err = genericEntry.CC.Client.Entries.Publish(ctx, genericEntry.CC.SpaceID, cfEntry)
 		if err != nil {
 			return fmt.Errorf("Update: publish operation failed: %w", err)

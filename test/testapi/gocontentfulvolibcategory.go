@@ -528,9 +528,15 @@ func (cc *ContentfulClient) cacheAllCategory(ctx context.Context, resultChan cha
 	var allCategory []*CfCategory
 	col := &contentful.Collection[CfCategory]{}
 	cc.cacheMutex.sharedDataGcLock.RLock()
-	defer cc.cacheMutex.sharedDataGcLock.RUnlock()
-	if cc.offline {
-		for _, entry := range cc.offlineSpace.Entries {
+	locales := cc.locales
+	_ = locales
+	offline := cc.offline
+	cacheInit := cc.cacheInit
+	optimisticPageSize := cc.optimisticPageSize
+	offlineSpace := cc.offlineSpace
+	cc.cacheMutex.sharedDataGcLock.RUnlock()
+	if offline {
+		for _, entry := range offlineSpace.Entries {
 			if entry.Sys.ContentType.Sys.ID == ContentTypeCategory {
 				var vo CfCategory
 				if err := contentful.DeepCopy(&vo, entry); err != nil {
@@ -540,7 +546,7 @@ func (cc *ContentfulClient) cacheAllCategory(ctx context.Context, resultChan cha
 			}
 		}
 	} else {
-		col, err = cc.optimisticPageSizeGetAllCategory(ctx, "category", cc.optimisticPageSize)
+		col, err = cc.optimisticPageSizeGetAllCategory(ctx, "category", optimisticPageSize)
 		if err != nil {
 			return nil, errors.New("optimisticPageSizeGetAll for Category failed: " + err.Error())
 		}
@@ -551,7 +557,7 @@ func (cc *ContentfulClient) cacheAllCategory(ctx context.Context, resultChan cha
 	}
 	categoryMap := map[string]*CfCategory{}
 	for _, category := range allCategory {
-		if cc.cacheInit {
+		if cacheInit {
 			existingCategory, err := cc.GetCategoryByID(ctx, category.Sys.ID)
 			if err == nil && existingCategory != nil && existingCategory.Sys.PublishedVersion > category.Sys.PublishedVersion {
 				return nil, fmt.Errorf("cache update canceled because Category entry %s is newer in cache", category.Sys.ID)

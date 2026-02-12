@@ -764,9 +764,15 @@ func (cc *ContentfulClient) cacheAllBrand(ctx context.Context, resultChan chan<-
 	var allBrand []*CfBrand
 	col := &contentful.Collection[CfBrand]{}
 	cc.cacheMutex.sharedDataGcLock.RLock()
-	defer cc.cacheMutex.sharedDataGcLock.RUnlock()
-	if cc.offline {
-		for _, entry := range cc.offlineSpace.Entries {
+	locales := cc.locales
+	_ = locales
+	offline := cc.offline
+	cacheInit := cc.cacheInit
+	optimisticPageSize := cc.optimisticPageSize
+	offlineSpace := cc.offlineSpace
+	cc.cacheMutex.sharedDataGcLock.RUnlock()
+	if offline {
+		for _, entry := range offlineSpace.Entries {
 			if entry.Sys.ContentType.Sys.ID == ContentTypeBrand {
 				var vo CfBrand
 				if err := contentful.DeepCopy(&vo, entry); err != nil {
@@ -776,7 +782,7 @@ func (cc *ContentfulClient) cacheAllBrand(ctx context.Context, resultChan chan<-
 			}
 		}
 	} else {
-		col, err = cc.optimisticPageSizeGetAllBrand(ctx, "brand", cc.optimisticPageSize)
+		col, err = cc.optimisticPageSizeGetAllBrand(ctx, "brand", optimisticPageSize)
 		if err != nil {
 			return nil, errors.New("optimisticPageSizeGetAll for Brand failed: " + err.Error())
 		}
@@ -787,7 +793,7 @@ func (cc *ContentfulClient) cacheAllBrand(ctx context.Context, resultChan chan<-
 	}
 	brandMap := map[string]*CfBrand{}
 	for _, brand := range allBrand {
-		if cc.cacheInit {
+		if cacheInit {
 			existingBrand, err := cc.GetBrandByID(ctx, brand.Sys.ID)
 			if err == nil && existingBrand != nil && existingBrand.Sys.PublishedVersion > brand.Sys.PublishedVersion {
 				return nil, fmt.Errorf("cache update canceled because Brand entry %s is newer in cache", brand.Sys.ID)
