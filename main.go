@@ -67,6 +67,7 @@ func main() {
 	flagEnvironment := flag.String("environment", "", "[Optional] Contentful space environment")
 	flagGenerateFromExport := flag.String("exportfile", "", "Space export file to generate the API from")
 	flagContentTypes := flag.String("contenttypes", "", "[Optional] Content type IDs to parse, comma separated")
+	flagRegion := flag.String("region", "", "[Optional] Contentful infrastructure region (e.g. eu)")
 	flagVersion := flag.Bool("version", false, "Print version and exit")
 	flagHelp := flag.Bool("help", false, "Print version and exit")
 	flag.Parse()
@@ -95,6 +96,7 @@ func main() {
 			SpaceID:     *flagSpaceID,
 			Environment: *flagEnvironment,
 			ExportFile:  *flagGenerateFromExport,
+			Region:      *flagRegion,
 		}
 		if *flagContentTypes != "" {
 			conf.ContentTypes = strings.Split(*flagContentTypes, ",")
@@ -140,7 +142,7 @@ func main() {
 		}
 	}
 
-	err = erm.GenerateAPI(context.Background(), filepath.Dir(path), packageName, conf.SpaceID, cmaKey, conf.Environment, conf.ExportFile, cleanContentTypes, VERSION)
+	err = erm.GenerateAPI(context.Background(), filepath.Dir(path), packageName, conf.SpaceID, cmaKey, conf.Environment, conf.ExportFile, cleanContentTypes, VERSION, conf.Region)
 	if err != nil {
 		fatal("Something went horribly wrong...", err)
 	}

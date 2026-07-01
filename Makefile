@@ -55,6 +55,11 @@ lint.fix:
 testapi:
 	@go run ./main.go -exportfile ./test/test-space-export.json ./test/testapi
 
+.PHONY: testapi-region
+## run api tests with EU region
+testapi-region:
+	@go run ./main.go -exportfile ./test/test-space-export.json -region eu ./test/testapi
+
 .PHONY: test
 ## Run tests
 test: testapi

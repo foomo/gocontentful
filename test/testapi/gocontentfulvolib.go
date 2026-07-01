@@ -1898,16 +1898,18 @@ func (cc *ContentfulClient) entryMapForContentTypeIsNil(contentType string) bool
 }
 
 func getContentfulAPIClient(clientMode ClientMode, clientKey string) (*contentful.Contentful, error) {
+	var c *contentful.Contentful
 	switch clientMode {
 	case ClientModeCDA:
-		return contentful.NewCDA(clientKey), nil
+		c = contentful.NewCDA(clientKey)
 	case ClientModeCPA:
-		return contentful.NewCPA(clientKey), nil
+		c = contentful.NewCPA(clientKey)
 	case ClientModeCMA:
-		return contentful.NewCMA(clientKey), nil
+		c = contentful.NewCMA(clientKey)
 	default:
 		return nil, errors.New("NewContentfulClient: Unknown ClientMode")
 	}
+	return c, nil
 }
 
 func (cc *ContentfulClient) GetSpaceID() string {
