@@ -19,9 +19,8 @@ func TestLoadConfigFromYAML(t *testing.T) {
 		assert.Equal(t, "eu", cfg.Region)
 	})
 	t.Run("region defaults to empty string when absent", func(t *testing.T) {
-		f, err := os.CreateTemp("", "gocontentful-test-*.yaml")
+		f, err := os.CreateTemp(t.TempDir(), "gocontentful-test-*.yaml")
 		require.NoError(t, err)
-		defer os.Remove(f.Name())
 		_, err = f.WriteString("spaceId: abc123\n")
 		require.NoError(t, err)
 		require.NoError(t, f.Close())
