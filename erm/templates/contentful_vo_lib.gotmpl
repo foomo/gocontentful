@@ -751,7 +751,7 @@ func NewOfflineContentfulClient(file []byte, logFn func(fields map[string]interf
 	}
 	cc := &ContentfulClient{
 		clientMode:  ClientModeCDA,
-		Client:      contentful.NewCDA(""),
+		Client:      contentful.NewCDA(""){{ if .Region }}.SetRegion("{{ .Region }}"){{ end }},
 		Cache: &ContentfulCache{
             contentTypes:     []string{},
             idContentTypeMap: map[string]string{},
@@ -1864,16 +1864,19 @@ func (cc *ContentfulClient) entryMapForContentTypeIsNil(contentType string) bool
 }
 
 func getContentfulAPIClient(clientMode ClientMode, clientKey string) (*contentful.Contentful, error) {
+	var c *contentful.Contentful
 	switch clientMode {
 	case ClientModeCDA:
-		return contentful.NewCDA(clientKey), nil
+		c = contentful.NewCDA(clientKey)
 	case ClientModeCPA:
-		return contentful.NewCPA(clientKey), nil
+		c = contentful.NewCPA(clientKey)
 	case ClientModeCMA:
-		return contentful.NewCMA(clientKey), nil
+		c = contentful.NewCMA(clientKey)
 	default:
 		return nil, errors.New("NewContentfulClient: Unknown ClientMode")
 	}
+	{{ if .Region }}c.SetRegion("{{ .Region }}")
+	{{ end }}return c, nil
 }
 
 func (cc *ContentfulClient) GetSpaceID() string {

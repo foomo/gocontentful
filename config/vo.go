@@ -7,4 +7,5 @@ type Config struct {
 	ContentTypes      []string `json:"contentTypes,omitempty" yaml:"contentTypes,omitempty"`
 	PathTargetPackage string   `json:"pathTargetPackage,omitempty" yaml:"pathTargetPackage,omitempty"`
 	RequireVersion    string   `json:"requireVersion,omitempty" yaml:"requireVersion,omitempty"`
+	Region            string   `json:"region,omitempty" yaml:"region,omitempty"`
 }

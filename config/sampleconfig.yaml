@@ -1,3 +1,4 @@
+region: eu
 spaceId: "abc123"
 environment: "dev"
 exportFile: "foo.json"

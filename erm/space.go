@@ -25,6 +25,7 @@ type spaceConf struct {
 	ContentTypes []ContentType          `yaml:"contentTypes"`
 	ContentType  ContentType            `yaml:"contentType"`
 	Version      string                 `yaml:"version"`
+	Region       string                 `yaml:"region"`
 }
 
 // GetLocales retrieves locale definition from Contentful
@@ -82,7 +83,7 @@ func getContentTypes(ctx context.Context, cma *contentful.Contentful, spaceID st
 	return
 }
 
-func getData(ctx context.Context, spaceID, cmaKey, environment, exportFile string, flagContentTypes []string) (
+func getData(ctx context.Context, spaceID, cmaKey, environment, exportFile string, flagContentTypes []string, region string) (
 	finalContentTypes []ContentType, locales []Locale, err error,
 ) {
 	var contentTypes []ContentType
@@ -100,7 +101,7 @@ func getData(ctx context.Context, spaceID, cmaKey, environment, exportFile strin
 		locales = export.Locales
 	} else {
 		// Get client
-		CMA := contentful.NewCMA(cmaKey)
+		CMA := contentful.NewCMA(cmaKey).SetRegion(contentful.Region(region))
 		CMA.Debug = false
 		if environment != "" {
 			CMA.Environment = environment
@@ -141,8 +142,11 @@ func getData(ctx context.Context, spaceID, cmaKey, environment, exportFile strin
 }
 
 // GenerateAPI calls the generators
-func GenerateAPI(ctx context.Context, dir, packageName, spaceID, cmaKey, environment, exportFile string, flagContentTypes []string, version string) error {
-	contentTypes, locales, errGetData := getData(ctx, spaceID, cmaKey, environment, exportFile, flagContentTypes)
+func GenerateAPI(ctx context.Context, dir, packageName, spaceID, cmaKey, environment, exportFile string, flagContentTypes []string, version string, region string) error {
+	if _, err := contentful.ParseRegion(region); err != nil {
+		return err
+	}
+	contentTypes, locales, errGetData := getData(ctx, spaceID, cmaKey, environment, exportFile, flagContentTypes, region)
 	if errGetData != nil {
 		return errors.Wrap(errGetData, "could not get data")
 	}
@@ -160,6 +164,7 @@ func GenerateAPI(ctx context.Context, dir, packageName, spaceID, cmaKey, environ
 		Locales:      locales,
 		ContentTypes: contentTypes,
 		Version:      version,
+		Region:       region,
 	}
 	return generateCode(conf)
 }
