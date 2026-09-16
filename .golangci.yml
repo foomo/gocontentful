@@ -31,6 +31,7 @@ linters:
     - dogsled # Checks assignments with too many blank identifiers (e.g. x, _, _, _, := f()) [fast: true, auto-fix: false]
     - err113 # Go linter to check the errors handling expressions [fast: false, auto-fix: false]
     - exhaustruct # Checks if all structure fields are initialized [fast: false, auto-fix: false]
+    - exhaustruct_v5 # Checks if all structure fields are initialized [fast: false, auto-fix: false]
     - funlen # Tool for detection of long functions [fast: true, auto-fix: false]
     - ginkgolinter # enforces standards of using ginkgo and gomega [fast: false, auto-fix: false]
     - gochecknoglobals # Check that no global variables exist. [fast: false, auto-fix: false]
@@ -71,6 +72,8 @@ linters:
     gosec:
       severity: medium
       confidence: medium
+      excludes:
+        - G703 # Codegen CLI: output paths are operator-supplied by design
     # https://golangci-lint.run/docs/linters/configuration/#revive
     revive:
       rules:
