@@ -757,7 +757,7 @@ func (cc *ContentfulClient) optimisticPageSizeGetAllBrand(ctx context.Context, c
 	return col, nil
 }
 
-func (cc *ContentfulClient) cacheAllBrand(ctx context.Context, resultChan chan<- ContentTypeResult) (vos map[string]*CfBrand, err error) {
+func (cc *ContentfulClient) cacheAllBrand(ctx context.Context, rebuild *cacheRebuild, resultChan chan<- ContentTypeResult) (vos map[string]*CfBrand, err error) {
 	if cc == nil || cc.Client == nil {
 		return nil, errors.New("cacheAllBrand: No CDA/CPA client available")
 	}
@@ -784,35 +784,35 @@ func (cc *ContentfulClient) cacheAllBrand(ctx context.Context, resultChan chan<-
 	} else {
 		col, err = cc.optimisticPageSizeGetAllBrand(ctx, "brand", optimisticPageSize)
 		if err != nil {
-			return nil, errors.New("optimisticPageSizeGetAll for Brand failed: " + err.Error())
+			return nil, fmt.Errorf("optimisticPageSizeGetAll for Brand failed: %w", err)
 		}
 	}
 	allBrand, err = colToCfBrand(col, cc)
 	if err != nil {
-		return nil, errors.New("colToCfBrand failed: " + err.Error())
+		return nil, fmt.Errorf("colToCfBrand failed: %w", err)
 	}
 	brandMap := map[string]*CfBrand{}
 	for _, brand := range allBrand {
 		if cacheInit {
 			existingBrand, err := cc.GetBrandByID(ctx, brand.Sys.ID)
 			if err == nil && existingBrand != nil && existingBrand.Sys.PublishedVersion > brand.Sys.PublishedVersion {
-				return nil, fmt.Errorf("cache update canceled because Brand entry %s is newer in cache", brand.Sys.ID)
+				// Contentful returned an older version: keep a snapshot of the cached entry, so that
+				// its generic entry and references below are built from the retained copy.
+				if rebuild.olderVersion(ContentTypeBrand, existingBrand.Sys, brand.Sys) {
+					snapshot, err := existingBrand.cacheSnapshot()
+					if err != nil {
+						return nil, fmt.Errorf("could not retain Brand entry %s: %w", brand.Sys.ID, err)
+					}
+					brand = snapshot
+				}
 			}
 		}
 		brandMap[brand.Sys.ID] = brand
 		result := ContentTypeResult{
 			EntryID:     brand.Sys.ID,
 			ContentType: ContentTypeBrand,
-			References:  map[string][]EntryReference{},
+			References:  brand.cacheReferences(locales),
 		}
-		addEntry := func(id string, refs EntryReference) {
-			if result.References[id] == nil {
-				result.References[id] = []EntryReference{}
-			}
-			result.References[id] = append(result.References[id], refs)
-		}
-		_ = addEntry
-
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
@@ -907,6 +907,45 @@ func (cc *ContentfulClient) cacheBrandByID(ctx context.Context, id string, entry
 		cc.Cache.parentMap[childID] = newParents
 	}
 	return nil
+}
+
+// cacheReferences returns the references from the entry to the entries it links to, indexed by
+// the linked entry ID, for the cache parent map.
+func (vo *CfBrand) cacheReferences(locales []Locale) map[string][]EntryReference {
+	references := map[string][]EntryReference{}
+	addEntry := func(id string, refs EntryReference) {
+		references[id] = append(references[id], refs)
+	}
+	_ = addEntry
+	return references
+}
+
+// cacheSnapshot returns a deep copy of the entry taken under its field locks, so that a rebuild
+// can keep a cached entry without sharing its maps with the live cache.
+func (vo *CfBrand) cacheSnapshot() (*CfBrand, error) {
+	vo.Fields.RWLockCompanyName.RLock()
+	defer vo.Fields.RWLockCompanyName.RUnlock()
+	vo.Fields.RWLockLogo.RLock()
+	defer vo.Fields.RWLockLogo.RUnlock()
+	vo.Fields.RWLockCompanyDescription.RLock()
+	defer vo.Fields.RWLockCompanyDescription.RUnlock()
+	vo.Fields.RWLockWebsite.RLock()
+	defer vo.Fields.RWLockWebsite.RUnlock()
+	vo.Fields.RWLockTwitter.RLock()
+	defer vo.Fields.RWLockTwitter.RUnlock()
+	vo.Fields.RWLockEmail.RLock()
+	defer vo.Fields.RWLockEmail.RUnlock()
+	vo.Fields.RWLockPhone.RLock()
+	defer vo.Fields.RWLockPhone.RUnlock()
+	snapshot := &CfBrand{}
+	if err := contentful.DeepCopy(snapshot, vo); err != nil {
+		return nil, err
+	}
+	snapshot.CC = vo.CC
+	if err := MapStructure(&snapshot.Fields, &snapshot.RawFields); err != nil {
+		return nil, err
+	}
+	return snapshot, nil
 }
 
 func colToCfBrand(col *contentful.Collection[CfBrand], cc *ContentfulClient) (vos []*CfBrand, err error) {
