@@ -49,13 +49,45 @@ When a webhook call gets in, you have the choice of updating your cache in diffe
   it's a lot faster and that works well for preview features.
 - You can use the Sync API, but only limited to `ClientModeCDA`, as explained in the following paragraph.
 
-In any case, if an update fails the previous cache is preserved to prevent service disruption.
+In any case, if an update fails UpdateCache returns the error and the previous cache is preserved to prevent service disruption.
 In the unfortunate case a service or application needs to start and Contentful is not available, Gocontentful can work
 in an offline mode if you call _SetOfflineFallback_ on the client after you create it passing the path to a space export file.
 
 The gocontentful API can work entirely offline too. In this case a cache is created from a space export file and most of the
 features are available (pretty obviously, those that don't require live access to the space, like custom queries). If you update
 the export file periodically you can even update the cache from the updated file.
+
+## Entries with older versions and cache resets
+
+Before a full rebuild replaces the cache, every entry Contentful returns is compared with the cached copy.
+If Contentful returns an older published version (`sys.publishedVersion`) than the one in cache, the cached copy is kept,
+together with its references, and the rest of the cache is refreshed. Entries and assets the kept copy links to (through
+reference fields, asset fields or rich text) are kept from the previous cache as well when the fresh data lacks them, so
+that its references keep resolving; they are listed in `result.RetainedDependencies`. This protects the cache from stale responses
+served by the Contentful API. The update still succeeds: call _UpdateCacheWithResult_ to know which entries were retained:
+
+```go
+result, err := cc.UpdateCacheWithResult(ctx, contentTypes, true)
+if err != nil {
+	// the update failed and the previous cache is unchanged
+}
+if result.Degraded() {
+	// result.Retained lists the entries kept from the previous cache
+}
+```
+
+Each retained entry is also logged as a warning with its cached and incoming versions, followed by a summary,
+and _ClientStats_ reports how many entries are currently retained.
+
+Entries stay retained until Contentful serves a version at least as new as the cached one. That never happens when the
+older versions are legitimate, for instance after an environment was re-created from another one. In that case call
+_ForceUpdateCache_: it rebuilds the cache and replaces it without comparing versions, listing the overwritten entries in
+`result.Replaced`. The rebuild still has to succeed, and a snapshot that is empty or holds less than a tenth of the cached
+entries is refused, leaving the cache as it was. _ForceUpdateCache_ is not available in sync mode.
+
+Rebuilds are serialized with entity updates; an update waiting for another one gives up when its context ends or the rebuild times out. A request arriving while a rebuild is queued joins it and gets its result,
+and a _ForceUpdateCache_ request turns the queued rebuild into a reset. The content types and asset caching requested by the
+first _UpdateCache_ call apply to all later rebuilds.
 
 ## Sync API support
 
@@ -82,6 +114,10 @@ Cache update operations time out by default after 120 seconds. This makes sure t
 routine is left hanging, blocking subsequent updates in case the main application or service
 recovers from a panic. If you need to increase this limit because you have a huge space with
 a lot of entries you can use the _SetCacheUpdateTimeout_ method. See the [API Reference](./04-api-reference) for details.
+A rebuild that times out returns an error, and a caller never waits longer than the timeout for a rebuild, even when
+the Contentful API asks to retry later: it gets a timeout error while the rebuild goes on in the background. A caller
+whose context is canceled stops waiting and gets the context error, while the rebuild goes on for any other caller
+waiting on it.
 
 ## Asset caching
 

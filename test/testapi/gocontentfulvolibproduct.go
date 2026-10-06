@@ -1359,7 +1359,7 @@ func (cc *ContentfulClient) optimisticPageSizeGetAllProduct(ctx context.Context,
 	return col, nil
 }
 
-func (cc *ContentfulClient) cacheAllProduct(ctx context.Context, resultChan chan<- ContentTypeResult) (vos map[string]*CfProduct, err error) {
+func (cc *ContentfulClient) cacheAllProduct(ctx context.Context, rebuild *cacheRebuild, resultChan chan<- ContentTypeResult) (vos map[string]*CfProduct, err error) {
 	if cc == nil || cc.Client == nil {
 		return nil, errors.New("cacheAllProduct: No CDA/CPA client available")
 	}
@@ -1386,73 +1386,35 @@ func (cc *ContentfulClient) cacheAllProduct(ctx context.Context, resultChan chan
 	} else {
 		col, err = cc.optimisticPageSizeGetAllProduct(ctx, "product", optimisticPageSize)
 		if err != nil {
-			return nil, errors.New("optimisticPageSizeGetAll for Product failed: " + err.Error())
+			return nil, fmt.Errorf("optimisticPageSizeGetAll for Product failed: %w", err)
 		}
 	}
 	allProduct, err = colToCfProduct(col, cc)
 	if err != nil {
-		return nil, errors.New("colToCfProduct failed: " + err.Error())
+		return nil, fmt.Errorf("colToCfProduct failed: %w", err)
 	}
 	productMap := map[string]*CfProduct{}
 	for _, product := range allProduct {
 		if cacheInit {
 			existingProduct, err := cc.GetProductByID(ctx, product.Sys.ID)
 			if err == nil && existingProduct != nil && existingProduct.Sys.PublishedVersion > product.Sys.PublishedVersion {
-				return nil, fmt.Errorf("cache update canceled because Product entry %s is newer in cache", product.Sys.ID)
+				// Contentful returned an older version: keep a snapshot of the cached entry, so that
+				// its generic entry and references below are built from the retained copy.
+				if rebuild.olderVersion(ContentTypeProduct, existingProduct.Sys, product.Sys) {
+					snapshot, err := existingProduct.cacheSnapshot()
+					if err != nil {
+						return nil, fmt.Errorf("could not retain Product entry %s: %w", product.Sys.ID, err)
+					}
+					product = snapshot
+				}
 			}
 		}
 		productMap[product.Sys.ID] = product
 		result := ContentTypeResult{
 			EntryID:     product.Sys.ID,
 			ContentType: ContentTypeProduct,
-			References:  map[string][]EntryReference{},
+			References:  product.cacheReferences(locales),
 		}
-		addEntry := func(id string, refs EntryReference) {
-			if result.References[id] == nil {
-				result.References[id] = []EntryReference{}
-			}
-			result.References[id] = append(result.References[id], refs)
-		}
-		_ = addEntry
-
-		for _, loc := range locales {
-			children, okChildren := product.Fields.Categories[string(loc)]
-			if okChildren {
-				for _, child := range children {
-					addEntry(child.Sys.ID, EntryReference{ContentType: product.Sys.ContentType.Sys.ID,
-						ID:        product.Sys.ID,
-						VO:        product,
-						CC:        cc,
-						FromField: "categories",
-					})
-				}
-			}
-		}
-
-		for _, loc := range locales {
-			child, okChild := product.Fields.Brand[string(loc)]
-			if okChild {
-				addEntry(child.Sys.ID, EntryReference{ContentType: product.Sys.ContentType.Sys.ID,
-					ID:        product.Sys.ID,
-					VO:        product,
-					CC:        cc,
-					FromField: "brand",
-				})
-			}
-		}
-
-		for _, loc := range locales {
-			child, okChild := product.Fields.SubProduct[string(loc)]
-			if okChild {
-				addEntry(child.Sys.ID, EntryReference{ContentType: product.Sys.ContentType.Sys.ID,
-					ID:        product.Sys.ID,
-					VO:        product,
-					CC:        cc,
-					FromField: "subProduct",
-				})
-			}
-		}
-
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
@@ -1606,6 +1568,96 @@ func (cc *ContentfulClient) cacheProductByID(ctx context.Context, id string, ent
 		cc.Cache.parentMap[childID] = newParents
 	}
 	return nil
+}
+
+// cacheReferences returns the references from the entry to the entries it links to, indexed by
+// the linked entry ID, for the cache parent map.
+func (vo *CfProduct) cacheReferences(locales []Locale) map[string][]EntryReference {
+	references := map[string][]EntryReference{}
+	addEntry := func(id string, refs EntryReference) {
+		references[id] = append(references[id], refs)
+	}
+	_ = addEntry
+	for _, loc := range locales {
+		children, okChildren := vo.Fields.Categories[string(loc)]
+		if okChildren {
+			for _, child := range children {
+				addEntry(child.Sys.ID, EntryReference{ContentType: vo.Sys.ContentType.Sys.ID,
+					ID:        vo.Sys.ID,
+					VO:        vo,
+					CC:        vo.CC,
+					FromField: "categories",
+				})
+			}
+		}
+	}
+	for _, loc := range locales {
+		child, okChild := vo.Fields.Brand[string(loc)]
+		if okChild {
+			addEntry(child.Sys.ID, EntryReference{ContentType: vo.Sys.ContentType.Sys.ID,
+				ID:        vo.Sys.ID,
+				VO:        vo,
+				CC:        vo.CC,
+				FromField: "brand",
+			})
+		}
+	}
+	for _, loc := range locales {
+		child, okChild := vo.Fields.SubProduct[string(loc)]
+		if okChild {
+			addEntry(child.Sys.ID, EntryReference{ContentType: vo.Sys.ContentType.Sys.ID,
+				ID:        vo.Sys.ID,
+				VO:        vo,
+				CC:        vo.CC,
+				FromField: "subProduct",
+			})
+		}
+	}
+	return references
+}
+
+// cacheSnapshot returns a deep copy of the entry taken under its field locks, so that a rebuild
+// can keep a cached entry without sharing its maps with the live cache.
+func (vo *CfProduct) cacheSnapshot() (*CfProduct, error) {
+	vo.Fields.RWLockProductName.RLock()
+	defer vo.Fields.RWLockProductName.RUnlock()
+	vo.Fields.RWLockSlug.RLock()
+	defer vo.Fields.RWLockSlug.RUnlock()
+	vo.Fields.RWLockProductDescription.RLock()
+	defer vo.Fields.RWLockProductDescription.RUnlock()
+	vo.Fields.RWLockSizetypecolor.RLock()
+	defer vo.Fields.RWLockSizetypecolor.RUnlock()
+	vo.Fields.RWLockImage.RLock()
+	defer vo.Fields.RWLockImage.RUnlock()
+	vo.Fields.RWLockTags.RLock()
+	defer vo.Fields.RWLockTags.RUnlock()
+	vo.Fields.RWLockCategories.RLock()
+	defer vo.Fields.RWLockCategories.RUnlock()
+	vo.Fields.RWLockPrice.RLock()
+	defer vo.Fields.RWLockPrice.RUnlock()
+	vo.Fields.RWLockBrand.RLock()
+	defer vo.Fields.RWLockBrand.RUnlock()
+	vo.Fields.RWLockSubProduct.RLock()
+	defer vo.Fields.RWLockSubProduct.RUnlock()
+	vo.Fields.RWLockQuantity.RLock()
+	defer vo.Fields.RWLockQuantity.RUnlock()
+	vo.Fields.RWLockSku.RLock()
+	defer vo.Fields.RWLockSku.RUnlock()
+	vo.Fields.RWLockWebsite.RLock()
+	defer vo.Fields.RWLockWebsite.RUnlock()
+	vo.Fields.RWLockSeoText.RLock()
+	defer vo.Fields.RWLockSeoText.RUnlock()
+	vo.Fields.RWLockNodes.RLock()
+	defer vo.Fields.RWLockNodes.RUnlock()
+	snapshot := &CfProduct{}
+	if err := contentful.DeepCopy(snapshot, vo); err != nil {
+		return nil, err
+	}
+	snapshot.CC = vo.CC
+	if err := MapStructure(&snapshot.Fields, &snapshot.RawFields); err != nil {
+		return nil, err
+	}
+	return snapshot, nil
 }
 
 func colToCfProduct(col *contentful.Collection[CfProduct], cc *ContentfulClient) (vos []*CfProduct, err error) {

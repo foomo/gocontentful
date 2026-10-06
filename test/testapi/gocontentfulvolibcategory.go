@@ -521,7 +521,7 @@ func (cc *ContentfulClient) optimisticPageSizeGetAllCategory(ctx context.Context
 	return col, nil
 }
 
-func (cc *ContentfulClient) cacheAllCategory(ctx context.Context, resultChan chan<- ContentTypeResult) (vos map[string]*CfCategory, err error) {
+func (cc *ContentfulClient) cacheAllCategory(ctx context.Context, rebuild *cacheRebuild, resultChan chan<- ContentTypeResult) (vos map[string]*CfCategory, err error) {
 	if cc == nil || cc.Client == nil {
 		return nil, errors.New("cacheAllCategory: No CDA/CPA client available")
 	}
@@ -548,35 +548,35 @@ func (cc *ContentfulClient) cacheAllCategory(ctx context.Context, resultChan cha
 	} else {
 		col, err = cc.optimisticPageSizeGetAllCategory(ctx, "category", optimisticPageSize)
 		if err != nil {
-			return nil, errors.New("optimisticPageSizeGetAll for Category failed: " + err.Error())
+			return nil, fmt.Errorf("optimisticPageSizeGetAll for Category failed: %w", err)
 		}
 	}
 	allCategory, err = colToCfCategory(col, cc)
 	if err != nil {
-		return nil, errors.New("colToCfCategory failed: " + err.Error())
+		return nil, fmt.Errorf("colToCfCategory failed: %w", err)
 	}
 	categoryMap := map[string]*CfCategory{}
 	for _, category := range allCategory {
 		if cacheInit {
 			existingCategory, err := cc.GetCategoryByID(ctx, category.Sys.ID)
 			if err == nil && existingCategory != nil && existingCategory.Sys.PublishedVersion > category.Sys.PublishedVersion {
-				return nil, fmt.Errorf("cache update canceled because Category entry %s is newer in cache", category.Sys.ID)
+				// Contentful returned an older version: keep a snapshot of the cached entry, so that
+				// its generic entry and references below are built from the retained copy.
+				if rebuild.olderVersion(ContentTypeCategory, existingCategory.Sys, category.Sys) {
+					snapshot, err := existingCategory.cacheSnapshot()
+					if err != nil {
+						return nil, fmt.Errorf("could not retain Category entry %s: %w", category.Sys.ID, err)
+					}
+					category = snapshot
+				}
 			}
 		}
 		categoryMap[category.Sys.ID] = category
 		result := ContentTypeResult{
 			EntryID:     category.Sys.ID,
 			ContentType: ContentTypeCategory,
-			References:  map[string][]EntryReference{},
+			References:  category.cacheReferences(locales),
 		}
-		addEntry := func(id string, refs EntryReference) {
-			if result.References[id] == nil {
-				result.References[id] = []EntryReference{}
-			}
-			result.References[id] = append(result.References[id], refs)
-		}
-		_ = addEntry
-
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
@@ -671,6 +671,37 @@ func (cc *ContentfulClient) cacheCategoryByID(ctx context.Context, id string, en
 		cc.Cache.parentMap[childID] = newParents
 	}
 	return nil
+}
+
+// cacheReferences returns the references from the entry to the entries it links to, indexed by
+// the linked entry ID, for the cache parent map.
+func (vo *CfCategory) cacheReferences(locales []Locale) map[string][]EntryReference {
+	references := map[string][]EntryReference{}
+	addEntry := func(id string, refs EntryReference) {
+		references[id] = append(references[id], refs)
+	}
+	_ = addEntry
+	return references
+}
+
+// cacheSnapshot returns a deep copy of the entry taken under its field locks, so that a rebuild
+// can keep a cached entry without sharing its maps with the live cache.
+func (vo *CfCategory) cacheSnapshot() (*CfCategory, error) {
+	vo.Fields.RWLockTitle.RLock()
+	defer vo.Fields.RWLockTitle.RUnlock()
+	vo.Fields.RWLockIcon.RLock()
+	defer vo.Fields.RWLockIcon.RUnlock()
+	vo.Fields.RWLockCategoryDescription.RLock()
+	defer vo.Fields.RWLockCategoryDescription.RUnlock()
+	snapshot := &CfCategory{}
+	if err := contentful.DeepCopy(snapshot, vo); err != nil {
+		return nil, err
+	}
+	snapshot.CC = vo.CC
+	if err := MapStructure(&snapshot.Fields, &snapshot.RawFields); err != nil {
+		return nil, err
+	}
+	return snapshot, nil
 }
 
 func colToCfCategory(col *contentful.Collection[CfCategory], cc *ContentfulClient) (vos []*CfCategory, err error) {

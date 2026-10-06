@@ -669,7 +669,7 @@ func (cc *ContentfulClient) optimisticPageSizeGetAll{{ firstCap $contentType.Sys
 	return col, nil
 }
 
-func (cc *ContentfulClient) cacheAll{{ firstCap $contentType.Sys.ID }}(ctx context.Context, resultChan chan<- ContentTypeResult) (vos map[string]*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
+func (cc *ContentfulClient) cacheAll{{ firstCap $contentType.Sys.ID }}(ctx context.Context, rebuild *cacheRebuild, resultChan chan<- ContentTypeResult) (vos map[string]*Cf{{ firstCap $contentType.Sys.ID }}, err error) {
 	if cc == nil || cc.Client == nil {
 		return nil, errors.New("cacheAll{{ firstCap $contentType.Sys.ID }}: No CDA/CPA client available")
 	}
@@ -696,64 +696,35 @@ func (cc *ContentfulClient) cacheAll{{ firstCap $contentType.Sys.ID }}(ctx conte
 	} else {
 		col, err = cc.optimisticPageSizeGetAll{{ firstCap $contentType.Sys.ID }}(ctx, "{{ $contentType.Sys.ID }}", optimisticPageSize)
 		if err != nil {
-			return nil, errors.New("optimisticPageSizeGetAll for {{ firstCap $contentType.Sys.ID }} failed: "+err.Error())
+			return nil, fmt.Errorf("optimisticPageSizeGetAll for {{ firstCap $contentType.Sys.ID }} failed: %w", err)
 		}
 	}
 	all{{ firstCap $contentType.Sys.ID }}, err = colToCf{{ firstCap $contentType.Sys.ID }}(col,cc)
 	if err != nil {
-		return nil, errors.New("colToCf{{ firstCap $contentType.Sys.ID }} failed: "+err.Error())
+		return nil, fmt.Errorf("colToCf{{ firstCap $contentType.Sys.ID }} failed: %w", err)
 	}
 	{{ $contentType.Sys.ID }}Map := map[string]*Cf{{ firstCap $contentType.Sys.ID }}{}
 	for _, {{ $contentType.Sys.ID }} := range all{{ firstCap $contentType.Sys.ID }} {
 		if cacheInit {
             existing{{ firstCap $contentType.Sys.ID }}, err := cc.Get{{ firstCap $contentType.Sys.ID }}ByID(ctx, {{ $contentType.Sys.ID }}.Sys.ID)
             if err == nil && existing{{ firstCap $contentType.Sys.ID }} != nil && existing{{ firstCap $contentType.Sys.ID }}.Sys.PublishedVersion > {{ $contentType.Sys.ID }}.Sys.PublishedVersion {
-                return nil, fmt.Errorf("cache update canceled because {{ firstCap $contentType.Sys.ID }} entry %s is newer in cache", {{ $contentType.Sys.ID }}.Sys.ID)
+                // Contentful returned an older version: keep a snapshot of the cached entry, so that
+                // its generic entry and references below are built from the retained copy.
+                if rebuild.olderVersion(ContentType{{ firstCap $contentType.Sys.ID }}, existing{{ firstCap $contentType.Sys.ID }}.Sys, {{ $contentType.Sys.ID }}.Sys) {
+                    snapshot, err := existing{{ firstCap $contentType.Sys.ID }}.cacheSnapshot()
+                    if err != nil {
+                        return nil, fmt.Errorf("could not retain {{ firstCap $contentType.Sys.ID }} entry %s: %w", {{ $contentType.Sys.ID }}.Sys.ID, err)
+                    }
+                    {{ $contentType.Sys.ID }} = snapshot
+                }
             }
         }
 		{{ $contentType.Sys.ID }}Map[{{ $contentType.Sys.ID }}.Sys.ID] = {{ $contentType.Sys.ID }}
-	result := ContentTypeResult{
-	EntryID: {{ $contentType.Sys.ID }}.Sys.ID,
-	ContentType: ContentType{{ firstCap $contentType.Sys.ID }},
-	References:  map[string][]EntryReference{},
-	}
-	addEntry := func(id string, refs EntryReference){
-		if result.References[id] == nil {
-			result.References[id] = []EntryReference{}
+		result := ContentTypeResult{
+			EntryID:     {{ $contentType.Sys.ID }}.Sys.ID,
+			ContentType: ContentType{{ firstCap $contentType.Sys.ID }},
+			References:  {{ $contentType.Sys.ID }}.cacheReferences(locales),
 		}
-		result.References[id] = append(result.References[id], refs)
-	}
-	_ = addEntry
-	{{ range $fieldIndex, $field := $contentType.Fields }}
-	{{ if fieldIsMultipleReference $field }}
-		for _, loc := range locales {
-		children, okChildren := {{ $contentType.Sys.ID }}.Fields.{{ firstCap $field.ID }}[string(loc)]
-		if okChildren {
-			for _, child := range children {
-				addEntry(child.Sys.ID, EntryReference{ContentType: {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID,
-					ID: {{ $contentType.Sys.ID }}.Sys.ID,
-					VO: {{ $contentType.Sys.ID }},
-					CC: cc,
-					FromField: "{{ $field.ID }}",
-				})
-			}
-		}
-	}
-	{{ end }}
-	{{ if fieldIsReference $field }}
-	for _, loc := range locales {
-		child, okChild := {{ $contentType.Sys.ID }}.Fields.{{ firstCap $field.ID }}[string(loc)]
-		if okChild {
-			addEntry(child.Sys.ID, EntryReference{ContentType: {{ $contentType.Sys.ID }}.Sys.ContentType.Sys.ID,
-				ID: {{ $contentType.Sys.ID }}.Sys.ID,
-				VO: {{ $contentType.Sys.ID }},
-				CC: cc,
-				FromField: "{{ $field.ID }}",
-})
-		}
-	}
-	{{ end }}
-	{{ end }}
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
@@ -891,6 +862,65 @@ func (cc *ContentfulClient) cache{{ firstCap $contentType.Sys.ID }}ByID(ctx cont
 		cc.Cache.parentMap[childID] = newParents
 	}
 	return nil
+}
+
+// cacheReferences returns the references from the entry to the entries it links to, indexed by
+// the linked entry ID, for the cache parent map.
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) cacheReferences(locales []Locale) map[string][]EntryReference {
+	references := map[string][]EntryReference{}
+	addEntry := func(id string, refs EntryReference) {
+		references[id] = append(references[id], refs)
+	}
+	_ = addEntry
+	{{- range $fieldIndex, $field := $contentType.Fields }}
+	{{- if fieldIsMultipleReference $field }}
+	for _, loc := range locales {
+		children, okChildren := vo.Fields.{{ firstCap $field.ID }}[string(loc)]
+		if okChildren {
+			for _, child := range children {
+				addEntry(child.Sys.ID, EntryReference{ContentType: vo.Sys.ContentType.Sys.ID,
+					ID:        vo.Sys.ID,
+					VO:        vo,
+					CC:        vo.CC,
+					FromField: "{{ $field.ID }}",
+				})
+			}
+		}
+	}
+	{{- end }}
+	{{- if fieldIsReference $field }}
+	for _, loc := range locales {
+		child, okChild := vo.Fields.{{ firstCap $field.ID }}[string(loc)]
+		if okChild {
+			addEntry(child.Sys.ID, EntryReference{ContentType: vo.Sys.ContentType.Sys.ID,
+				ID:        vo.Sys.ID,
+				VO:        vo,
+				CC:        vo.CC,
+				FromField: "{{ $field.ID }}",
+			})
+		}
+	}
+	{{- end }}
+	{{- end }}
+	return references
+}
+
+// cacheSnapshot returns a deep copy of the entry taken under its field locks, so that a rebuild
+// can keep a cached entry without sharing its maps with the live cache.
+func (vo *Cf{{ firstCap $contentType.Sys.ID }}) cacheSnapshot() (*Cf{{ firstCap $contentType.Sys.ID }}, error) {
+	{{- range $fieldIndex, $field := $contentType.Fields }}
+	vo.Fields.RWLock{{ firstCap $field.ID }}.RLock()
+	defer vo.Fields.RWLock{{ firstCap $field.ID }}.RUnlock()
+	{{- end }}
+	snapshot := &Cf{{ firstCap $contentType.Sys.ID }}{}
+	if err := contentful.DeepCopy(snapshot, vo); err != nil {
+		return nil, err
+	}
+	snapshot.CC = vo.CC
+	if err := MapStructure(&snapshot.Fields, &snapshot.RawFields); err != nil {
+		return nil, err
+	}
+	return snapshot, nil
 }
 
 func colToCf{{ firstCap $contentType.Sys.ID }}(col *contentful.Collection[Cf{{ firstCap $contentType.Sys.ID }}], cc *ContentfulClient) (vos []*Cf{{ firstCap $contentType.Sys.ID }}, err error) {

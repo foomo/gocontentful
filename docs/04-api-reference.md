@@ -71,10 +71,27 @@ Switches on/off the cache sync mode. This method will return an error if called 
 Resets the sync token: the next call to UpdateCache() will rebuild the cache from scratch.
 
 ```go
-(cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []string, cacheAssets bool) error
+(cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []string, cacheAssets bool) (map[string][]string, []string, error)
 ```
 
-Builds or re-builds the entire client cache.
+Builds or re-builds the entire client cache. Returns an error if the rebuild fails, times out or the context is canceled;
+the previous cache is then kept. In sync mode it also returns the IDs of the synced entries and assets.
+
+```go
+(cc *ContentfulClient) UpdateCacheWithResult(ctx context.Context, contentTypes []string, cacheAssets bool) (*CacheUpdateResult, error)
+```
+
+Works like UpdateCache and returns a CacheUpdateResult. Its Retained field lists the entries kept from the previous cache
+because Contentful returned an older published version, RetainedDependencies the cached entries and assets kept because
+those entries link to them, and Degraded() reports whether any entry was retained.
+
+```go
+(cc *ContentfulClient) ForceUpdateCache(ctx context.Context, contentTypes []string, cacheAssets bool) (*CacheUpdateResult, error)
+```
+
+Rebuilds the cache and replaces it without comparing published versions with the previous cache, for example after an
+environment was re-created. The Replaced field of the result lists the entries overwritten with an older version.
+Empty or drastically smaller snapshots are refused. Not available in sync mode.
 
 ```go
 (cc *ContentfulClient) UpdateCacheForEntity(ctx context.Context, sysType string, contentType string, entityID string) error

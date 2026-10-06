@@ -40,6 +40,9 @@ type ContentfulCache struct {
 }
 
 type ContentfulCacheMutex struct {
+	// cacheUpdateGcLock serializes everything that writes to the cache: full rebuilds,
+	// sync runs and entity updates. Acquire it before any other lock.
+	cacheUpdateGcLock      cacheUpdateLock
 	fullCacheGcLock        sync.RWMutex
 	sharedDataGcLock       sync.RWMutex
 	assetsGcLock           sync.RWMutex
@@ -52,6 +55,31 @@ type ContentfulCacheMutex struct {
 	productGcLock          sync.RWMutex
 }
 
+// cacheUpdateLock is a mutex whose acquisition gives up when the context ends, so that a
+// caller waiting for another cache update still honors its cancellation and deadline.
+// The zero value is ready to use.
+type cacheUpdateLock struct {
+	init  sync.Once
+	slots chan struct{}
+}
+
+func (l *cacheUpdateLock) lock(ctx context.Context) error {
+	l.init.Do(func() { l.slots = make(chan struct{}, 1) })
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	select {
+	case l.slots <- struct{}{}:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func (l *cacheUpdateLock) unlock() {
+	<-l.slots
+}
+
 type assetCacheMap map[string]*contentful.Asset
 
 type tagsCacheMap map[string]string
@@ -61,7 +89,9 @@ type ContentfulClient struct {
 	cacheInit          bool
 	cacheMutex         *ContentfulCacheMutex
 	cacheQueue         chan struct{}
-	cacheDone          chan struct{}
+	cachePending       *cacheJob
+	cachePendingMutex  sync.Mutex
+	cacheRetainedSince map[string]time.Time
 	cacheUpdateTimeout int64
 	cacheWorkerOnce    sync.Once
 	clientMode         ClientMode
@@ -90,6 +120,97 @@ type offlineSpace struct {
 	Entries []contentful.Entry `json:"entries"`
 	Assets  []contentful.Asset `json:"assets"`
 	Tags    []contentful.Tag   `json:"tags"`
+}
+
+// CacheUpdateMode tells how a cache update treated the previous cache.
+type CacheUpdateMode string
+
+const (
+	// CacheUpdateModeRefresh is an ordinary full rebuild: entries for which Contentful returns
+	// an older published version than the cached one are retained from the previous cache.
+	CacheUpdateModeRefresh CacheUpdateMode = "refresh"
+	// CacheUpdateModeReset is an explicit reset (ForceUpdateCache): the fresh snapshot replaces
+	// the previous cache without comparing published versions.
+	CacheUpdateModeReset CacheUpdateMode = "reset"
+	// CacheUpdateModeSync is an incremental update through the Sync API.
+	CacheUpdateModeSync CacheUpdateMode = "sync"
+)
+
+// EntryVersionRegression is an entry for which Contentful returned an older published
+// version than the one in cache.
+type EntryVersionRegression struct {
+	ContentType       string
+	EntryID           string
+	CachedVersion     float64
+	IncomingVersion   float64
+	CachedUpdatedAt   string
+	IncomingUpdatedAt string
+	// RetainedSince is when the entry was first retained in consecutive refreshes. It is
+	// zero for entries replaced by a reset.
+	RetainedSince time.Time
+}
+
+// RetainedDependency is a cached entry or asset that a retained entry links to, directly or
+// through other dependencies, and that the fresh snapshot lacks. It is kept so that the
+// references of retained entries still resolve.
+type RetainedDependency struct {
+	SysType     string // Entry or Asset
+	ContentType string // empty for assets
+	ID          string
+	RequiredBy  string // ID of the entry linking to it
+}
+
+// CacheUpdateResult describes a cache update that completed. Retained entries kept their
+// cached copy, together with the RetainedDependencies they link to; Replaced entries were
+// overwritten with an older version by a reset.
+type CacheUpdateResult struct {
+	Mode                 CacheUpdateMode
+	SpaceID              string
+	Environment          string
+	ClientMode           ClientMode
+	Retained             []EntryVersionRegression
+	RetainedDependencies []RetainedDependency
+	Replaced             []EntryVersionRegression
+}
+
+// Degraded reports whether the update kept entries from the previous cache because
+// Contentful returned older versions of them. Only ForceUpdateCache clears that state.
+func (r *CacheUpdateResult) Degraded() bool {
+	return r != nil && len(r.Retained) > 0
+}
+
+// cacheJob is one queued full rebuild. Requests arriving while it is queued join it, and
+// a reset request turns it into a reset.
+type cacheJob struct {
+	force  bool
+	done   chan struct{}
+	result *CacheUpdateResult
+	err    error
+}
+
+// cacheRebuild collects the version regressions found by the content type workers of one
+// full rebuild.
+type cacheRebuild struct {
+	force       bool
+	mutex       sync.Mutex
+	regressions []EntryVersionRegression
+}
+
+// olderVersion records that Contentful returned an older published version than the cached
+// one and reports whether the cached entry must be kept, which is always the case except
+// for a reset.
+func (b *cacheRebuild) olderVersion(contentType string, cached ContentfulSys, incoming ContentfulSys) (keepCached bool) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	b.regressions = append(b.regressions, EntryVersionRegression{
+		ContentType:       contentType,
+		EntryID:           incoming.ID,
+		CachedVersion:     cached.PublishedVersion,
+		IncomingVersion:   incoming.PublishedVersion,
+		CachedUpdatedAt:   cached.UpdatedAt,
+		IncomingUpdatedAt: incoming.UpdatedAt,
+	})
+	return !b.force
 }
 
 type ContentTypeResult struct {
@@ -167,6 +288,10 @@ const (
 
 const cacheUpdateConcurrency = 4
 
+// A reset is refused when the fresh snapshot is empty or holds less than this share of the
+// entries in cache, so that a broken or half-provisioned environment can't wipe the cache.
+const cacheResetMinEntryRatio = 0.1
+
 const (
 	sysTypeEntry        = "Entry"
 	sysTypeAsset        = "Asset"
@@ -193,6 +318,12 @@ var (
 	InfoCacheUpdateCanceled          = "contentful cache update canceled"
 	InfoCacheUpdateDone              = "contentful cache update returning"
 	InfoCacheUpdateSkipped           = "contentful cache update skipped, already one in the queue"
+	InfoCacheUpdateCoalesced         = "contentful cache update joined the one already queued"
+	WarnCacheEntryRetained           = "contentful returned an older published version than the cache, cached entry retained"
+	WarnCacheEntryReplaced           = "contentful returned an older published version than the cache, entry replaced by cache reset"
+	WarnCacheDependencyRetained      = "contentful snapshot lacks an entry or asset that a retained entry links to, cached copy retained"
+	WarnCacheUpdateDegraded          = "contentful cache refreshed with entries retained from the previous cache"
+	WarnCacheResetReplacedEntries    = "contentful cache reset replaced entries that were newer in cache"
 	InfoCacheSyncOp                  = "contentful cache sync op done"
 	InfoOfflineEntitiesLoaded        = "downloaded entries and assets from offline file"
 	InfoPreservingExistingCache      = "could not connect for cache update, preserving the existing cache"
@@ -270,12 +401,13 @@ func (cc *ContentfulClient) ClientStats() {
 	defer cc.cacheMutex.sharedDataGcLock.RUnlock()
 	if cc.logFn != nil {
 		fieldsMap := map[string]interface{}{
-			"space ID":     cc.SpaceID,
-			"environment":  cc.Client.Environment,
-			"clientMode":   cc.clientMode,
-			"contentTypes": strings.Join(cc.Cache.contentTypes, ","),
-			"locales":      cc.locales,
-			"cached":       cc.cacheInit,
+			"space ID":               cc.SpaceID,
+			"environment":            cc.Client.Environment,
+			"clientMode":             cc.clientMode,
+			"contentTypes":           strings.Join(cc.Cache.contentTypes, ","),
+			"locales":                cc.locales,
+			"cached":                 cc.cacheInit,
+			"cache retained entries": len(cc.cacheRetainedSince),
 		}
 		if cc.cacheInit {
 			fieldsMap["cache asset count"] = len(cc.Cache.assets)
@@ -744,7 +876,6 @@ func NewContentfulClient(ctx context.Context, spaceID string, clientMode ClientM
 		},
 		cacheMutex:         &ContentfulCacheMutex{},
 		cacheQueue:         make(chan struct{}, 1),
-		cacheDone:          make(chan struct{}, 1),
 		cacheUpdateTimeout: 120,
 		locales:            []Locale{SpaceLocaleGerman, SpaceLocaleFrench},
 		logFn:              logFn,
@@ -780,7 +911,6 @@ func NewOfflineContentfulClient(file []byte, logFn func(fields map[string]interf
 		},
 		cacheMutex:         &ContentfulCacheMutex{},
 		cacheQueue:         make(chan struct{}, 1),
-		cacheDone:          make(chan struct{}, 1),
 		cacheUpdateTimeout: 120,
 		locales: []Locale{
 			SpaceLocaleGerman,
@@ -1487,26 +1617,57 @@ func (cc *ContentfulClient) ResetSync() {
 	cc.syncToken = ""
 }
 
+// UpdateCache builds or rebuilds the client cache. A full rebuild keeps the cached copy of any
+// entry for which Contentful returns an older published version and still returns nil: use
+// UpdateCacheWithResult to see those entries and ForceUpdateCache to replace them.
+// The content types and asset caching requested by the first call apply to all later rebuilds.
 func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []string, cacheAssets bool) (map[string][]string, []string, error) {
+	syncdEntries, syncdAssets, _, err := cc.updateCache(ctx, contentTypes, cacheAssets, false)
+	return syncdEntries, syncdAssets, err
+}
+
+// UpdateCacheWithResult works like UpdateCache and also returns what the update did,
+// including the entries retained from the previous cache.
+func (cc *ContentfulClient) UpdateCacheWithResult(ctx context.Context, contentTypes []string, cacheAssets bool) (*CacheUpdateResult, error) {
+	_, _, result, err := cc.updateCache(ctx, contentTypes, cacheAssets, false)
+	return result, err
+}
+
+// ForceUpdateCache rebuilds the cache and replaces it without comparing published versions with
+// the previous cache. Use it after an intentional environment replacement, when Contentful
+// legitimately serves older versions. The rebuild must still succeed, and an empty or drastically
+// smaller snapshot is refused, leaving the cache untouched. Not available in sync mode.
+func (cc *ContentfulClient) ForceUpdateCache(ctx context.Context, contentTypes []string, cacheAssets bool) (*CacheUpdateResult, error) {
+	_, _, result, err := cc.updateCache(ctx, contentTypes, cacheAssets, true)
+	return result, err
+}
+
+func (cc *ContentfulClient) updateCache(ctx context.Context, contentTypes []string, cacheAssets bool, force bool) (map[string][]string, []string, *CacheUpdateResult, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, nil, nil, err
+	}
 	cc.cacheMutex.sharedDataGcLock.RLock()
-	ctxAtWork, cancel := context.WithTimeout(ctx, time.Second*time.Duration(cc.cacheUpdateTimeout))
-	defer cancel()
 	localOffline := cc.offline
 	isSync := cc.sync
+	cacheUpdateTimeout := cc.cacheUpdateTimeout
 	cc.cacheMutex.sharedDataGcLock.RUnlock()
 
-	if localOffline {
-		ctxAtWork = ctx
+	if force && isSync {
+		return nil, nil, nil, errors.New("ForceUpdateCache: not supported in sync mode, call ResetSync and UpdateCache instead")
 	}
 	if !localOffline {
-		time.Sleep(time.Second * 2)
+		select {
+		case <-time.After(time.Second * 2):
+		case <-ctx.Done():
+			return nil, nil, nil, ctx.Err()
+		}
 	}
 	if contentTypes == nil {
 		contentTypes = spaceContentTypes
 	} else {
 		for _, contentType := range contentTypes {
 			if !slices.Contains(spaceContentTypes, contentType) {
-				return nil, nil, fmt.Errorf("UpdateCache: Content Type %q not available in this space", contentType)
+				return nil, nil, nil, fmt.Errorf("UpdateCache: Content Type %q not available in this space", contentType)
 			}
 		}
 	}
@@ -1521,41 +1682,82 @@ func (cc *ContentfulClient) UpdateCache(ctx context.Context, contentTypes []stri
 	cc.cacheMutex.tagGcLock.Unlock()
 
 	if isSync {
-		return cc.syncCache(ctxAtWork, contentTypes)
+		ctxAtWork, cancel := context.WithTimeout(ctx, time.Second*time.Duration(cacheUpdateTimeout))
+		defer cancel()
+		syncdEntries, syncdAssets, err := cc.syncCache(ctxAtWork, contentTypes)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		return syncdEntries, syncdAssets, cc.newCacheUpdateResult(CacheUpdateModeSync), nil
 	}
 	cc.cacheWorkerOnce.Do(func() {
-		go cc.cacheWorker(ctx, contentTypes, cacheAssets)
+		go cc.cacheWorker(contentTypes, cacheAssets)
 	})
-	if len(cc.cacheQueue) == 0 {
+	job := cc.enqueueCacheJob(force)
+	// The rebuild has its own deadline, but the SDK sleeps through rate-limit resets without
+	// watching it, so the wait is bounded separately.
+	waitCtx := ctx
+	if !localOffline {
+		var cancel context.CancelFunc
+		waitCtx, cancel = context.WithTimeout(ctx, time.Second*time.Duration(cacheUpdateTimeout))
+		defer cancel()
+	}
+	select {
+	case <-job.done:
+	case <-waitCtx.Done():
+		if cc.logFn != nil && cc.logLevel <= LogInfo {
+			cc.logFn(map[string]interface{}{"task": "UpdateCache"}, LogInfo, InfoCacheUpdateCanceled)
+		}
+		if err := ctx.Err(); err != nil {
+			return nil, nil, nil, err
+		}
+		return nil, nil, nil, fmt.Errorf("UpdateCache: no result within %d seconds, the update goes on in the background: %w", cacheUpdateTimeout, waitCtx.Err())
+	}
+	if cc.logFn != nil && cc.logLevel <= LogInfo {
+		cc.logFn(map[string]interface{}{"task": "UpdateCache"}, LogInfo, InfoCacheUpdateDone)
+	}
+	return nil, nil, job.result, job.err
+}
+
+// enqueueCacheJob returns the queued rebuild, queueing a new one if none is waiting. A reset
+// request upgrades the queued rebuild, so it can't be served by an ordinary refresh.
+func (cc *ContentfulClient) enqueueCacheJob(force bool) *cacheJob {
+	cc.cachePendingMutex.Lock()
+	defer cc.cachePendingMutex.Unlock()
+	job := cc.cachePending
+	if job == nil {
+		job = &cacheJob{done: make(chan struct{})}
+		cc.cachePending = job
+		select {
+		case cc.cacheQueue <- struct{}{}:
+		default: // the worker has a wake-up pending and will pick this job up
+		}
 		if cc.logFn != nil && cc.logLevel <= LogInfo {
 			cc.logFn(map[string]interface{}{"task": "UpdateCache"}, LogInfo, InfoCacheUpdateQueued)
 		}
-		cc.cacheQueue <- struct{}{}
-		select {
-		case <-cc.cacheDone:
-			if cc.logFn != nil && cc.logLevel <= LogInfo {
-				cc.logFn(map[string]interface{}{"task": "UpdateCache"}, LogInfo, InfoCacheUpdateDone)
-			}
-		case <-ctxAtWork.Done():
-			if cc.logFn != nil && cc.logLevel <= LogInfo {
-				cc.logFn(map[string]interface{}{"task": "UpdateCache"}, LogInfo, InfoCacheUpdateCanceled)
-			}
-		}
-		cc.cacheMutex.sharedDataGcLock.Lock()
-		cc.cacheInit = true
-		cc.cacheMutex.sharedDataGcLock.Unlock()
-		if cc.logFn != nil && cc.logLevel <= LogInfo {
-			cc.logFn(map[string]interface{}{"task": "UpdateCache"}, LogInfo, InfoCacheUpdateDone)
-		}
-		return nil, nil, nil
+	} else if cc.logFn != nil && cc.logLevel <= LogInfo {
+		cc.logFn(map[string]interface{}{"task": "UpdateCache"}, LogInfo, InfoCacheUpdateCoalesced)
 	}
-	if cc.logFn != nil && cc.logLevel <= LogInfo {
-		cc.logFn(map[string]interface{}{"task": "UpdateCache"}, LogInfo, InfoCacheUpdateSkipped)
+	if force {
+		job.force = true
 	}
-	return nil, nil, nil
+	return job
+}
+
+func (cc *ContentfulClient) newCacheUpdateResult(mode CacheUpdateMode) *CacheUpdateResult {
+	return &CacheUpdateResult{
+		Mode:        mode,
+		SpaceID:     cc.SpaceID,
+		Environment: cc.Client.Environment,
+		ClientMode:  cc.clientMode,
+	}
 }
 
 func (cc *ContentfulClient) syncCache(ctx context.Context, contentTypes []string) (map[string][]string, []string, error) {
+	if err := cc.cacheMutex.cacheUpdateGcLock.lock(ctx); err != nil {
+		return nil, nil, fmt.Errorf("syncCache: waiting for the cache update lock: %w", err)
+	}
+	defer cc.cacheMutex.cacheUpdateGcLock.unlock()
 	start := time.Now()
 	cc.cacheMutex.sharedDataGcLock.Lock()
 	cc.Cache.contentTypes = contentTypes
@@ -1698,16 +1900,55 @@ func (cc *ContentfulClient) syncCache(ctx context.Context, contentTypes []string
 	}
 }
 
-func (cc *ContentfulClient) cacheWorker(ctx context.Context, contentTypes []string, cacheAssets bool) {
+func (cc *ContentfulClient) cacheWorker(contentTypes []string, cacheAssets bool) {
 	if cc.logFn != nil && cc.logLevel <= LogInfo {
 		cc.logFn(map[string]interface{}{"task": "UpdateCache"}, LogInfo, InfoCacheWorkerStart)
 	}
 	for range cc.cacheQueue {
-		cc.cacheSpace(ctx, contentTypes, cacheAssets)
-		cc.cacheDone <- struct{}{}
+		cc.cachePendingMutex.Lock()
+		job := cc.cachePending
+		cc.cachePending = nil
+		cc.cachePendingMutex.Unlock()
+		if job == nil {
+			continue
+		}
+		job.result, job.err = cc.runCacheJob(contentTypes, cacheAssets, job.force)
+		close(job.done)
 	}
 }
-func (cc *ContentfulClient) cacheSpace(ctx context.Context, contentTypes []string, cacheAssets bool) {
+
+// runCacheJob runs one full rebuild with its own deadline, so that a caller giving up on waiting
+// never cancels a rebuild that other callers are waiting for.
+func (cc *ContentfulClient) runCacheJob(contentTypes []string, cacheAssets bool, force bool) (*CacheUpdateResult, error) {
+	cc.cacheMutex.sharedDataGcLock.RLock()
+	offline := cc.offline
+	cacheUpdateTimeout := cc.cacheUpdateTimeout
+	cc.cacheMutex.sharedDataGcLock.RUnlock()
+	ctx := context.Background()
+	if !offline {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, time.Second*time.Duration(cacheUpdateTimeout))
+		defer cancel()
+	}
+	result, err := cc.cacheSpace(ctx, contentTypes, cacheAssets, force)
+	// As before, the cache counts as initialized after the first attempt, even a failed one.
+	// Only the first run writes the flag: the getters read it without a lock.
+	cc.cacheMutex.sharedDataGcLock.Lock()
+	if !cc.cacheInit {
+		cc.cacheInit = true
+	}
+	cc.cacheMutex.sharedDataGcLock.Unlock()
+	if err != nil && ctx.Err() != nil && !errors.Is(err, ctx.Err()) {
+		err = fmt.Errorf("%w: %w", ctx.Err(), err)
+	}
+	return result, err
+}
+
+func (cc *ContentfulClient) cacheSpace(ctx context.Context, contentTypes []string, cacheAssets bool, force bool) (*CacheUpdateResult, error) {
+	if err := cc.cacheMutex.cacheUpdateGcLock.lock(ctx); err != nil {
+		return nil, fmt.Errorf("UpdateCache: waiting for the cache update lock: %w", err)
+	}
+	defer cc.cacheMutex.cacheUpdateGcLock.unlock()
 	start := time.Now()
 	tempCache := &ContentfulCache{
 		contentTypes:     contentTypes,
@@ -1715,6 +1956,7 @@ func (cc *ContentfulClient) cacheSpace(ctx context.Context, contentTypes []strin
 		genericEntries:   map[string]*GenericEntry{},
 		parentMap:        map[string][]EntryReference{},
 	}
+	rebuild := &cacheRebuild{force: force}
 	if cacheAssets {
 		contentTypes = append([]string{assetWorkerType, tagWorkerType}, contentTypes...)
 	}
@@ -1736,6 +1978,11 @@ func (cc *ContentfulClient) cacheSpace(ctx context.Context, contentTypes []strin
 			}
 		}
 	}
+	restoreOffline := func() {
+		cc.cacheMutex.sharedDataGcLock.Lock()
+		cc.offline = offlinePreviousState
+		cc.cacheMutex.sharedDataGcLock.Unlock()
+	}
 	results := make(chan ContentTypeResult, 16)
 	resultsDone := make(chan struct{})
 	contentTypeChan := make(chan string)
@@ -1743,7 +1990,7 @@ func (cc *ContentfulClient) cacheSpace(ctx context.Context, contentTypes []strin
 	for i := 0; i < cacheUpdateConcurrency; i++ {
 		group.Go(func() error {
 			for contentType := range contentTypeChan {
-				err := updateCacheForContentType(gctx, results, cc, tempCache, contentType)
+				err := updateCacheForContentType(gctx, results, cc, tempCache, rebuild, contentType)
 				if err != nil {
 					if cc.logFn != nil && cc.logLevel <= LogInfo {
 						cc.logFn(map[string]interface{}{"task": "UpdateCache", "contentType": contentType, "clientMode": cc.clientMode}, LogError, err.Error())
@@ -1771,20 +2018,44 @@ func (cc *ContentfulClient) cacheSpace(ctx context.Context, contentTypes []strin
 	}()
 	err := group.Wait()
 	close(results)
+	<-resultsDone
 	if err != nil {
 		// drain contentTypeChan
 		for range contentTypeChan {
 		}
-		cc.cacheMutex.sharedDataGcLock.Lock()
-		cc.offline = offlinePreviousState
-		cc.cacheMutex.sharedDataGcLock.Unlock()
+		restoreOffline()
 		if cc.logFn != nil && cc.logLevel <= LogInfo {
 			cc.logFn(map[string]interface{}{"task": "UpdateCache", "clientMode": cc.clientMode}, LogError, err.Error())
 		}
-		return
+		return nil, err
 	}
-	// Signal that the cache build is done
-	<-resultsDone
+	slices.SortFunc(rebuild.regressions, func(a, b EntryVersionRegression) int {
+		if c := strings.Compare(a.ContentType, b.ContentType); c != 0 {
+			return c
+		}
+		return strings.Compare(a.EntryID, b.EntryID)
+	})
+	var dependencies []RetainedDependency
+	if !force && len(rebuild.regressions) > 0 {
+		dependencies, err = cc.retainDependencies(ctx, tempCache, rebuild.regressions)
+		if err != nil {
+			restoreOffline()
+			if cc.logFn != nil && cc.logLevel <= LogError {
+				cc.logFn(map[string]interface{}{"task": "UpdateCache", "clientMode": cc.clientMode}, LogError, err.Error())
+			}
+			return nil, err
+		}
+	}
+	if force {
+		if err := cc.validateCacheReset(tempCache); err != nil {
+			restoreOffline()
+			if cc.logFn != nil && cc.logLevel <= LogError {
+				cc.logFn(map[string]interface{}{"task": "UpdateCache", "clientMode": cc.clientMode}, LogError, err.Error())
+			}
+			return nil, err
+		}
+	}
+	result := cc.newCacheUpdateResult(CacheUpdateModeRefresh)
 
 	if cc.logFn != nil && cc.logLevel <= LogInfo {
 		cc.logFn(map[string]interface{}{"time elapsed": fmt.Sprint(time.Since(start)), "task": "UpdateCache", "clientMode": cc.clientMode}, LogInfo, InfoUpdateCacheTime)
@@ -1795,22 +2066,285 @@ func (cc *ContentfulClient) cacheSpace(ctx context.Context, contentTypes []strin
 	cc.cacheMutex.idContentTypeMapGcLock.Lock()
 	cc.cacheMutex.parentMapGcLock.Lock()
 	cc.cacheMutex.genericEntriesGcLock.Lock()
+	cc.cacheMutex.tagGcLock.Lock()
 	cc.cacheMutex.brandGcLock.Lock()
 	cc.cacheMutex.categoryGcLock.Lock()
 	cc.cacheMutex.productGcLock.Lock()
 
 	cc.Cache = tempCache
 	cc.offline = offlinePreviousState
+	if force {
+		result.Mode = CacheUpdateModeReset
+		result.Replaced = rebuild.regressions
+		cc.cacheRetainedSince = nil
+	} else {
+		result.Retained = cc.trackRetained(rebuild.regressions)
+		result.RetainedDependencies = dependencies
+	}
 	cc.cacheMutex.brandGcLock.Unlock()
 	cc.cacheMutex.categoryGcLock.Unlock()
 	cc.cacheMutex.productGcLock.Unlock()
 
+	cc.cacheMutex.tagGcLock.Unlock()
 	cc.cacheMutex.parentMapGcLock.Unlock()
 	cc.cacheMutex.idContentTypeMapGcLock.Unlock()
 	cc.cacheMutex.assetsGcLock.Unlock()
 	cc.cacheMutex.sharedDataGcLock.Unlock()
 	cc.cacheMutex.fullCacheGcLock.Unlock()
 	cc.cacheMutex.genericEntriesGcLock.Unlock()
+	cc.logCacheRegressions(result)
+	return result, nil
+}
+
+// validateCacheReset refuses a reset snapshot that is empty or drastically smaller than the
+// cache it would replace. Legitimate shrinkage passes.
+func (cc *ContentfulClient) validateCacheReset(tempCache *ContentfulCache) error {
+	cc.cacheMutex.idContentTypeMapGcLock.RLock()
+	cachedEntries := len(cc.Cache.idContentTypeMap)
+	cc.cacheMutex.idContentTypeMapGcLock.RUnlock()
+	incomingEntries := len(tempCache.idContentTypeMap)
+	if cachedEntries > 0 && (incomingEntries == 0 || float64(incomingEntries) < float64(cachedEntries)*cacheResetMinEntryRatio) {
+		return fmt.Errorf("ForceUpdateCache: refusing to replace %d cached entries with a snapshot of %d entries", cachedEntries, incomingEntries)
+	}
+	return nil
+}
+
+// retainDependencies keeps the cached entries and assets that retained entries link to when the
+// fresh snapshot lacks them, and in turn their own dependencies, so that the references of
+// retained entries still resolve. Call it with cacheUpdateGcLock held.
+func (cc *ContentfulClient) retainDependencies(ctx context.Context, tempCache *ContentfulCache, retained []EntryVersionRegression) ([]RetainedDependency, error) {
+	var dependencies []RetainedDependency
+	queue := make([]string, 0, len(retained))
+	for _, entry := range retained {
+		queue = append(queue, entry.EntryID)
+	}
+	for len(queue) > 0 {
+		parentID := queue[0]
+		queue = queue[1:]
+		parent, ok := tempCache.genericEntries[parentID]
+		if !ok {
+			continue
+		}
+		entryIDs, assetIDs, err := linkedIDs(parent.RawFields)
+		if err != nil {
+			return nil, fmt.Errorf("retainDependencies: could not read the links of %s: %w", parentID, err)
+		}
+		for _, id := range entryIDs {
+			if _, inSnapshot := tempCache.idContentTypeMap[id]; inSnapshot {
+				continue
+			}
+			cc.cacheMutex.idContentTypeMapGcLock.RLock()
+			contentType, cached := cc.Cache.idContentTypeMap[id]
+			cc.cacheMutex.idContentTypeMapGcLock.RUnlock()
+			if !cached {
+				continue // the reference was already broken in cache
+			}
+			if err := cc.retainCachedEntry(ctx, tempCache, contentType, id); err != nil {
+				return nil, fmt.Errorf("retainDependencies: could not retain entry %s linked from %s: %w", id, parentID, err)
+			}
+			dependencies = append(dependencies, RetainedDependency{SysType: sysTypeEntry, ContentType: contentType, ID: id, RequiredBy: parentID})
+			queue = append(queue, id)
+		}
+		if tempCache.assets == nil {
+			continue // assets are not cached
+		}
+		for _, id := range assetIDs {
+			if _, inSnapshot := tempCache.assets[id]; inSnapshot {
+				continue
+			}
+			cc.cacheMutex.assetsGcLock.RLock()
+			asset, cached := cc.Cache.assets[id]
+			cc.cacheMutex.assetsGcLock.RUnlock()
+			if !cached {
+				continue
+			}
+			tempCache.assets[id] = asset
+			dependencies = append(dependencies, RetainedDependency{SysType: sysTypeAsset, ID: id, RequiredBy: parentID})
+		}
+	}
+	return dependencies, nil
+}
+
+// retainCachedEntry copies a snapshot of a cached entry, with its references, into the cache
+// being built.
+func (cc *ContentfulClient) retainCachedEntry(ctx context.Context, tempCache *ContentfulCache, contentType string, id string) error {
+	cc.cacheMutex.sharedDataGcLock.RLock()
+	locales := cc.locales
+	cc.cacheMutex.sharedDataGcLock.RUnlock()
+	var snapshotSys ContentfulSys
+	var snapshotFields RawFields
+	var references map[string][]EntryReference
+	switch contentType {
+	case ContentTypeBrand:
+		cached, err := cc.GetBrandByID(ctx, id)
+		if err != nil {
+			return err
+		}
+		snapshot, err := cached.cacheSnapshot()
+		if err != nil {
+			return err
+		}
+		if tempCache.entryMaps.brand == nil {
+			tempCache.entryMaps.brand = map[string]*CfBrand{}
+		}
+		tempCache.entryMaps.brand[id] = snapshot
+		snapshotSys, snapshotFields, references = snapshot.Sys, snapshot.RawFields, snapshot.cacheReferences(locales)
+	case ContentTypeCategory:
+		cached, err := cc.GetCategoryByID(ctx, id)
+		if err != nil {
+			return err
+		}
+		snapshot, err := cached.cacheSnapshot()
+		if err != nil {
+			return err
+		}
+		if tempCache.entryMaps.category == nil {
+			tempCache.entryMaps.category = map[string]*CfCategory{}
+		}
+		tempCache.entryMaps.category[id] = snapshot
+		snapshotSys, snapshotFields, references = snapshot.Sys, snapshot.RawFields, snapshot.cacheReferences(locales)
+	case ContentTypeProduct:
+		cached, err := cc.GetProductByID(ctx, id)
+		if err != nil {
+			return err
+		}
+		snapshot, err := cached.cacheSnapshot()
+		if err != nil {
+			return err
+		}
+		if tempCache.entryMaps.product == nil {
+			tempCache.entryMaps.product = map[string]*CfProduct{}
+		}
+		tempCache.entryMaps.product[id] = snapshot
+		snapshotSys, snapshotFields, references = snapshot.Sys, snapshot.RawFields, snapshot.cacheReferences(locales)
+	default:
+		return fmt.Errorf("retainCachedEntry: content type %q not available in this space", contentType)
+	}
+	tempCache.genericEntries[id] = &GenericEntry{Sys: snapshotSys, RawFields: snapshotFields, CC: cc}
+	tempCache.idContentTypeMap[id] = contentType
+	for childID, childReferences := range references {
+		tempCache.parentMap[childID] = append(tempCache.parentMap[childID], childReferences...)
+	}
+	return nil
+}
+
+// linkedIDs returns the IDs of the entries and assets that fields link to, including links
+// embedded in rich text.
+func linkedIDs(fields RawFields) (entryIDs []string, assetIDs []string, err error) {
+	var tree interface{}
+	if err := contentful.DeepCopy(&tree, fields); err != nil {
+		return nil, nil, err
+	}
+	var walk func(node interface{})
+	walk = func(node interface{}) {
+		switch typed := node.(type) {
+		case map[string]interface{}:
+			if sys, ok := typed["sys"].(map[string]interface{}); ok && sys["type"] == FieldTypeLink {
+				if id, ok := sys["id"].(string); ok {
+					switch sys["linkType"] {
+					case FieldLinkTypeEntry:
+						entryIDs = append(entryIDs, id)
+					case FieldLinkTypeAsset:
+						assetIDs = append(assetIDs, id)
+					}
+				}
+			}
+			for _, value := range typed {
+				walk(value)
+			}
+		case []interface{}:
+			for _, value := range typed {
+				walk(value)
+			}
+		}
+	}
+	walk(tree)
+	return entryIDs, assetIDs, nil
+}
+
+// trackRetained stamps each retained entry with the time it was first retained in consecutive
+// refreshes and forgets entries that are no longer retained. Call it with sharedDataGcLock held.
+func (cc *ContentfulClient) trackRetained(retained []EntryVersionRegression) []EntryVersionRegression {
+	now := time.Now()
+	retainedSince := make(map[string]time.Time, len(retained))
+	for i := range retained {
+		since, ok := cc.cacheRetainedSince[retained[i].EntryID]
+		if !ok {
+			since = now
+		}
+		retained[i].RetainedSince = since
+		retainedSince[retained[i].EntryID] = since
+	}
+	cc.cacheRetainedSince = retainedSince
+	return retained
+}
+
+// logCacheRegressions logs every entry Contentful returned in an older version than the cached
+// one, with the action taken, followed by a summary.
+func (cc *ContentfulClient) logCacheRegressions(result *CacheUpdateResult) {
+	if cc.logFn == nil || cc.logLevel > LogWarn {
+		return
+	}
+	regressions, action, entryMessage, summaryMessage := result.Retained, "retained", WarnCacheEntryRetained, WarnCacheUpdateDegraded
+	if result.Mode == CacheUpdateModeReset {
+		regressions, action, entryMessage, summaryMessage = result.Replaced, "replaced", WarnCacheEntryReplaced, WarnCacheResetReplacedEntries
+	}
+	if len(regressions) == 0 {
+		return
+	}
+	countByContentType := map[string]int{}
+	var oldestRetainedSince time.Time
+	for _, regression := range regressions {
+		fields := map[string]interface{}{
+			"task":                     "UpdateCache",
+			"spaceID":                  result.SpaceID,
+			"environment":              result.Environment,
+			"clientMode":               result.ClientMode,
+			"contentType":              regression.ContentType,
+			"entryID":                  regression.EntryID,
+			"cachedPublishedVersion":   regression.CachedVersion,
+			"incomingPublishedVersion": regression.IncomingVersion,
+			"cachedUpdatedAt":          regression.CachedUpdatedAt,
+			"incomingUpdatedAt":        regression.IncomingUpdatedAt,
+			"action":                   action,
+		}
+		if !regression.RetainedSince.IsZero() {
+			fields["retainedSince"] = regression.RetainedSince.Format(time.RFC3339)
+			if oldestRetainedSince.IsZero() || regression.RetainedSince.Before(oldestRetainedSince) {
+				oldestRetainedSince = regression.RetainedSince
+			}
+		}
+		cc.logFn(fields, LogWarn, entryMessage)
+		countByContentType[regression.ContentType]++
+	}
+	for _, dependency := range result.RetainedDependencies {
+		cc.logFn(map[string]interface{}{
+			"task":        "UpdateCache",
+			"spaceID":     result.SpaceID,
+			"environment": result.Environment,
+			"clientMode":  result.ClientMode,
+			"sysType":     dependency.SysType,
+			"contentType": dependency.ContentType,
+			"id":          dependency.ID,
+			"requiredBy":  dependency.RequiredBy,
+			"action":      action,
+		}, LogWarn, WarnCacheDependencyRetained)
+	}
+	summary := map[string]interface{}{
+		"task":               "UpdateCache",
+		"spaceID":            result.SpaceID,
+		"environment":        result.Environment,
+		"clientMode":         result.ClientMode,
+		"mode":               result.Mode,
+		"action":             action,
+		"count":              len(regressions),
+		"countByContentType": countByContentType,
+		"dependencyCount":    len(result.RetainedDependencies),
+	}
+	if !oldestRetainedSince.IsZero() {
+		summary["oldestRetainedSince"] = oldestRetainedSince.Format(time.RFC3339)
+	}
+	cc.logFn(summary, LogWarn, summaryMessage)
 }
 
 func ToAssetReference(asset *contentful.Asset) (refSys ContentTypeSys) {
@@ -1821,6 +2355,10 @@ func ToAssetReference(asset *contentful.Asset) (refSys ContentTypeSys) {
 }
 
 func (cc *ContentfulClient) UpdateCacheForEntity(ctx context.Context, sysType string, contentType string, entityID string) error {
+	if err := cc.cacheMutex.cacheUpdateGcLock.lock(ctx); err != nil {
+		return fmt.Errorf("UpdateCacheForEntity: waiting for the cache update lock: %w", err)
+	}
+	defer cc.cacheMutex.cacheUpdateGcLock.unlock()
 	if sysType == sysTypeEntry && cc.entryMapForContentTypeIsNil(contentType) {
 		return fmt.Errorf("UpdateCacheForEntity: Content Type %q not available in cache", contentType)
 	}
@@ -2426,16 +2964,16 @@ func (n *RichTextGenericNode) MarshalJSON() ([]byte, error) {
 	}
 }
 
-func updateCacheForContentType(ctx context.Context, results chan ContentTypeResult, cc *ContentfulClient, tempCache *ContentfulCache, contentType string) error {
+func updateCacheForContentType(ctx context.Context, results chan ContentTypeResult, cc *ContentfulClient, tempCache *ContentfulCache, rebuild *cacheRebuild, contentType string) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 	switch contentType {
 
 	case ContentTypeBrand:
-		allBrand, err := cc.cacheAllBrand(ctx, results)
+		allBrand, err := cc.cacheAllBrand(ctx, rebuild, results)
 		if err != nil {
-			return errors.New("updateCacheForContentType failed for contentType brand: " + err.Error())
+			return fmt.Errorf("updateCacheForContentType failed for contentType brand: %w", err)
 		}
 		tempCache.entryMaps.brand = allBrand
 		cc.cacheMutex.genericEntriesGcLock.Lock()
@@ -2452,9 +2990,9 @@ func updateCacheForContentType(ctx context.Context, results chan ContentTypeResu
 		}
 
 	case ContentTypeCategory:
-		allCategory, err := cc.cacheAllCategory(ctx, results)
+		allCategory, err := cc.cacheAllCategory(ctx, rebuild, results)
 		if err != nil {
-			return errors.New("updateCacheForContentType failed for contentType category: " + err.Error())
+			return fmt.Errorf("updateCacheForContentType failed for contentType category: %w", err)
 		}
 		tempCache.entryMaps.category = allCategory
 		cc.cacheMutex.genericEntriesGcLock.Lock()
@@ -2471,9 +3009,9 @@ func updateCacheForContentType(ctx context.Context, results chan ContentTypeResu
 		}
 
 	case ContentTypeProduct:
-		allProduct, err := cc.cacheAllProduct(ctx, results)
+		allProduct, err := cc.cacheAllProduct(ctx, rebuild, results)
 		if err != nil {
-			return errors.New("updateCacheForContentType failed for contentType product: " + err.Error())
+			return fmt.Errorf("updateCacheForContentType failed for contentType product: %w", err)
 		}
 		tempCache.entryMaps.product = allProduct
 		cc.cacheMutex.genericEntriesGcLock.Lock()
@@ -2492,7 +3030,7 @@ func updateCacheForContentType(ctx context.Context, results chan ContentTypeResu
 	case assetWorkerType:
 		allAssets, err := cc.getAllAssets(ctx, false)
 		if err != nil {
-			return errors.New("updateCacheForContentType failed for assets")
+			return fmt.Errorf("updateCacheForContentType failed for assets: %w", err)
 		}
 		tempCache.assets = allAssets
 		if cc.logFn != nil && cc.logLevel <= LogInfo {
@@ -2502,7 +3040,7 @@ func updateCacheForContentType(ctx context.Context, results chan ContentTypeResu
 	case tagWorkerType:
 		allTags, err := cc.getAllTags(ctx, false)
 		if err != nil {
-			return errors.New("updateCacheForContentType failed for tags")
+			return fmt.Errorf("updateCacheForContentType failed for tags: %w", err)
 		}
 		tempCache.tags = allTags
 		if cc.logFn != nil && cc.logLevel <= LogInfo {
