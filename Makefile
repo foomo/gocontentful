@@ -75,13 +75,13 @@ coverage: test
 ## Build binary
 build:
 	@echo "〉building bin/gocontenful"
-	@go build -o bin/gocontenful main.go
+	@go build -o bin/gocontenful .
 
 .PHONY: install
 ## Install binary
 install:
 	@echo "〉installing ${GOPATH}/bin/gocontentful"
-	@go build -o ${GOPATH}/bin/gocontentful main.go
+	@go build -o ${GOPATH}/bin/gocontentful .
 
 .PHONY: outdated
 ## Show outdated direct dependencies
