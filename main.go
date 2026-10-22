@@ -9,13 +9,23 @@ import (
 	"os/user"
 	"path/filepath"
 	"regexp"
+	"runtime/debug"
 	"strings"
 
 	"github.com/foomo/gocontentful/config"
 	"github.com/foomo/gocontentful/erm"
 )
 
+// VERSION is set at release time via -ldflags "-X main.VERSION=..." (see .goreleaser.yml)
 var VERSION = "latest"
+
+func init() {
+	// Not set via ldflags: fall back to the module version stamped by the go tool
+	// (go install ...@vX.Y.Z, or go build of a tagged checkout)
+	if info, ok := debug.ReadBuildInfo(); ok && VERSION == "latest" && info.Main.Version != "" && info.Main.Version != "(devel)" {
+		VERSION = info.Main.Version
+	}
+}
 
 type contentfulRc struct {
 	ManagementToken string `json:"managementToken"`
